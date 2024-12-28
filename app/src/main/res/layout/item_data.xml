@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="2dp">
+
+    <TextView
+        android:id="@+id/keyTextView"
+        android:layout_width="0dp"
+        android:layout_weight="2"
+        android:layout_height="wrap_content"
+        android:text="KEY"
+        android:textStyle="bold"
+        android:textColor="#333333"
+        android:textSize="16sp"
+        android:paddingEnd="8dp" />
+
+    <TextView
+        android:id="@+id/valueTextView"
+        android:text="VALUE"
+        android:layout_width="0dp"
+        android:layout_weight="3"
+        android:layout_height="wrap_content"
+        android:textColor="#666666"
+        android:textSize="16sp" />
+</LinearLayout>

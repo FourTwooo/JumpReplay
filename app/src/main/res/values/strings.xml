@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">JumpReplay</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">JumpReplay</string>
+    <string name="nav_header_subtitle">https://github.com/FourTwooo/JumpReplay</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">更多选项</string>
+    <string name="action_delete">清空</string>
+
+    <string name="menu_home">JumpReplay</string>
+    <string name="menu_home_list_detail">详情内容</string>
+    <string name="menu_gallery">收藏</string>
+    <string name="menu_slideshow">关于</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="empty_view">点击按钮开启HOOK</string>
+    <string name="copy_code">复制命令</string>
+</resources>

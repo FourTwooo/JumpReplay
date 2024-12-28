@@ -1,0 +1,5 @@
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <size android:height="1dp" />
+    <solid android:color="#3BE0E0E0" /> <!-- 选择较浅的颜色 -->
+</shape>
