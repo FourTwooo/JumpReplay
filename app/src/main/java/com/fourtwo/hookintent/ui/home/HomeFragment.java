@@ -1,5 +1,6 @@
 package com.fourtwo.hookintent.ui.home;
 
+import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -11,6 +12,8 @@ import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -18,6 +21,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -59,13 +63,11 @@ public class HomeFragment extends Fragment {
 
     private boolean getIsHook() {
         // 通知广播
-        Context context = getContext();
-        if (context != null) {
-            Intent SendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
-            SendIntent.putExtra("type", "set_isHook");
-            SendIntent.putExtra("data", isHook);
-            context.sendBroadcast(SendIntent);
-        }
+        Context context = requireContext();
+        Intent SendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
+        SendIntent.putExtra("type", "set_isHook");
+        SendIntent.putExtra("data", isHook);
+        context.sendBroadcast(SendIntent);
 
         Log.d(TAG, "HoneGetIsHook" + ": " + isHook);
         return isHook;
@@ -80,7 +82,6 @@ public class HomeFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
-
         requireActivity().addMenuProvider(new MenuProvider() {
             @Override
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
@@ -145,6 +146,22 @@ public class HomeFragment extends Fragment {
             adapter.setData(itemDataList);
             toggleEmptyView(itemDataList);
         });
+
+        // Initialize search EditText and set its TextWatcher
+        EditText searchEditText = view.findViewById(R.id.searchEditText);
+        searchEditText.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                adapter.getFilter().filter(s);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
         // 按钮保活
         viewModel.getIsHook().observe(getViewLifecycleOwner(), hook -> {
             isHook = hook;
@@ -171,9 +188,12 @@ public class HomeFragment extends Fragment {
                 int position = viewHolder.getAdapterPosition();
                 List<ItemData> data = adapter.getData();
                 if (position >= 0 && position < data.size()) {
+                    // 从 ViewModel 中删除数据
+                    viewModel.removeIntentData(position);
+
+                    // 从适配器中删除数据
                     data.remove(position);
                     adapter.notifyItemRemoved(position);
-                    adapter.notifyItemRangeChanged(position, data.size());
                 }
             }
 
@@ -341,6 +361,11 @@ public class HomeFragment extends Fragment {
         emptyView = root.findViewById(R.id.empty_view);
         setEmptyView("点击按钮开启HOOK");
 
+        // Set up RecyclerView
+        recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
+        adapter = new HomeAdapter(new ArrayList<>());
+        recyclerView.setAdapter(adapter);
+
         return root;
     }
 
@@ -365,6 +390,19 @@ public class HomeFragment extends Fragment {
         super.onResume();
         if (fab != null) {
             fab.show();
+        }
+
+        // 获取当前搜索框内容
+        EditText searchEditText = requireView().findViewById(R.id.searchEditText);
+        String currentSearchText = searchEditText != null ? searchEditText.getText().toString().trim() : "";
+
+        // 根据搜索框内容重新过滤数据
+        adapter.getFilter().filter(currentSearchText);
+
+        // 确保显示正确的数据集
+        List<ItemData> allData = viewModel.getIntentDataList().getValue();
+        if (allData != null && currentSearchText.isEmpty()) {
+            adapter.setData(allData);
         }
     }
 

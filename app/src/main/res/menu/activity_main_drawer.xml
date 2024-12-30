@@ -13,7 +13,7 @@
             android:icon="@drawable/gallery"
             android:title="@string/menu_gallery" />
         <item
-            android:id="@+id/nav_slideshow"
+            android:id="@+id/nav_me"
             android:icon="@drawable/slideshow"
             android:title="@string/menu_slideshow" />
     </group>

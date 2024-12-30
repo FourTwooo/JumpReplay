@@ -14,6 +14,8 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -27,16 +29,19 @@ import com.fourtwo.hookintent.ItemData;
 import com.fourtwo.hookintent.R;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
-public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
+public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> implements Filterable {
 
     private List<ItemData> mData;
+    private List<ItemData> filteredData;
     private final int normalColor = Color.WHITE; // 正常状态的颜色
     private final int pressedColor = Color.LTGRAY; // 触摸时的颜色
 
     public HomeAdapter(List<ItemData> data) {
-        mData = data;
+        this.mData = data;
+        this.filteredData = new ArrayList<>(data);
     }
 
     @NonNull
@@ -47,8 +52,43 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
     }
 
     @Override
+    public Filter getFilter() {
+        return new Filter() {
+            @Override
+            protected FilterResults performFiltering(CharSequence constraint) {
+                List<ItemData> filteredList = new ArrayList<>();
+                if (constraint == null || constraint.length() == 0) {
+                    filteredList.addAll(mData);
+                } else {
+                    String filterPattern = constraint.toString().toLowerCase().trim();
+                    for (ItemData item : mData) {
+                        // 判断item是否包含过滤的字符串
+                        if (item.getAppName().toLowerCase().contains(filterPattern) ||
+                                item.getItem_from().toLowerCase().contains(filterPattern) ||
+                                item.getItem_data().toLowerCase().contains(filterPattern)) {
+                            filteredList.add(item);
+                        }
+                    }
+                }
+                FilterResults results = new FilterResults();
+                results.values = filteredList;
+                return results;
+            }
+
+            @SuppressLint("NotifyDataSetChanged")
+            @Override
+            protected void publishResults(CharSequence constraint, FilterResults results) {
+                filteredData.clear();
+                filteredData.addAll((List<ItemData>) results.values);
+                notifyDataSetChanged();
+            }
+        };
+    }
+
+    @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        ItemData item = mData.get(position);
+        ItemData item = filteredData.get(position);
+//        ItemData item = mData.get(position);
         holder.icon.setImageDrawable(item.getIcon());
         holder.appName.setText(item.getAppName());
         holder.item_from.setText(item.getItem_from());
@@ -123,20 +163,22 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
     private void showPopupWindow(View view, ItemData item) {
         // 实现弹出窗口逻辑，例如使用PopupWindow或AlertDialog
         AlertDialog.Builder builder = new AlertDialog.Builder(view.getContext());
-        builder.setTitle("Item")
+        builder.setTitle(item.getBase())
                 .setMessage(item.getItem_from() + "\n\n" + item.getItem_data())
                 .setPositiveButton("OK", (dialog, which) -> dialog.dismiss())
                 .show();
     }
 
+
     @Override
     public int getItemCount() {
-        return mData.size();
+        return filteredData.size();
     }
 
     @SuppressLint("NotifyDataSetChanged")
     public void setData(List<ItemData> newData) {
         this.mData = newData;
+        this.filteredData = new ArrayList<>(newData);  // 更新 filteredData
         notifyDataSetChanged();  // Notify the adapter that the data has changed
     }
 
@@ -148,6 +190,7 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
     @SuppressLint("NotifyDataSetChanged")
     public void clearData() {
         mData.clear();
+        filteredData.clear();
         notifyDataSetChanged();  // 通知适配器数据已更改
     }
 

@@ -30,10 +30,10 @@ public class AmCommandBuilder {
             Object value = map.get("value");
 
             if (key != null && className != null) {
-                // 如果className和value都是null，将其视为空字符串
+
                 if (className.equals("null")) {
                     className = "java.lang.String";
-                    value = "";
+                    value = null;
                 }
 
                 switch (className) {
@@ -70,9 +70,6 @@ public class AmCommandBuilder {
                         break;
                     case "[F": // Float array
                         command.append(" --efa ").append(key).append(" ").append(arrayToString((float[]) value));
-                        break;
-                    case "[Ljava.lang.String;": // String array
-                        command.append(" --esa ").append(key).append(" ").append(arrayToString((String[]) value));
                         break;
                     default:
                         Log.d("buildAmCommand", String.format("class: %s key: %s value: %s", className, key, value));

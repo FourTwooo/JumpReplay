@@ -11,6 +11,13 @@ public class MainViewModel extends ViewModel {
     private final MutableLiveData<List<ItemData>> intentDataList = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<Boolean> isHook = new MutableLiveData<>(false);
 
+    public void removeIntentData(int position) {
+        List<ItemData> currentData = intentDataList.getValue();
+        if (currentData != null && position >= 0 && position < currentData.size()) {
+            currentData.remove(position);
+            intentDataList.setValue(currentData);
+        }
+    }
     public LiveData<Boolean> getIsHook() {
         return isHook;
     }

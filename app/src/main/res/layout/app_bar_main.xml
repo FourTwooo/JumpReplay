@@ -22,6 +22,4 @@
 
     <include layout="@layout/content_main" />
 
-    <!-- Removed FloatingActionButton here -->
-
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

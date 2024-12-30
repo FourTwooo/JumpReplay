@@ -29,8 +29,8 @@
         tools:layout="@layout/fragment_gallery" />
 
     <fragment
-        android:id="@+id/nav_slideshow"
-        android:name="com.fourtwo.hookintent.ui.slideshow.SlideshowFragment"
+        android:id="@+id/nav_me"
+        android:name="com.fourtwo.hookintent.ui.me.MeFragment"
         android:label="@string/menu_slideshow"
-        tools:layout="@layout/fragment_slideshow" />
+        tools:layout="@layout/fragment_me" />
 </navigation>

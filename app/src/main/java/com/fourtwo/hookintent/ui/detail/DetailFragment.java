@@ -14,6 +14,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,10 +31,10 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.analysis.extract;
 import com.fourtwo.hookintent.analysis.AmCommandBuilder;
 import com.fourtwo.hookintent.ItemData;
 import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.tools.ShellExecutor;
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
@@ -92,10 +93,12 @@ public class DetailFragment extends Fragment {
             }
 
             @Override
-            public void onTabUnselected(TabLayout.Tab tab) {}
+            public void onTabUnselected(TabLayout.Tab tab) {
+            }
 
             @Override
-            public void onTabReselected(TabLayout.Tab tab) {}
+            public void onTabReselected(TabLayout.Tab tab) {
+            }
         });
 
         // 初始化 RecyclerView 数据
@@ -104,7 +107,7 @@ public class DetailFragment extends Fragment {
             urlTextView.setText(itemData.getItem_from());
 
             // Define the keys in the desired order
-            List<String> keys = Arrays.asList("FunctionCall", "time", "from", "to");
+            List<String> keys = Arrays.asList("FunctionCall", "time", "from", "to", "scheme_raw_url");
 
             // Create a map to store the Bundle data
             Map<String, String> dataMap = new HashMap<>();
@@ -201,6 +204,7 @@ public class DetailFragment extends Fragment {
             }
         }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
     }
+
     private void showOptionsDialog() {
         // 获取 Arguments 中的 itemData
         ItemData itemData = null;
@@ -223,30 +227,37 @@ public class DetailFragment extends Fragment {
         List<Runnable> actions = new ArrayList<>();
 
         if (Base.equals("Intent")) {
+
             ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
             boolean hasError = false;
-            String template = "am start -n %s %s";
+            String activityTemplate = "am start -n %s %s";
+            String intentTemplate = "am start \"%s\"";
             String packageName = bundle.getString("componentName");
             String buildAmCommand = "";
             if (intentExtras != null) {
                 AmCommandBuilder.CommandResult result = AmCommandBuilder.buildAmCommand((List<Map<String, Object>>) intentExtras);
                 buildAmCommand = result.command;
                 hasError = result.hasError;
-                Log.d(TAG, "buildAmCommand:" +  buildAmCommand);
+                Log.d(TAG, "buildAmCommand:" + buildAmCommand);
             }
-            String amCommand = String.format(template, packageName, buildAmCommand);
+            String activityCommand = String.format(activityTemplate, packageName, buildAmCommand);
 
             options.add("activity命令");
             boolean finalHasError = hasError;
-            actions.add(() -> showAmCommandDialog(amCommand, finalHasError));
+            actions.add(() -> showAmCommandDialog(activityCommand, finalHasError));
 
-            String intentCommand = itemData.getUri();
+            String uriCommand = String.format(intentTemplate, itemData.getUri());
 
-            Log.d(TAG, "intentCommand: " + intentCommand);
+            Log.d(TAG, "intentCommand: " + uriCommand);
             options.add("intent协议");
-            actions.add(() -> showAmCommandDialog(intentCommand, false));
-        } else if (Base.equals("Scheme")){
+            actions.add(() -> showAmCommandDialog(uriCommand, false));
+        } else if (Base.equals("Scheme")) {
+            String uriTemplate = "am start -d \"%s\"";
+            String uriCommand = String.format(uriTemplate, itemData.getAppBundle().getString("scheme_raw_url"));
 
+            Log.d(TAG, "schemeCommand: " + uriCommand);
+            options.add("scheme协议");
+            actions.add(() -> showAmCommandDialog(uriCommand, false));
         }
 
         // 创建并显示对话框
@@ -267,9 +278,10 @@ public class DetailFragment extends Fragment {
         View dialogView = inflater.inflate(R.layout.dialog_custom_view, null);
 
         // 获取视图中的元素
-        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) TextView commandTextView = dialogView.findViewById(R.id.command_text_view);
+        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) EditText commandTextView = dialogView.findViewById(R.id.command_edit_text);
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) TextView hintTextView = dialogView.findViewById(R.id.hint_text_view);
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button copyButton = dialogView.findViewById(R.id.copy_button);
+        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button suCodeButton = dialogView.findViewById(R.id.su_code_button);
 
         commandTextView.setText(amCommand); // 确保文本足够长以测试滚动
         commandTextView.setMovementMethod(new ScrollingMovementMethod());
@@ -279,11 +291,16 @@ public class DetailFragment extends Fragment {
             hintTextView.setText("Extras包含自定义类型,已忽略但命令可能无效");
         }
 
+        suCodeButton.setOnClickListener(v -> {
+            ShellExecutor.executeSuCommand("su -c '" + commandTextView.getText() + "'");
+            Toast.makeText(requireContext(), "已执行", Toast.LENGTH_SHORT).show();
+        });
+
         copyButton.setOnClickListener(v -> {
             ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
-            ClipData clip = ClipData.newPlainText("amCommand", amCommand);
+            ClipData clip = ClipData.newPlainText("amCommand", commandTextView.getText());
             clipboard.setPrimaryClip(clip);
-            Toast.makeText(requireContext(), "命令已复制到剪贴板", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), "已复制到剪贴板", Toast.LENGTH_SHORT).show();
         });
 
         AlertDialog dialog = new AlertDialog.Builder(requireContext())

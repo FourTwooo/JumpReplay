@@ -12,7 +12,8 @@ Xposed Hook Android Intent/Scheme
 https://github.com/user-attachments/assets/7f32c479-84ba-4698-9a20-f8e82d490428
 
 
-# 目前是测试版.有bug请直接提交Issues或QQ群联系我
+## 目前是测试版.有bug请直接提交Issues或QQ群联系我
 
-## QQ交流群: 1021904342
+- QQ交流群: 1021904342
 
+## 项目完全免费开源.使用了GPL3.0.请严格遵守.如果你喜欢项目请点个Star支持一下.

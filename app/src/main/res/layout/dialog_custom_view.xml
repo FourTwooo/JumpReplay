@@ -5,16 +5,18 @@
     android:padding="16dp">
 
     <ScrollView
-        android:layout_width="match_parent"
-        android:layout_height="150dp">
+        android:layout_width="327dp"
+        android:layout_height="150dp"
+        android:background="@color/teal_200">
 
-        <TextView
-            android:id="@+id/command_text_view"
+        <EditText
+            android:id="@+id/command_edit_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:scrollbars="vertical"
             android:text="AM Command"
-            android:textSize="16sp" />
+            android:textSize="16sp"
+            android:background="@android:color/transparent"
+            android:scrollbars="vertical" />
     </ScrollView>
 
     <TextView
@@ -27,11 +29,43 @@
         android:textStyle="bold"
         android:visibility="gone" />
 
-    <Button
-        android:id="@+id/copy_button"
-        android:layout_width="wrap_content"
+    <!-- 新的水平布局，用于放置两个按钮 -->
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="end"
-        android:text="复制命令" />
+        android:orientation="horizontal">
 
+        <!-- 空间填充 -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <!-- 左边的按钮 -->
+        <Button
+            android:id="@+id/su_code_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="调用" />
+
+        <!-- 空间填充 -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <!-- 右边的按钮 -->
+        <Button
+            android:id="@+id/copy_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="复制" />
+
+        <!-- 空间填充 -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+    </LinearLayout>
 </LinearLayout>
