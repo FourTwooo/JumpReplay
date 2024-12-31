@@ -28,7 +28,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fourtwo.hookintent.ItemData;
 import com.fourtwo.hookintent.R;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 

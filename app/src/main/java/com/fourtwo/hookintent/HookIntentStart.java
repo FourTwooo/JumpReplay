@@ -16,6 +16,7 @@ import com.fourtwo.hookintent.analysis.CustomUri;
 import com.fourtwo.hookintent.analysis.IntentData;
 import com.fourtwo.hookintent.analysis.UriData;
 import com.fourtwo.hookintent.analysis.extract;
+import com.fourtwo.hookintent.analysis.StringListUtil;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,20 +29,37 @@ import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
+
+/**
+ * 为什么不使用XSharedPrefsUtil和网络请求做进程通信？XSharedPrefsUtil在安卓高版本无法使用.除非使用LSPosed的New XSharedPrefsUtil
+ * 但很显然 我不可能让用户指定去使用LSPosed才能使用这个工具.更别提LSPosed已经停止维护了
+ * ...
+ * 网络请求我认为他和intent广播一样具有延迟性. 启动部分APP会直接触发大量intent和scheme. 等通信回来早就已经处理完了.所以过滤的拦截是不够迅速的
+ * 如果阻塞等待会出问题的.如果你勾选了系统.并且还改动了我的代码为阻塞等待.还把hook状态改成true.出了任何bug.重启手机会卡logo变砖
+ * 他和intent广播都具有这个劣势. 或许后面我会考虑使用socket的方式.这样能方便使用中间人代理的方式去做自定义个性化
+ * ...
+ * 所以综上考虑 我不会让用户只能去使用LSPosed使用这款工具. 为了兼容我采用intent广播为进程通信
+ * 如果你有更好的方案愿意提供,我可以自行替换掉这intent广播通信的代码
+ * 如果你不是通过github下载使用如何联系我？ <a href="https://github.com/FourTwooo/JumpReplay/"</a>
+ */
+
 public class HookIntentStart implements IXposedHookLoadPackage {
 
     private Boolean isHook = false;
 
+    private List<String> standardSchemes = Arrays.asList("http", "https");
+
     private final String TAG = "XposedJumpReplay";
 
-    private Boolean getIsHook() {
+
+    private void sendTaskIntent(String data){
         Context appContext = getAppContext();
         if (appContext != null) {
             Handler mainHandler = new Handler(Looper.getMainLooper());
             mainHandler.post(() -> {
                 try {
                     Intent intentMsg = new Intent("GET_JUMP_REPLAY_HOOK");
-                    intentMsg.putExtra("data", "get_isHook");
+                    intentMsg.putExtra("data", data);
                     intentMsg.putExtra("type", "msg");
                     appContext.sendBroadcast(intentMsg);
                 } catch (Exception e) {
@@ -49,7 +67,11 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 }
             });
         }
-        Log.d(TAG, "onReceiveIntentIsHook" + isHook);
+    }
+
+    private Boolean getIsHook() {
+        sendTaskIntent(Constants.GET_IS_HOOK);
+        Log.d(TAG, "isHook: " + isHook);
         return isHook;
     }
 
@@ -96,9 +118,9 @@ public class HookIntentStart implements IXposedHookLoadPackage {
     }
 
     private boolean isCustomScheme(String scheme_url) {
+        sendTaskIntent(Constants.GET_STAND_ARD_SCHEME_STRING);
         String scheme = CustomUri.getScheme(scheme_url);
         Log.d(TAG, "scheme_url  => " + scheme_url);
-        List<String> standardSchemes = Arrays.asList("http", "https", "file", "content", "data", "about", "javascript", "mailto", "ftp", "ftps", "ws", "wss", "tel", "sms", "smsto", "geo", "market", "res");
         if (scheme != null) {
             for (String standardScheme : standardSchemes) {
                 if (scheme.equalsIgnoreCase(standardScheme)) {
@@ -155,14 +177,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
             if (!(methodHookParam.thisObject instanceof Context)) return;
 
             Intent intent = (Intent) methodHookParam.args[0];
-            int requestCode = (Integer) methodHookParam.args[1];
-            Bundle options = null;
-
-            if (methodHookParam.args.length > 2 && methodHookParam.args[2] instanceof Bundle) {
-                options = (Bundle) methodHookParam.args[2];
-            }
-
-            // Map<String, Object> MapData = IntentData.convertIntentToMap(intent, requestCode, options);
             filterIntent(intent, "Activity.startActivityForResult", methodHookParam.thisObject.getClass().getName());
 
         }
@@ -177,17 +191,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
             if (!(methodHookParam.thisObject instanceof Context)) return;
 
             Intent intent = (Intent) methodHookParam.args[0];
-            Bundle options = null;
-            if (methodHookParam.args.length > 1) {
-                options = (Bundle) methodHookParam.args[1];
-            }
-
-            Map<String, Object> MapData;
-            if (options != null) {
-                MapData = IntentData.convertIntentToMap(intent, options);
-            } else {
-                MapData = IntentData.convertIntentToMap(intent);
-            }
 
             filterIntent(intent, "Activity.startActivity", methodHookParam.thisObject.getClass().getName());
         }
@@ -213,28 +216,20 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         String DataType = intent.getStringExtra("type");
-                        if (Objects.equals(DataType, "set_isHook")) {
+                        if (Objects.equals(DataType, Constants.SET_IS_HOOK)) {
                             isHook = intent.getBooleanExtra("data", false);
+                        } else if (Objects.equals(DataType, Constants.SET_STAND_ARD_SCHEMES_STRING)) {
+                            standardSchemes = StringListUtil.stringToList(intent.getStringExtra("data"));
+                            Log.d(TAG, "standardSchemes: " + standardSchemes);
                         }
                     }
                 };
                 // 注册接收器
                 IntentFilter filter = new IntentFilter("SET_JUMP_REPLAY_HOOK");
                 application.registerReceiver(receiver, filter);
-                Log.d(TAG, "注册广播接收");
+                Log.d(TAG, application.getClass().getName() + "注册广播接收");
             }
         });
-
-//        XposedHelpers.findAndHookMethod(Application.class, "onDestroy", new XC_MethodHook() {
-//            @Override
-//            protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-//                super.afterHookedMethod(param);
-//                Log.d(TAB, "准备销毁广播接收");
-//                Application application = (Application) param.thisObject;
-//                application.unregisterReceiver(receiver);
-//                Log.d(TAB, "完成销毁广播接收");
-//            }
-//        });
 
         Class<?> activityClass = XposedHelpers.findClass("android.app.Activity", loadPackageParam.classLoader);
 

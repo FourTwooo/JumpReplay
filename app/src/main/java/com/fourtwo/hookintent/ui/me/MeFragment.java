@@ -1,7 +1,6 @@
 package com.fourtwo.hookintent.ui.me;
 
 import android.annotation.SuppressLint;
-import android.nfc.Tag;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;

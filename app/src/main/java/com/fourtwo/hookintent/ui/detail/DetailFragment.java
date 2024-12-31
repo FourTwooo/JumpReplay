@@ -31,9 +31,9 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.analysis.AmCommandBuilder;
 import com.fourtwo.hookintent.ItemData;
 import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.analysis.AmCommandBuilder;
 import com.fourtwo.hookintent.tools.ShellExecutor;
 import com.google.android.material.tabs.TabLayout;
 

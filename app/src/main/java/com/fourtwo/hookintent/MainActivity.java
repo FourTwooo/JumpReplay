@@ -29,7 +29,7 @@ import com.google.android.material.navigation.NavigationView;
 
 public class MainActivity extends AppCompatActivity {
 
-    private String TAG = "MainActivity";
+    private static String TAG = "MainActivity";
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
 
@@ -83,7 +83,7 @@ public class MainActivity extends AppCompatActivity {
                 return "";
             }
         } catch (Exception e) {
-            Log.e("VersionInfo", "Exception", e);
+            Log.e( TAG,"VersionInfo Exception", e);
         }
         return versionName;
     }

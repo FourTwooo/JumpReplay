@@ -1,11 +1,11 @@
 package com.fourtwo.hookintent.ui.home;
 
-import android.animation.ObjectAnimator;
 import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -40,9 +40,12 @@ import com.fourtwo.hookintent.ItemData;
 import com.fourtwo.hookintent.MainViewModel;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.analysis.UriData;
+import com.fourtwo.hookintent.analysis.extract;
+import com.fourtwo.hookintent.analysis.StringListUtil;
 import com.fourtwo.hookintent.tools.IntentDuplicateChecker;
 import com.fourtwo.hookintent.tools.SchemeResolver;
-import com.fourtwo.hookintent.analysis.extract;
+import com.fourtwo.hookintent.Constants;
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
@@ -61,14 +64,17 @@ public class HomeFragment extends Fragment {
     private FloatingActionButton fab;
     private static boolean isHook = false; // 保留 isHook 状态
 
+    private String standardSchemesSting;
+
+    private SharedPreferences sharedPreferences;
+
     private boolean getIsHook() {
         // 通知广播
         Context context = requireContext();
         Intent SendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
-        SendIntent.putExtra("type", "set_isHook");
+        SendIntent.putExtra("type", Constants.SET_IS_HOOK);
         SendIntent.putExtra("data", isHook);
         context.sendBroadcast(SendIntent);
-
         Log.d(TAG, "HoneGetIsHook" + ": " + isHook);
         return isHook;
     }
@@ -151,7 +157,8 @@ public class HomeFragment extends Fragment {
         EditText searchEditText = view.findViewById(R.id.searchEditText);
         searchEditText.addTextChangedListener(new TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -159,7 +166,8 @@ public class HomeFragment extends Fragment {
             }
 
             @Override
-            public void afterTextChanged(Editable s) {}
+            public void afterTextChanged(Editable s) {
+            }
         });
 
         // 按钮保活
@@ -219,12 +227,16 @@ public class HomeFragment extends Fragment {
         addDataReceiver = new BroadcastReceiver() {
 
             private void handleMsgType(Context context, Intent intent) {
-                if ("get_isHook".equals(intent.getStringExtra("data"))) {
-                    Intent sendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
-                    sendIntent.putExtra("type", "set_isHook");
+                Intent sendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
+                String data = intent.getStringExtra("data");
+                if (Constants.GET_IS_HOOK.equals(data)) {
+                    sendIntent.putExtra("type", Constants.SET_IS_HOOK);
                     sendIntent.putExtra("data", isHook);
-                    context.sendBroadcast(sendIntent);
+                }                else if (Constants.GET_STAND_ARD_SCHEME_STRING.equals(data)) {
+                    sendIntent.putExtra("type", Constants.SET_STAND_ARD_SCHEMES_STRING);
+                    sendIntent.putExtra("data", standardSchemesSting);
                 }
+                context.sendBroadcast(sendIntent);
             }
 
             private boolean handleIntentBase(Bundle bundle) {
@@ -282,7 +294,7 @@ public class HomeFragment extends Fragment {
                         }
                         to = bundle.getString("to");
                         packageName = bundle.getString("componentName");
-                        if (Objects.equals(packageName, "null") && !Objects.equals(bundle.getString("dataString"), "null")){
+                        if (Objects.equals(packageName, "null") && !Objects.equals(bundle.getString("dataString"), "null")) {
                             packageName = SchemeResolver.findAppByUri(context, bundle.getString("dataString")) + "/";
                             to = bundle.getString("dataString");
                         }
@@ -294,7 +306,7 @@ public class HomeFragment extends Fragment {
                         Bundle bundle1 = extract.convertMapToBundle(UriData.convertUriToMap(Uri.parse(schemeRawUrl)));
                         bundle.putAll(bundle1);
 
-                        if (schemeRawUrl.startsWith("#Intent;")) {
+                        if (schemeRawUrl.startsWith("#Intent;") || bundle.getString("authority").equals("null")) {
                             to = schemeRawUrl;
                             packageName = extract.getIntentSchemeValue(schemeRawUrl, "component");
                             if (packageName == null) {
@@ -388,6 +400,7 @@ public class HomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+
         if (fab != null) {
             fab.show();
         }
@@ -404,6 +417,23 @@ public class HomeFragment extends Fragment {
         if (allData != null && currentSearchText.isEmpty()) {
             adapter.setData(allData);
         }
+
+        sharedPreferences = requireContext().getSharedPreferences(Constants.SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
+        standardSchemesSting = sharedPreferences.getString(StringListUtil.STAND_ARD_SCHEMES, null);
+        Log.d(TAG, "standardSchemesSting: " + standardSchemesSting);
+        if (standardSchemesSting == null) {
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            List<String> standardSchemes = Constants.SET_STAND_ARD_SCHEMES;
+            standardSchemesSting = StringListUtil.listToString(standardSchemes);
+            editor.putString(StringListUtil.STAND_ARD_SCHEMES, standardSchemesSting);
+            editor.apply();
+        }
+        // 通知广播
+        Context context = requireContext();
+        Intent SendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
+        SendIntent.putExtra("type", Constants.SET_STAND_ARD_SCHEMES_STRING);
+        SendIntent.putExtra("data", standardSchemesSting);
+        context.sendBroadcast(SendIntent);
     }
 
     @Override
