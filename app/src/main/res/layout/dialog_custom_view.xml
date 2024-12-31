@@ -16,7 +16,10 @@
             android:text="AM Command"
             android:textSize="16sp"
             android:background="@android:color/transparent"
-            android:scrollbars="vertical" />
+            android:scrollbars="vertical"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:longClickable="true" />
     </ScrollView>
 
     <TextView

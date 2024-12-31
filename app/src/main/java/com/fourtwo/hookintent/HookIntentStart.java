@@ -33,6 +33,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
     private Boolean isHook = false;
 
     private final String TAG = "XposedJumpReplay";
+
     private Boolean getIsHook() {
         Context appContext = getAppContext();
         if (appContext != null) {
@@ -44,11 +45,11 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                     intentMsg.putExtra("type", "msg");
                     appContext.sendBroadcast(intentMsg);
                 } catch (Exception e) {
-                    Log.e("HandlerException", "Error sending intent", e);
+                    Log.e(TAG, "HandlerException Error sending intent", e);
                 }
             });
         }
-        Log.d("onReceiveIntentIsHook 2", String.valueOf(isHook));
+        Log.d(TAG, "onReceiveIntentIsHook" + isHook);
         return isHook;
     }
 
@@ -67,7 +68,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         Context appContext = getAppContext();
         String uri = "";
         if (appContext == null) return;
-        if (mapData.containsKey("uri")){
+        if (mapData.containsKey("uri")) {
             uri = (String) mapData.get("uri");
             mapData.remove("uri");
         }
@@ -87,16 +88,16 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 intentMsg.putExtra("uri", finalUri);
 
                 appContext.sendBroadcast(intentMsg);
-                Log.d("putExtraBundle", bundle.toString());
+                Log.d(TAG, "putExtraBundle " + bundle);
             } catch (Exception e) {
-                Log.e("HandlerException", "Error sending intent", e);
+                Log.e(TAG, "HandlerException Error sending intent", e);
             }
         });
     }
 
     private boolean isCustomScheme(String scheme_url) {
         String scheme = CustomUri.getScheme(scheme_url);
-        Log.d("scheme_url",  scheme + " => " + scheme_url);
+        Log.d(TAG, "scheme_url  => " + scheme_url);
         List<String> standardSchemes = Arrays.asList("http", "https", "file", "content", "data", "about", "javascript", "mailto", "ftp", "ftps", "ws", "wss", "tel", "sms", "smsto", "geo", "market", "res");
         if (scheme != null) {
             for (String standardScheme : standardSchemes) {
@@ -113,19 +114,19 @@ public class HookIntentStart implements IXposedHookLoadPackage {
 
         if (scheme_raw_url != null && isCustomScheme(scheme_raw_url)) {
             Map<String, Object> MapData = UriData.GetMap(scheme_raw_url);
-            Log.d("filterSchemeMapData", "MapData: " + MapData);
+            Log.d(TAG, "filterSchemeMapData MapData: " + MapData);
             MapData.put("FunctionCall", FunctionCall);
             sendBroadcastSafely(MapData, "Scheme", getStackTraceString());
         }
     }
 
-    private void filterIntent(Intent intent, String FunctionCall, String from){
+    private void filterIntent(Intent intent, String FunctionCall, String from) {
 //        String uri = (String) XposedHelpers.callMethod(intent, "toUri", Intent.URI_INTENT_SCHEME);
         intent.putExtra("skipToUriHook", true);
         String uri = intent.toUri(Intent.URI_INTENT_SCHEME);
         uri = uri.replace("B.skipToUriHook=true;", "");
         intent.removeExtra("skipToUriHook");
-        Log.d("Intent.toUriCeSi 1", uri);
+        Log.d(TAG, String.format("%s Intent.toUriCeSi %s", FunctionCall, uri));
         Map<String, Object> MapData = IntentData.convertIntentToMap(intent);
         MapData.put("FunctionCall", FunctionCall);
         MapData.put("uri", uri);
@@ -141,7 +142,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
             Object activityThread = XposedHelpers.callStaticMethod(ActivityThread.class, "currentActivityThread");
             return (Context) XposedHelpers.callMethod(activityThread, "getApplication");
         } catch (Exception e) {
-            Log.e("getAppContext", "Failed to get context", e);
+            Log.e(TAG, "getAppContext Failed to get context", e);
             return null;
         }
     }
@@ -162,7 +163,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
             }
 
             // Map<String, Object> MapData = IntentData.convertIntentToMap(intent, requestCode, options);
-            filterIntent(intent, "startActivityForResult", methodHookParam.thisObject.getClass().getName());
+            filterIntent(intent, "Activity.startActivityForResult", methodHookParam.thisObject.getClass().getName());
 
         }
     };
@@ -172,7 +173,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         protected void beforeHookedMethod(XC_MethodHook.MethodHookParam methodHookParam) throws Throwable {
             super.beforeHookedMethod(methodHookParam);
             if (!getIsHook()) return;
-            Log.d("HookStartActivity", "HookStartActivityRun");
+            Log.d(TAG, "HookStartActivityRun");
             if (!(methodHookParam.thisObject instanceof Context)) return;
 
             Intent intent = (Intent) methodHookParam.args[0];
@@ -188,7 +189,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 MapData = IntentData.convertIntentToMap(intent);
             }
 
-            filterIntent(intent, "startActivity", methodHookParam.thisObject.getClass().getName());
+            filterIntent(intent, "Activity.startActivity", methodHookParam.thisObject.getClass().getName());
         }
     };
 
@@ -214,7 +215,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                         String DataType = intent.getStringExtra("type");
                         if (Objects.equals(DataType, "set_isHook")) {
                             isHook = intent.getBooleanExtra("data", false);
-                            Log.d("onReceiveIntentIsHook 0", String.valueOf(isHook));
                         }
                     }
                 };
@@ -238,22 +238,22 @@ public class HookIntentStart implements IXposedHookLoadPackage {
 
         Class<?> activityClass = XposedHelpers.findClass("android.app.Activity", loadPackageParam.classLoader);
 
-        /* startActivityForResult */
+        /* Activity.startActivityForResult */
         XposedHelpers.findAndHookMethod(activityClass, "startActivityForResult", Intent.class, Integer.TYPE, Bundle.class, HookStartActivityForResult);
         XposedHelpers.findAndHookMethod(activityClass, "startActivityForResult", Intent.class, Integer.TYPE, HookStartActivityForResult);
 
-        /* startActivity */
+        /* Activity.startActivity */
         XposedHelpers.findAndHookMethod(activityClass, "startActivity", Intent.class, HookStartActivity);
         XposedHelpers.findAndHookMethod(activityClass, "startActivity", Intent.class, Bundle.class, HookStartActivity);
 
-        /* onResume */
+        /* Activity.onResume */
         XposedHelpers.findAndHookMethod(activityClass, "onResume", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
                 super.beforeHookedMethod(methodHookParam);
                 if (!getIsHook()) return;
                 Intent intent = (Intent) XposedHelpers.callMethod(methodHookParam.thisObject, "getIntent");
-                filterIntent(intent, "onResume", methodHookParam.thisObject.getClass().getName());
+                filterIntent(intent, "Activity.onResume", methodHookParam.thisObject.getClass().getName());
             }
         });
 
@@ -266,7 +266,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 if (!getIsHook()) return;
                 String scheme = (String) methodHookParam.args[0];
                 filterScheme(scheme, "Uri.parse");
-                Log.d("parseUri scheme", scheme);
+                Log.d(TAG, "parseUri scheme" + scheme);
             }
 
 
@@ -280,7 +280,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 if (!getIsHook()) return;
 
                 String scheme = (String) methodHookParam.args[0];
-                Log.d("parseUri scheme", scheme);
+                Log.d(TAG, "parseUri scheme" + scheme);
                 filterScheme(scheme, "Intent.parseUri");
 
                 Intent intent = (Intent) methodHookParam.getResult();
@@ -298,11 +298,24 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 Intent intent = (Intent) methodHookParam.thisObject;
                 if (intent.hasExtra("skipToUriHook")) return; // 检查自定义标志
                 String scheme = (String) methodHookParam.getResult();
-                Log.d("Intent.toUriCeSi 2", scheme);
+                Log.d(TAG, "Intent.toUriCeSi " + scheme);
                 filterScheme(scheme, "Intent.toUri");
             }
 
         });
+
+        /* PendingIntent.getActivity */
+        XposedHelpers.findAndHookMethod("android.app.PendingIntent", loadPackageParam.classLoader, "getActivity", Context.class, int.class, Intent.class, int.class, new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.beforeHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                Intent intent = (Intent) methodHookParam.args[2];
+                Context context = (Context) methodHookParam.args[1];
+                filterIntent(intent, "PendingIntent.getActivity", context.getClass().getName());
+            }
+        });
+
 
     }
 
