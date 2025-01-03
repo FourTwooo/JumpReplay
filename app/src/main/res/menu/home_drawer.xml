@@ -2,20 +2,28 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <item
-        android:id="@+id/action_settings"
-        android:orderInCategory="1"
-        android:title="@string/action_settings"
-        app:showAsAction="never"/>
 
-<!--    android:icon="@drawable/delete"/-->
-<!--    android:icon="@android:drawable/ic_menu_delete"-->
+    <!-- 移除列表选项 -->
     <item
         android:id="@+id/remove_list"
         android:icon="@drawable/delete"
         android:orderInCategory="0"
+        android:tint="@color/white"
         android:title="@string/action_delete"
-        app:showAsAction="ifRoom"
-        android:tint="@color/white" />
+        app:showAsAction="ifRoom" />
+
+    <!-- 新增的菜单选项 -->
+    <item
+        android:id="@+id/action_filter"
+        android:icon="@drawable/filter_list_off"
+        android:title="过滤"
+        app:showAsAction="never" />
+
+    <!--    <item-->
+    <!--        android:id="@+id/action_sort"-->
+    <!--        android:icon="@drawable/ic_sort"-->
+    <!--        android:title="排序"-->
+    <!--        app:showAsAction="never"/>-->
+
 
 </menu>

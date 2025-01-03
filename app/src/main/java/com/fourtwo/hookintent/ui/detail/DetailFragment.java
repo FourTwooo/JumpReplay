@@ -47,7 +47,7 @@ import java.util.Objects;
 public class DetailFragment extends Fragment {
 
     private String TAG = "DetailFragment";
-    private static final String ARG_ITEM_DATA = "itemData";
+    private static final String  ARG_ITEM_DATA = "itemData";
     private RecyclerView recyclerView;
     private TextView urlTextView;
     private TabLayout tabLayout;
@@ -292,7 +292,7 @@ public class DetailFragment extends Fragment {
         }
 
         suCodeButton.setOnClickListener(v -> {
-            ShellExecutor.executeSuCommand("su -c '" + commandTextView.getText() + "'");
+            ShellExecutor.executeCommandInBackground("su -c '" + commandTextView.getText() + "'");
             Toast.makeText(requireContext(), "已执行", Toast.LENGTH_SHORT).show();
         });
 

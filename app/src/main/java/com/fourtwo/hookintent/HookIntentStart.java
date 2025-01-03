@@ -12,14 +12,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
-import com.fourtwo.hookintent.analysis.CustomUri;
 import com.fourtwo.hookintent.analysis.IntentData;
 import com.fourtwo.hookintent.analysis.UriData;
 import com.fourtwo.hookintent.analysis.extract;
-import com.fourtwo.hookintent.analysis.StringListUtil;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -46,9 +42,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 public class HookIntentStart implements IXposedHookLoadPackage {
 
     private Boolean isHook = false;
-
-    private List<String> standardSchemes = Arrays.asList("http", "https");
-
+//    private List<String> standardSchemes = Constants.SET_STAND_ARD_SCHEMES;
     private final String TAG = "XposedJumpReplay";
 
 
@@ -117,24 +111,10 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         });
     }
 
-    private boolean isCustomScheme(String scheme_url) {
-        sendTaskIntent(Constants.GET_STAND_ARD_SCHEME_STRING);
-        String scheme = CustomUri.getScheme(scheme_url);
-        Log.d(TAG, "scheme_url  => " + scheme_url);
-        if (scheme != null) {
-            for (String standardScheme : standardSchemes) {
-                if (scheme.equalsIgnoreCase(standardScheme)) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-
     private void filterScheme(String scheme_raw_url, String FunctionCall) {
 
-        if (scheme_raw_url != null && isCustomScheme(scheme_raw_url)) {
+        //  && isCustomScheme(scheme_raw_url)
+        if (scheme_raw_url != null) {
             Map<String, Object> MapData = UriData.GetMap(scheme_raw_url);
             Log.d(TAG, "filterSchemeMapData MapData: " + MapData);
             MapData.put("FunctionCall", FunctionCall);
@@ -218,9 +198,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                         String DataType = intent.getStringExtra("type");
                         if (Objects.equals(DataType, Constants.SET_IS_HOOK)) {
                             isHook = intent.getBooleanExtra("data", false);
-                        } else if (Objects.equals(DataType, Constants.SET_STAND_ARD_SCHEMES_STRING)) {
-                            standardSchemes = StringListUtil.stringToList(intent.getStringExtra("data"));
-                            Log.d(TAG, "standardSchemes: " + standardSchemes);
                         }
                     }
                 };
@@ -278,8 +255,8 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 Log.d(TAG, "parseUri scheme" + scheme);
                 filterScheme(scheme, "Intent.parseUri");
 
-                Intent intent = (Intent) methodHookParam.getResult();
-                filterIntent(intent, "Intent.parseUri", null);
+//                Intent intent = (Intent) methodHookParam.getResult();
+//                filterIntent(intent, "Intent.parseUri", null);
             }
 
         });

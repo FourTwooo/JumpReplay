@@ -15,6 +15,6 @@
         <item
             android:id="@+id/nav_me"
             android:icon="@drawable/slideshow"
-            android:title="@string/menu_slideshow" />
+            android:title="@string/menu_me" />
     </group>
 </menu>

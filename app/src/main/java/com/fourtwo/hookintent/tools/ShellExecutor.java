@@ -2,8 +2,18 @@ package com.fourtwo.hookintent.tools;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ShellExecutor {
+
+    private static final ExecutorService executorService = Executors.newSingleThreadExecutor();
+
+    public static void executeCommandInBackground(String command) {
+        executorService.execute(() -> {
+            ShellExecutor.executeSuCommand(command);
+        });
+    }
 
     public static boolean executeSuCommand(String command) {
         Process process = null;
@@ -38,16 +48,6 @@ public class ShellExecutor {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
-    }
-
-    public static void main(String[] args) {
-        String command = "am start -n com.example/.MainActivity";
-        boolean success = executeSuCommand("su -c '" + command + "'");
-        if (success) {
-            System.out.println("Command executed successfully.");
-        } else {
-            System.out.println("Failed to execute command.");
         }
     }
 }

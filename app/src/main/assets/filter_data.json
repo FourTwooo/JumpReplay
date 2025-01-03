@@ -1,0 +1,113 @@
+{
+  "scheme": {
+    "FunctionCall": [
+      {
+        "text": "Intent.toUri",
+        "type": false
+      },
+      {
+        "text": "Intent.parseUri",
+        "type": false
+      },
+      {
+        "text": "Uri.parse",
+        "type": false
+      }],
+    "from": [],
+    "scheme": [
+      {
+        "text": "http",
+        "type": true
+      },
+      {
+        "text": "https",
+        "type": true
+      },
+      {
+        "text": "file",
+        "type": true
+      },
+      {
+        "text": "content",
+        "type": true
+      },
+      {
+        "text": "data",
+        "type": true
+      },
+      {
+        "text": "about",
+        "type": true
+      },
+      {
+        "text": "javascript",
+        "type": true
+      },
+      {
+        "text": "mailto",
+        "type": true
+      },
+      {
+        "text": "ftp",
+        "type": true
+      },
+      {
+        "text": "ftps",
+        "type": true
+      },
+      {
+        "text": "ws",
+        "type": true
+      },
+      {
+        "text": "wss",
+        "type": true
+      },
+      {
+        "text": "tel",
+        "type": true
+      },
+      {
+        "text": "sms",
+        "type": true
+      },
+      {
+        "text": "smsto",
+        "type": true
+      },
+      {
+        "text": "geo",
+        "type": true
+      },
+      {
+        "text": "market",
+        "type": true
+      },
+      {
+        "text": "res",
+        "type": true
+      }
+    ]
+  },
+  "intent": {
+    "FunctionCall": [
+      {
+        "text": "Activity.onResume",
+        "type": false
+      },
+      {
+        "text": "PendingIntent.getActivity",
+        "type": false
+      },
+      {
+        "text": "Activity.startActivity",
+        "type": false
+      },
+      {
+        "text": "Activity.startActivityForResult",
+        "type": false
+      }
+    ],
+    "from": []
+  }
+}

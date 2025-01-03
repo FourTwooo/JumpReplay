@@ -31,6 +31,17 @@
     <fragment
         android:id="@+id/nav_me"
         android:name="com.fourtwo.hookintent.ui.me.MeFragment"
-        android:label="@string/menu_slideshow"
+        android:label="@string/menu_me"
         tools:layout="@layout/fragment_me" />
+
+    <fragment
+        android:id="@+id/nav_filter"
+        android:name="com.fourtwo.hookintent.ui.filter.FilterFragment"
+        android:label="过滤"
+        tools:layout="@layout/fragment_filter" />
+
+    <fragment
+        android:id="@+id/nav_select"
+        android:name="com.fourtwo.hookintent.ui.select.SelectFragment"
+        tools:layout="@layout/fragment_select" />
 </navigation>

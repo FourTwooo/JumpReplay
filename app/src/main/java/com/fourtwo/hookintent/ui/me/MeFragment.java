@@ -50,13 +50,15 @@ public class MeFragment extends Fragment {
             @Override
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
                 e.printStackTrace();
-                // 更新UI需要在主线程
-                requireActivity().runOnUiThread(() -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
-                    }
-                    textView.setText("请求失败：" + url);
-                });
+                // 检查 Fragment 是否附加到 Activity
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
+                        }
+                        textView.setText("请求失败：" + url);
+                    });
+                }
             }
 
             @SuppressLint("SetTextI18n")

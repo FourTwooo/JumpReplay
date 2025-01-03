@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -31,25 +30,28 @@ import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.navigation.NavController;
+import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.Constants;
 import com.fourtwo.hookintent.ItemData;
 import com.fourtwo.hookintent.MainViewModel;
 import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.analysis.JsonHandler;
 import com.fourtwo.hookintent.analysis.UriData;
 import com.fourtwo.hookintent.analysis.extract;
-import com.fourtwo.hookintent.analysis.StringListUtil;
 import com.fourtwo.hookintent.tools.IntentDuplicateChecker;
 import com.fourtwo.hookintent.tools.SchemeResolver;
-import com.fourtwo.hookintent.Constants;
-
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class HomeFragment extends Fragment {
@@ -64,9 +66,7 @@ public class HomeFragment extends Fragment {
     private FloatingActionButton fab;
     private static boolean isHook = false; // 保留 isHook 状态
 
-    private String standardSchemesSting;
-
-    private SharedPreferences sharedPreferences;
+    private Map<String, Object> JsonData;
 
     private boolean getIsHook() {
         // 通知广播
@@ -91,9 +91,19 @@ public class HomeFragment extends Fragment {
         requireActivity().addMenuProvider(new MenuProvider() {
             @Override
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
-                menu.clear(); // Clear existing menu items to avoid duplication
-                menuInflater.inflate(R.menu.home_drawer, menu); // Inflate the menu specific to this Fragment
+                menu.clear(); // 清除现有菜单项以避免重复
+                menuInflater.inflate(R.menu.home_drawer, menu); // 加载特定于此Fragment的菜单
 
+                // 使用反射设置溢出菜单中的图标可见
+                if (menu.getClass().getSimpleName().equalsIgnoreCase("MenuBuilder")) {
+                    try {
+                        Method method = menu.getClass().getDeclaredMethod("setOptionalIconsVisible", Boolean.TYPE);
+                        method.setAccessible(true);
+                        method.invoke(menu, true);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
             }
 
             @Override
@@ -105,12 +115,15 @@ public class HomeFragment extends Fragment {
                     // 如果需要，也可以在ViewModel中清空数据
                     viewModel.clearIntentDataList();
                     return true;
-                } else if (itemId == R.id.action_settings) {
-                    // Handle settings action
+                } else if (itemId == R.id.action_filter) {
+                    // 使用 NavController 进行导航
+                    NavController navController = Navigation.findNavController(requireActivity(), R.id.nav_host_fragment_content_main);
+                    navController.navigate(R.id.nav_filter);
                     return true;
                 }
                 return false;
             }
+
         }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
 
 
@@ -191,19 +204,30 @@ public class HomeFragment extends Fragment {
                 return false;
             }
 
+            @SuppressLint("NotifyDataSetChanged")
             @Override
             public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
                 int position = viewHolder.getAdapterPosition();
-                List<ItemData> data = adapter.getData();
-                if (position >= 0 && position < data.size()) {
+
+                if (position >= 0 && position < adapter.getItemCount()) {
+                    // 从适配器获取要删除的 ItemData
+                    ItemData item = adapter.getFilteredData().get(position);
+
                     // 从 ViewModel 中删除数据
-                    viewModel.removeIntentData(position);
+                    int originalPosition = adapter.getData().indexOf(item);
+                    Log.d(TAG, "originalPosition: " + originalPosition);
+                    if (originalPosition != -1) {
+                        viewModel.removeIntentData(originalPosition);
+                    }
 
                     // 从适配器中删除数据
-                    data.remove(position);
-                    adapter.notifyItemRemoved(position);
+                    adapter.removeItem(position);
+                } else {
+                    // 如果位置无效，刷新适配器以避免崩溃
+                    adapter.notifyDataSetChanged();
                 }
             }
+
 
             @Override
             public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder,
@@ -226,15 +250,88 @@ public class HomeFragment extends Fragment {
         // Register the broadcast receiver
         addDataReceiver = new BroadcastReceiver() {
 
+            public boolean isFilterMatched(Map<String, Object> schemeData, String key, String valueToMatch) {
+                List<Map<String, Object>> itemList = (List<Map<String, Object>>) schemeData.get(key);
+                if (itemList == null) {
+                    return false;
+                }
+
+                for (Map<String, Object> item : itemList) {
+                    Boolean type = (Boolean) item.get("type");
+                    String text = (String) item.get("text");
+
+                    if (Boolean.TRUE.equals(type) && valueToMatch.equalsIgnoreCase(text)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            private boolean filter(Intent intent) {
+                boolean is_filter = false;
+                String base = intent.getStringExtra("Base");
+                Bundle info = intent.getBundleExtra("info");
+
+                String functionCall = info.getString("FunctionCall");
+                String from = info.getString("from");
+
+                switch (base) {
+                    case "Intent":
+                        Map<String, Object> intentData = (Map<String, Object>) JsonData.get("intent");
+                        assert intentData != null;
+                        Log.d(TAG, "filter 1: " + is_filter);
+                        if (isFilterMatched(intentData, "FunctionCall", functionCall)) {
+                            is_filter = true;
+                        }
+                        Log.d(TAG, "filter 2: " + is_filter);
+                        if (!is_filter && isFilterMatched(intentData, "from", from)) {
+                            is_filter = true;
+                        }
+                        Log.d(TAG, "filter 3: " + is_filter);
+                        break;
+                    case "Scheme":
+                        String scheme_url = info.getString("scheme_raw_url");
+                        // Log.d(TAG, "scheme_url  => " + scheme_url);
+                        if (scheme_url == null) {
+                            is_filter = true;
+                            break;
+                        }
+                        String scheme = Uri.parse(scheme_url).getScheme();
+                        if (scheme == null) {
+                            is_filter = true;
+                            break;
+                        }
+
+                        Map<String, Object> schemeData = (Map<String, Object>) JsonData.get("scheme");
+
+                        assert schemeData != null;
+
+                        if (isFilterMatched(schemeData, "FunctionCall", functionCall)) {
+                            is_filter = true;
+                        }
+
+                        if (!is_filter && isFilterMatched(schemeData, "from", from)) {
+                            is_filter = true;
+                        }
+
+                        if (!is_filter && isFilterMatched(schemeData, "scheme", scheme)) {
+                            is_filter = true;
+                        }
+                        break;
+                    default:
+                        break;
+                }
+                Log.d(TAG, "filter end: " + is_filter);
+                return is_filter;
+            }
+
+
             private void handleMsgType(Context context, Intent intent) {
                 Intent sendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
                 String data = intent.getStringExtra("data");
                 if (Constants.GET_IS_HOOK.equals(data)) {
                     sendIntent.putExtra("type", Constants.SET_IS_HOOK);
                     sendIntent.putExtra("data", isHook);
-                }                else if (Constants.GET_STAND_ARD_SCHEME_STRING.equals(data)) {
-                    sendIntent.putExtra("type", Constants.SET_STAND_ARD_SCHEMES_STRING);
-                    sendIntent.putExtra("data", standardSchemesSting);
                 }
                 context.sendBroadcast(sendIntent);
             }
@@ -273,8 +370,12 @@ public class HomeFragment extends Fragment {
                         return;
                     }
 
-                    Log.d(TAG, "BundleInfo OK");
                     if (bundle == null) {
+                        return;
+                    }
+
+                    // 过滤
+                    if (filter(intent)) {
                         return;
                     }
 
@@ -418,22 +519,19 @@ public class HomeFragment extends Fragment {
             adapter.setData(allData);
         }
 
-        sharedPreferences = requireContext().getSharedPreferences(Constants.SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
-        standardSchemesSting = sharedPreferences.getString(StringListUtil.STAND_ARD_SCHEMES, null);
-        Log.d(TAG, "standardSchemesSting: " + standardSchemesSting);
-        if (standardSchemesSting == null) {
-            SharedPreferences.Editor editor = sharedPreferences.edit();
-            List<String> standardSchemes = Constants.SET_STAND_ARD_SCHEMES;
-            standardSchemesSting = StringListUtil.listToString(standardSchemes);
-            editor.putString(StringListUtil.STAND_ARD_SCHEMES, standardSchemesSting);
-            editor.apply();
-        }
-        // 通知广播
-        Context context = requireContext();
-        Intent SendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
-        SendIntent.putExtra("type", Constants.SET_STAND_ARD_SCHEMES_STRING);
-        SendIntent.putExtra("data", standardSchemesSting);
-        context.sendBroadcast(SendIntent);
+        JsonData = new JsonHandler().readJsonFromFile(requireContext());
+        Log.d(TAG, "onResume: " + JsonData);
+//        // 更新过滤表
+//        SharedPreferences sharedPreferences = requireContext().getSharedPreferences(SelectItemData.SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
+//
+//        String STAND_ARD_SCHEMES = sharedPreferences.getString(SelectItemData.SHARED_SCHEMES_NAME, null);
+//        if (STAND_ARD_SCHEMES == null) {
+//            SharedPreferences.Editor editor = sharedPreferences.edit();
+//            editor.putString(SelectItemData.SHARED_SCHEMES_NAME, SelectItemData.SHARED_SCHEMES_VALUE);
+//            editor.apply();
+//        }
+//        Map<String, ?> allEntries = sharedPreferences.getAll();
+//        Log.d(TAG, "onResume: " + allEntries);
     }
 
     @Override
@@ -452,4 +550,5 @@ public class HomeFragment extends Fragment {
             requireActivity().unregisterReceiver(addDataReceiver);
         }
     }
+
 }

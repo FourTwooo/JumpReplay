@@ -46,7 +46,7 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_list, parent, false);
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.fragment_item_list, parent, false);
         return new ViewHolder(view);
     }
 
@@ -169,11 +169,29 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
     }
 
 
+    public void removeItem(int position) {
+        if (position >= 0 && position < filteredData.size()) {
+            // 获取要删除的项目
+            ItemData item = filteredData.get(position);
+
+            // 从 filteredData 中移除
+            filteredData.remove(position);
+
+            // 从 mData 中移除相同的项目
+            mData.remove(item);
+
+            notifyItemRemoved(position);
+        }
+    }
+
     @Override
     public int getItemCount() {
         return filteredData.size();
     }
 
+    public List<ItemData> getFilteredData() {
+        return filteredData;
+    }
     @SuppressLint("NotifyDataSetChanged")
     public void setData(List<ItemData> newData) {
         this.mData = newData;

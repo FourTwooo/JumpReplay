@@ -15,7 +15,7 @@ public class MainViewModel extends ViewModel {
         List<ItemData> currentData = intentDataList.getValue();
         if (currentData != null && position >= 0 && position < currentData.size()) {
             currentData.remove(position);
-            intentDataList.setValue(currentData);
+            intentDataList.postValue(currentData);
         }
     }
     public LiveData<Boolean> getIsHook() {
