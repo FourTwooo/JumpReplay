@@ -289,6 +289,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
 
         });
 
+
         /* PendingIntent.getActivity */
         XposedHelpers.findAndHookMethod("android.app.PendingIntent", loadPackageParam.classLoader, "getActivity", Context.class, int.class, Intent.class, int.class, new XC_MethodHook() {
             @Override
