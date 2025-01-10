@@ -12,7 +12,8 @@
       {
         "text": "Uri.parse",
         "type": false
-      }],
+      }
+    ],
     "from": [],
     "scheme": [
       {

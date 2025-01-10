@@ -72,8 +72,8 @@ public class HomeFragment extends Fragment {
         // 通知广播
         Context context = requireContext();
         Intent SendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
-        SendIntent.putExtra("type", Constants.SET_IS_HOOK);
-        SendIntent.putExtra("data", isHook);
+        SendIntent.putExtra(Constants.TYPE, Constants.SET_IS_HOOK);
+        SendIntent.putExtra(Constants.DATA, isHook);
         context.sendBroadcast(SendIntent);
         Log.d(TAG, "HoneGetIsHook" + ": " + isHook);
         return isHook;
@@ -129,22 +129,6 @@ public class HomeFragment extends Fragment {
 
         // Initialize FloatingActionButton using the view parameter
         fab = view.findViewById(R.id.fab);
-        fab.setOnClickListener(v -> {
-            // Toggle the isHook state
-            isHook = !isHook;
-            if (isHook) {
-                fab.setImageResource(android.R.drawable.ic_media_pause);
-                fab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#47AA4B")));
-                setEmptyView("暂无数据");
-            } else {
-                setEmptyView("点击按钮开启HOOK");
-                fab.setImageResource(android.R.drawable.ic_media_play);
-                fab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#CE1A7EAC")));
-            }
-
-
-            Log.d(TAG, "isHook" + ": " + getIsHook());
-        });
 
         // Other initializations
         recyclerView = view.findViewById(R.id.recycler_view);
@@ -279,15 +263,12 @@ public class HomeFragment extends Fragment {
                     case "Intent":
                         Map<String, Object> intentData = (Map<String, Object>) JsonData.get("intent");
                         assert intentData != null;
-                        Log.d(TAG, "filter 1: " + is_filter);
                         if (isFilterMatched(intentData, "FunctionCall", functionCall)) {
                             is_filter = true;
                         }
-                        Log.d(TAG, "filter 2: " + is_filter);
                         if (!is_filter && isFilterMatched(intentData, "from", from)) {
                             is_filter = true;
                         }
-                        Log.d(TAG, "filter 3: " + is_filter);
                         break;
                     case "Scheme":
                         String scheme_url = info.getString("scheme_raw_url");
@@ -321,17 +302,17 @@ public class HomeFragment extends Fragment {
                     default:
                         break;
                 }
-                Log.d(TAG, "filter end: " + is_filter);
+//                Log.d(TAG, "filter end: " + is_filter);
                 return is_filter;
             }
 
 
             private void handleMsgType(Context context, Intent intent) {
                 Intent sendIntent = new Intent("SET_JUMP_REPLAY_HOOK");
-                String data = intent.getStringExtra("data");
+                String data = intent.getStringExtra(Constants.DATA);
                 if (Constants.GET_IS_HOOK.equals(data)) {
-                    sendIntent.putExtra("type", Constants.SET_IS_HOOK);
-                    sendIntent.putExtra("data", isHook);
+                    sendIntent.putExtra(Constants.TYPE, Constants.SET_IS_HOOK);
+                    sendIntent.putExtra(Constants.DATA, isHook);
                 }
                 context.sendBroadcast(sendIntent);
             }
@@ -363,13 +344,12 @@ public class HomeFragment extends Fragment {
             public void onReceive(Context context, Intent intent) {
                 try {
                     Bundle bundle = intent.getBundleExtra("info");
-                    String msgType = intent.getStringExtra("type");
-
+                    String msgType = intent.getStringExtra(Constants.TYPE);
                     if ("msg".equals(msgType)) {
                         handleMsgType(context, intent);
                         return;
                     }
-
+                    Log.d(TAG, "onReceive: " + bundle);
                     if (bundle == null) {
                         return;
                     }
@@ -453,6 +433,7 @@ public class HomeFragment extends Fragment {
             fab.setImageResource(android.R.drawable.ic_media_play);
             fab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#CE1A7EAC")));
         }
+        Log.d(TAG, "isHook" + ": " + getIsHook());
     }
 
     @SuppressLint("SetTextI18n")

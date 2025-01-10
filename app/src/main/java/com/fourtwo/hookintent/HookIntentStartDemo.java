@@ -11,11 +11,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import android.util.Base64;
-
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
 
 import com.fourtwo.hookintent.analysis.IntentData;
 import com.fourtwo.hookintent.analysis.UriData;
@@ -28,7 +23,6 @@ import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 
@@ -45,33 +39,33 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
  * 如果你不是通过github下载使用如何联系我？ <a href="https://github.com/FourTwooo/JumpReplay/"</a>
  */
 
-public class HookIntentStart implements IXposedHookLoadPackage {
-    private Boolean isHook = null;
+public class HookIntentStartDemo implements IXposedHookLoadPackage {
+
+    private Boolean isHook = false;
+    //    private List<String> standardSchemes = Constants.SET_STAND_ARD_SCHEMES;
     private final String TAG = "XposedJumpReplay";
 
 
-    private void sendTaskIntent(String data) {
+    private void sendTaskIntent(){
         Context appContext = getAppContext();
         if (appContext != null) {
             Handler mainHandler = new Handler(Looper.getMainLooper());
             mainHandler.post(() -> {
                 try {
                     Intent intentMsg = new Intent("GET_JUMP_REPLAY_HOOK");
-                    intentMsg.putExtra(Constants.DATA, data);
-                    intentMsg.putExtra(Constants.TYPE, "msg");
-                    appContext.sendBroadcast(intentMsg);
+                    intentMsg.putExtra("data", Constants.GET_IS_HOOK);
+                    intentMsg.putExtra("type", "msg");
+//                    appContext.sendBroadcast(intentMsg);
                 } catch (Exception e) {
-                    XposedBridge.log("HandlerException Error sending intent" + e);
+                    Log.e(TAG, "HandlerException Error sending intent", e);
                 }
             });
         }
     }
 
     private Boolean getIsHook() {
-        if (isHook == null) {
-            sendTaskIntent(Constants.GET_IS_HOOK);
-            return false;
-        }
+        sendTaskIntent();
+        // Log.d(TAG, "isHook: " + isHook);
         return isHook;
     }
 
@@ -105,22 +99,24 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 Intent intentMsg = new Intent("GET_JUMP_REPLAY_HOOK");
                 intentMsg.putExtra("info", bundle);
                 intentMsg.putExtra("Base", base);
-                intentMsg.putExtra(Constants.TYPE, "data");
+                intentMsg.putExtra("data-type", "data");
                 intentMsg.putExtra("stack_trace", StackTraceString);
                 intentMsg.putExtra("uri", finalUri);
-                XposedBridge.log("sendBroadcastSafely: " + intentMsg);
-                appContext.sendBroadcast(intentMsg);
-                // XposedBridge.log("putExtraBundle " + bundle);
+                Log.d(TAG, "sendBroadcastSafely: " + intentMsg);
+//                appContext.sendBroadcast(intentMsg);
+                // Log.d(TAG, "putExtraBundle " + bundle);
             } catch (Exception e) {
-                XposedBridge.log("HandlerException Error sending intent" + e);
+                Log.e(TAG, "HandlerException Error sending intent", e);
             }
         });
     }
 
     private void filterScheme(String scheme_raw_url, String FunctionCall) {
 
+        //  && isCustomScheme(scheme_raw_url)
         if (scheme_raw_url != null) {
             Map<String, Object> MapData = UriData.GetMap(scheme_raw_url);
+            // Log.d(TAG, "filterSchemeMapData MapData: " + MapData);
             MapData.put("FunctionCall", FunctionCall);
             sendBroadcastSafely(MapData, "Scheme", getStackTraceString());
         }
@@ -132,22 +128,13 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         String uri = intent.toUri(Intent.URI_INTENT_SCHEME);
         uri = uri.replace("B.skipToUriHook=true;", "");
         intent.removeExtra("skipToUriHook");
+        // Log.d(TAG, String.format("%s Intent.toUriCeSi %s", FunctionCall, uri));
         Map<String, Object> MapData = IntentData.convertIntentToMap(intent);
         MapData.put("FunctionCall", FunctionCall);
         MapData.put("uri", uri);
         if (from != null) {
             MapData.put("from", from);
         }
-
-        Bundle extras = intent.getExtras();
-//        try (FileOutputStream fos = context.openFileOutput(filename, Context.MODE_PRIVATE);
-//             ObjectOutputStream oos = new ObjectOutputStream(fos)) {
-//            oos.writeObject(intent.getExtras());
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//      Bundle extras = (Bundle) "Bundle[{key_root_page=true, key_param_NewLoginConfig=com.shizhuang.duapp.du_login.NewLoginConfig@4e0c22e, key_logging_flag=value_logging_flag, key_param_OneKeyInfo=OneKeyInfo(operatorCode=2, securityPhone=132****0476, privacyUrl=https://ms.zzx9.cn/html/oauth/protocol2.html, privacyName=中国联通认证服务协议, slogan=中国联通提供认证服务)}]";
-        XposedBridge.log("intent.getDataString() " + extras);
         sendBroadcastSafely(MapData, "Intent", getStackTraceString());
     }
 
@@ -157,7 +144,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
             Object activityThread = XposedHelpers.callStaticMethod(ActivityThread.class, "currentActivityThread");
             return (Context) XposedHelpers.callMethod(activityThread, "getApplication");
         } catch (Exception e) {
-            XposedBridge.log("getAppContext Failed to get context" + e);
+            Log.e(TAG, "getAppContext Failed to get context", e);
             return null;
         }
     }
@@ -207,17 +194,16 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 BroadcastReceiver receiver = new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
-                        String DataType = intent.getStringExtra(Constants.TYPE);
+                        String DataType = intent.getStringExtra("type");
                         if (Objects.equals(DataType, Constants.SET_IS_HOOK)) {
-                            isHook = intent.getBooleanExtra(Constants.DATA, false);
-                            XposedBridge.log("Constants.SET_IS_HOOK " + isHook);
+                            isHook = intent.getBooleanExtra("data", false);
                         }
                     }
                 };
                 // 注册接收器
                 IntentFilter filter = new IntentFilter("SET_JUMP_REPLAY_HOOK");
                 application.registerReceiver(receiver, filter);
-                XposedBridge.log(application.getClass().getName() + "注册广播接收");
+                Log.d(TAG, application.getClass().getName() + "注册广播接收");
             }
         });
 
@@ -251,7 +237,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 if (!getIsHook()) return;
                 String scheme = (String) methodHookParam.args[0];
                 filterScheme(scheme, "Uri.parse");
-                XposedBridge.log("parseUri scheme" + scheme);
+                Log.d(TAG, "parseUri scheme" + scheme);
             }
 
 
@@ -266,7 +252,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
 
                 String scheme = (String) methodHookParam.args[0];
                 filterScheme(scheme, "Intent.parseUri");
-                XposedBridge.log("parseUri scheme" + scheme);
+                Log.d(TAG, "parseUri scheme" + scheme);
 
 //                Intent intent = (Intent) methodHookParam.getResult();
 //                filterIntent(intent, "Intent.parseUri", null);
@@ -283,7 +269,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 Intent intent = (Intent) methodHookParam.thisObject;
                 if (intent.hasExtra("skipToUriHook")) return; // 检查自定义标志
                 String scheme = (String) methodHookParam.getResult();
-                XposedBridge.log("Intent.toUriCeSi " + scheme);
+                Log.d(TAG, "Intent.toUriCeSi " + scheme);
                 filterScheme(scheme, "Intent.toUri");
             }
 

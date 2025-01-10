@@ -12,10 +12,10 @@ public final class Constants {
 
     // 数据库列名
     public static final String SET_IS_HOOK = "set_isHook";
-    public static final String SET_STAND_ARD_SCHEMES_STRING = "set_standardSchemesSting";
-
     public static final String GET_IS_HOOK = "get_isHook";
-    public static final String GET_STAND_ARD_SCHEME_STRING = "get_standardSchemesSting";
 
+    public static final String TYPE = "type";
+
+    public static final String DATA = "data";
 }
 
