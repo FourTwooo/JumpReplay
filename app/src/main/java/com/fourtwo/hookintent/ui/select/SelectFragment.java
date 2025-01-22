@@ -17,15 +17,12 @@ import androidx.annotation.Nullable;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Lifecycle;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.analysis.JsonHandler;
 
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +31,6 @@ public class SelectFragment extends Fragment {
 
     private final JsonHandler jsonHandler = new JsonHandler();
     private final String TAG = "SelectFragment";
-    private RecyclerView recyclerView;
     private SelectAdapter adapter;
 
     @SuppressLint("NotifyDataSetChanged")
@@ -110,22 +106,26 @@ public class SelectFragment extends Fragment {
         }
 
         Map<String, Object> jsonData = jsonHandler.readJsonFromFile(requireContext());
+
         if (jsonData == null) {
             Log.e(TAG, "JSON data is null");
             return null; // 或适当地处理此情况
         }
+        Log.d(TAG, "jsonData: " + jsonData);
 
-        Map<String, Object> protocolData = (Map<String, Object>) jsonData.get(protocol);
+        Map<String, Object> protocolData = JsonHandler.getFilterKeyJson(jsonData.get(protocol));
+//        Map<String, Object> protocolData = (Map<String, Object>) jsonData.get(protocol);
+        Log.d(TAG, "onCreateView: " + jsonData.get(protocol));
         if (protocolData == null) {
-            Log.e(TAG, "Protocol data is null for protocol: " + protocol);
+            Log.e(TAG, "Protocol data is null " + jsonData + " for protocol: " + protocol);
             return null; // 或适当地处理此情况
         }
 
-        List<Map<String, Object>> nameData = (List<Map<String, Object>>) protocolData.get(name);
+        List<Map<String, Object>> nameData = JsonHandler.getFilterValueJson(protocolData.get(name));
         Log.d(TAG, "onCreateView: " + name + " " + protocol + " " + nameData);
 
         View view = inflater.inflate(R.layout.fragment_select, container, false);
-        recyclerView = view.findViewById(R.id.recycler_view);
+        RecyclerView recyclerView = view.findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new SelectAdapter(nameData);
         recyclerView.setAdapter(adapter);
@@ -147,14 +147,13 @@ public class SelectFragment extends Fragment {
         assert getArguments() != null;
         String name = getArguments().getString("NAME");
         String protocol = getArguments().getString("PROTOCOL");
-
-        Map<String, Object> protocolData = (Map<String, Object>) jsonData.get(protocol);
+        Map<String, Object> protocolData = JsonHandler.getFilterKeyJson(jsonData.get(protocol));
         if (protocolData != null) {
             protocolData.put(name, dataWithCheckStates);
             Log.d(TAG, "onPause: " + jsonData);
             jsonHandler.writeJsonToFile(requireContext(), jsonData);
         } else {
-            Log.e(TAG, "Protocol data is null in onPause for protocol: " + protocol);
+            Log.e(TAG, "Protocol data is null " + jsonData + " for protocol: " + protocol);
         }
     }
 }

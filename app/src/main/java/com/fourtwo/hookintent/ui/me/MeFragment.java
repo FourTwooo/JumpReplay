@@ -1,6 +1,5 @@
 package com.fourtwo.hookintent.ui.me;
 
-import android.annotation.SuppressLint;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -14,78 +13,52 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.fourtwo.hookintent.databinding.FragmentMeBinding;
-
-import java.io.IOException;
+import com.fourtwo.hookintent.tools.NetworkClient;
 
 import io.noties.markwon.Markwon;
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
 
 public class MeFragment extends Fragment {
 
     private String TAG = "MeFragment";
     private FragmentMeBinding binding;
-    private OkHttpClient client;
     private MeViewModel meViewModel;
+    private NetworkClient networkClient;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 初始化 OkHttpClient
-        client = new OkHttpClient();
         // 使用 ViewModelProvider 获取 ViewModel 实例
         meViewModel = new ViewModelProvider(requireActivity()).get(MeViewModel.class);
+        // 初始化 NetworkClient
+        networkClient = new NetworkClient();
     }
 
     private void fetchMarkdownFile(String url, TextView textView) {
-        Request request = new Request.Builder()
-                .url(url)
-                .build();
-
-        client.newCall(request).enqueue(new Callback() {
-            @SuppressLint("SetTextI18n")
+        networkClient.getReadMe(url, new NetworkClient.ReadMeCallback() {
             @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                e.printStackTrace();
-                // 检查 Fragment 是否附加到 Activity
+            public void onSuccess(String data) {
+                if (isAdded()) {
+                    requireActivity().runOnUiThread(() -> {
+                        Markwon markwon = Markwon.create(requireContext());
+                        markwon.setMarkdown(textView, data);
+                    });
+                }
+                meViewModel.setResponseData(data); // 缓存到 ViewModel
+            }
+
+            @Override
+            public void onFailure(String errorMessage) {
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                             textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
                         }
-                        textView.setText("请求失败：" + url);
-                    });
-                }
-            }
-
-            @SuppressLint("SetTextI18n")
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                if (response.isSuccessful() && response.body() != null) {
-                    String responseData = response.body().string();
-                    meViewModel.setResponseData(responseData); // 缓存到 ViewModel
-
-                    // 更新UI需要在主线程
-                    requireActivity().runOnUiThread(() -> {
-                        Markwon markwon = Markwon.create(requireContext());
-                        markwon.setMarkdown(textView, responseData);
-                    });
-                } else {
-                    // 如果响应不成功，处理为失败
-                    requireActivity().runOnUiThread(() -> {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
-                        }
-                        textView.setText("请求失败：" + url);
+                        textView.setText(errorMessage);
                     });
                 }
             }
         });
     }
-
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {

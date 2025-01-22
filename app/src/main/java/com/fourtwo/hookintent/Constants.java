@@ -1,8 +1,5 @@
 package com.fourtwo.hookintent;
 
-import java.util.Arrays;
-import java.util.List;
-
 public final class Constants {
 
     // 防止实例化这个类

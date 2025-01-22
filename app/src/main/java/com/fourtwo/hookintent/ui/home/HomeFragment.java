@@ -235,7 +235,7 @@ public class HomeFragment extends Fragment {
         addDataReceiver = new BroadcastReceiver() {
 
             public boolean isFilterMatched(Map<String, Object> schemeData, String key, String valueToMatch) {
-                List<Map<String, Object>> itemList = (List<Map<String, Object>>) schemeData.get(key);
+                List<Map<String, Object>> itemList = JsonHandler.getFilterValueJson(schemeData.get(key));
                 if (itemList == null) {
                     return false;
                 }
@@ -261,7 +261,7 @@ public class HomeFragment extends Fragment {
 
                 switch (base) {
                     case "Intent":
-                        Map<String, Object> intentData = (Map<String, Object>) JsonData.get("intent");
+                        Map<String, Object> intentData = JsonHandler.getFilterKeyJson(JsonData.get("intent"));
                         assert intentData != null;
                         if (isFilterMatched(intentData, "FunctionCall", functionCall)) {
                             is_filter = true;
@@ -283,8 +283,7 @@ public class HomeFragment extends Fragment {
                             break;
                         }
 
-                        Map<String, Object> schemeData = (Map<String, Object>) JsonData.get("scheme");
-
+                        Map<String, Object> schemeData = JsonHandler.getFilterKeyJson(JsonData.get("scheme"));
                         assert schemeData != null;
 
                         if (isFilterMatched(schemeData, "FunctionCall", functionCall)) {
@@ -322,7 +321,7 @@ public class HomeFragment extends Fragment {
                 return IntentDuplicateChecker.isDuplicate(bundle);
             }
 
-            private boolean handleSchemeBase(Context context, Bundle bundle) {
+            private boolean handleSchemeBase(Bundle bundle) {
                 Log.d(TAG, "removeBundle: " + bundle);
                 return SchemeDuplicateChecker.isDuplicate(bundle);
             }
@@ -379,9 +378,13 @@ public class HomeFragment extends Fragment {
                             packageName = SchemeResolver.findAppByUri(context, bundle.getString("dataString")) + "/";
                             to = bundle.getString("dataString");
                         }
+                        if (Objects.equals(packageName, "null") && !Objects.equals(bundle.getString("action"), "null")) {
+                            packageName = SchemeResolver.findAppByUri(context, bundle.getString("action")) + "/";
+                            to = bundle.getString("action");
+                        }
                         Log.d(TAG, "packageName" + ": " + packageName);
                     } else if ("Scheme".equals(base)) {
-                        if (handleSchemeBase(context, bundle)) return;
+                        if (handleSchemeBase(bundle)) return;
                         String schemeRawUrl = bundle.getString("scheme_raw_url");
                         packageName = SchemeResolver.findAppByUri(context, schemeRawUrl) + "/";
                         Bundle bundle1 = extract.convertMapToBundle(UriData.convertUriToMap(Uri.parse(schemeRawUrl)));
