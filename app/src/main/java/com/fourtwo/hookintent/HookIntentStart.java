@@ -39,6 +39,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
  * 如果你不是通过github下载使用如何联系我？ <a href="https://github.com/FourTwooo/JumpReplay/"</a>
  */
 
+
 public class HookIntentStart implements IXposedHookLoadPackage {
     private Boolean isHook = null;
 
@@ -77,7 +78,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         return stackTraceString.toString();
     }
 
-
     private void sendBroadcastSafely(Map<String, Object> mapData, String base, String StackTraceString) {
         Context appContext = getAppContext();
         String uri = "";
@@ -100,9 +100,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                 intentMsg.putExtra(Constants.TYPE, "data");
                 intentMsg.putExtra("stack_trace", StackTraceString);
                 intentMsg.putExtra("uri", finalUri);
-                //XposedBridge.log("sendBroadcastSafely: " + intentMsg);
                 appContext.sendBroadcast(intentMsg);
-                //XposedBridge.log("putExtraBundle " + bundle);
             } catch (Exception e) {
                 XposedBridge.log("HandlerException Error sending intent" + e);
             }
@@ -110,7 +108,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
     }
 
     private void filterScheme(String scheme_raw_url, String FunctionCall) {
-
         if (scheme_raw_url != null) {
             Map<String, Object> MapData = UriData.GetMap(scheme_raw_url);
             MapData.put("FunctionCall", FunctionCall);
@@ -119,7 +116,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
     }
 
     private void filterIntent(Intent intent, String FunctionCall, String from) {
-//        String uri = (String) XposedHelpers.callMethod(intent, "toUri", Intent.URI_INTENT_SCHEME);
         intent.putExtra("skipToUriHook", true);
         String uri = intent.toUri(Intent.URI_INTENT_SCHEME);
         uri = uri.replace("B.skipToUriHook=true;", "");
@@ -132,19 +128,11 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         }
 
         Bundle extras = intent.getExtras();
-//        try (FileOutputStream fos = context.openFileOutput(filename, Context.MODE_PRIVATE);
-//             ObjectOutputStream oos = new ObjectOutputStream(fos)) {
-//            oos.writeObject(intent.getExtras());
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//      Bundle extras = (Bundle) "Bundle[{key_root_page=true, key_param_NewLoginConfig=com.shizhuang.duapp.du_login.NewLoginConfig@4e0c22e, key_logging_flag=value_logging_flag, key_param_OneKeyInfo=OneKeyInfo(operatorCode=2, securityPhone=132****0476, privacyUrl=https://ms.zzx9.cn/html/oauth/protocol2.html, privacyName=中国联通认证服务协议, slogan=中国联通提供认证服务)}]";
         XposedBridge.log("intent.getDataString() " + extras);
         sendBroadcastSafely(MapData, "Intent", getStackTraceString());
     }
 
     private Context getAppContext() {
-        // return (Context) XposedHelpers.callStaticMethod(ActivityThread.class, "currentApplication");
         try {
             Object activityThread = XposedHelpers.callStaticMethod(ActivityThread.class, "currentActivityThread");
             return (Context) XposedHelpers.callMethod(activityThread, "getApplication");
@@ -155,11 +143,10 @@ public class HookIntentStart implements IXposedHookLoadPackage {
     }
 
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam loadPackageParam) {
-
         if (loadPackageParam.packageName.equals("com.fourtwo.hookintent")) {
-            XposedHelpers.findAndHookMethod("com.fourtwo.hookintent.ui.home.HomeFragment", // 你的 Activity 的完整类名
-                    loadPackageParam.classLoader, "isXposed", // 需要 hook 的方法名
-                    XC_MethodReplacement.returnConstant(true) // 将返回值替换为 true
+            XposedHelpers.findAndHookMethod("com.fourtwo.hookintent.ui.home.HomeFragment",
+                    loadPackageParam.classLoader, "isXposed",
+                    XC_MethodReplacement.returnConstant(true)
             );
             return;
         }
@@ -187,124 +174,17 @@ public class HookIntentStart implements IXposedHookLoadPackage {
             }
         });
 
-        Class<?> activityClass = XposedHelpers.findClass("android.app.Activity", loadPackageParam.classLoader);
-
-        /* Activity.startActivityForResult */
-        XposedBridge.hookAllMethods(activityClass, "startActivity", new XC_MethodHook() {
+        XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
             @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                if (!(methodHookParam.thisObject instanceof Context)) return;
-                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
-                    Intent intent = (Intent) methodHookParam.args[0];
-                    filterIntent(intent, "Activity.startActivity", methodHookParam.thisObject.getClass().getName());
-                }
-            }
-        });
+            protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                super.afterHookedMethod(param);
+                Context context = (Context) param.args[0];
+                ClassLoader classLoader = context.getClassLoader();
 
-        /* Activity.startActivity */
-        XposedBridge.hookAllMethods(activityClass, "startActivityForResult", new XC_MethodHook() {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                if (!(methodHookParam.thisObject instanceof Context)) return;
-
-                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
-                    Intent intent = (Intent) methodHookParam.args[0];
-                    filterIntent(intent, "Activity.startActivityForResult", methodHookParam.thisObject.getClass().getName());
-                }
-            }
-        });
-
-        /* Activity.onResume */
-        XposedHelpers.findAndHookMethod(activityClass, "onResume", new XC_MethodHook() {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                Intent intent = (Intent) XposedHelpers.callMethod(methodHookParam.thisObject, "getIntent");
-                filterIntent(intent, "Activity.onResume", methodHookParam.thisObject.getClass().getName());
-            }
-        });
-
-        /* Uri.parse */
-        XposedHelpers.findAndHookMethod("android.net.Uri", loadPackageParam.classLoader, "parse", String.class, new XC_MethodHook() {
-
-            @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                String scheme = (String) methodHookParam.args[0];
-                filterScheme(scheme, "Uri.parse");
-            }
-
-
-        });
-
-        /* Intent.parseUri */
-        XposedHelpers.findAndHookMethod("android.content.Intent", loadPackageParam.classLoader, "parseUri", String.class, int.class, new XC_MethodHook() {
-            @Override
-            protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.afterHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-
-                String scheme = (String) methodHookParam.args[0];
-                filterScheme(scheme, "Intent.parseUri");
-            }
-
-        });
-
-        /* Intent.parseUri */
-        XposedHelpers.findAndHookMethod("android.content.Intent", loadPackageParam.classLoader, "toUri", int.class, new XC_MethodHook() {
-            @Override
-            protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.afterHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                Intent intent = (Intent) methodHookParam.thisObject;
-                if (intent.hasExtra("skipToUriHook")) return; // 检查自定义标志
-                String scheme = (String) methodHookParam.getResult();
-                filterScheme(scheme, "Intent.toUri");
-            }
-
-        });
-
-
-
-//        /* PendingIntent.getActivity */
-//        XposedBridge.hookAllMethods(XposedHelpers.findClass("android.app.PendingIntent", loadPackageParam.classLoader), "getActivity", new XC_MethodHook() {
-//            @Override
-//            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-//                super.beforeHookedMethod(methodHookParam);
-//                if (!getIsHook()) return;
-//                Context context = (Context) methodHookParam.args[0];
-//                Intent intent = (Intent) methodHookParam.args[2];
-//                XposedBridge.log("PendingIntent.getActivity" + intent);
-//                filterIntent(intent, "PendingIntent.getActivity", context.getClass().getName());
-//            }
-//        });
-
-
-        // Intent()
-//        XposedBridge.hookAllConstructors(
-//                XposedHelpers.findClass("android.content.Intent", loadPackageParam.classLoader),
-//                new XC_MethodHook() {
-//                    @Override
-//                    protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-//                        super.afterHookedMethod(methodHookParam);
-//                        if (!getIsHook()) return;
-//                        // 使用 thisObject 获取当前构造的 Intent 实例
-//                        Intent intent = (Intent) methodHookParam.thisObject;
-//                        if ("GET_JUMP_REPLAY_HOOK".equals(intent.getAction())) {return;}
-//                        XposedBridge.log("new intent: " + intent);
-//                        filterIntent(intent, "Intent()", null);
-//                    }
-//                }
-//        );
-
-        // 系统应用
-        if (loadPackageParam.appInfo == null || (loadPackageParam.appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 1) {
+                // Hook methods
+                hookMethods(classLoader);
+                // 系统应用
+//                if (loadPackageParam.appInfo == null || (loadPackageParam.appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 1) {
 //            try {
 //                Class<?> packageManagerServiceClass = XposedHelpers.findClass("com.android.server.pm.PackageManagerService", loadPackageParam.classLoader);
 //                /* PackageManagerService.queryIntentActivities */
@@ -340,9 +220,127 @@ public class HookIntentStart implements IXposedHookLoadPackage {
 //            } catch (XposedHelpers.ClassNotFoundError e) {
 //                XposedBridge.log("Class not found: " + e.getMessage());
 //            }
-        }
+//                }
+            }
+        });
     }
 
+    private void hookMethods(ClassLoader classLoader) {
+        Class<?> activityClass = XposedHelpers.findClass("android.app.Activity", classLoader);
+
+        XposedBridge.hookAllMethods(activityClass, "startActivity", new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.beforeHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                if (!(methodHookParam.thisObject instanceof Context)) return;
+                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
+                    Intent intent = (Intent) methodHookParam.args[0];
+                    filterIntent(intent, "Activity.startActivity", methodHookParam.thisObject.getClass().getName());
+                }
+            }
+        });
+
+        XposedBridge.hookAllMethods(activityClass, "startActivityForResult", new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.beforeHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                if (!(methodHookParam.thisObject instanceof Context)) return;
+                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
+                    Intent intent = (Intent) methodHookParam.args[0];
+                    filterIntent(intent, "Activity.startActivityForResult", methodHookParam.thisObject.getClass().getName());
+                }
+            }
+        });
+
+
+        XposedHelpers.findAndHookMethod(activityClass, "onResume", new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.beforeHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                Intent intent = (Intent) XposedHelpers.callMethod(methodHookParam.thisObject, "getIntent");
+                filterIntent(intent, "Activity.onResume", methodHookParam.thisObject.getClass().getName());
+            }
+        });
+
+
+        XposedBridge.hookAllMethods(XposedHelpers.findClass("android.content.ContextWrapper", classLoader), "startActivity", new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.beforeHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
+                    Intent intent = (Intent) methodHookParam.args[0];
+                    filterIntent(intent, "ContextWrapper.startActivity", null);
+                }
+            }
+        });
+
+        XposedHelpers.findAndHookMethod("android.net.Uri", classLoader, "parse", String.class, new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.beforeHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                String scheme = (String) methodHookParam.args[0];
+                filterScheme(scheme, "Uri.parse");
+            }
+        });
+
+        XposedHelpers.findAndHookMethod("android.content.Intent", classLoader, "parseUri", String.class, int.class, new XC_MethodHook() {
+            @Override
+            protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.afterHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                String scheme = (String) methodHookParam.args[0];
+                filterScheme(scheme, "Intent.parseUri");
+            }
+        });
+
+        XposedHelpers.findAndHookMethod("android.content.Intent", classLoader, "toUri", int.class, new XC_MethodHook() {
+            @Override
+            protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                super.afterHookedMethod(methodHookParam);
+                if (!getIsHook()) return;
+                Intent intent = (Intent) methodHookParam.thisObject;
+                if (intent.hasExtra("skipToUriHook")) return;
+                String scheme = (String) methodHookParam.getResult();
+                filterScheme(scheme, "Intent.toUri");
+            }
+        });
+
+//        /* PendingIntent.getActivity */
+//        XposedBridge.hookAllMethods(XposedHelpers.findClass("android.app.PendingIntent", classLoader), "getActivity", new XC_MethodHook() {
+//            @Override
+//            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+//                super.beforeHookedMethod(methodHookParam);
+//                if (!getIsHook()) return;
+//                Context context = (Context) methodHookParam.args[0];
+//                Intent intent = (Intent) methodHookParam.args[2];
+//                XposedBridge.log("PendingIntent.getActivity" + intent);
+//                filterIntent(intent, "PendingIntent.getActivity", context.getClass().getName());
+//            }
+//        });
+//
+//
+////         Intent()
+//        XposedBridge.hookAllConstructors(XposedHelpers.findClass("android.content.Intent", classLoader),
+//                new XC_MethodHook() {
+//                    @Override
+//                    protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+//                        super.afterHookedMethod(methodHookParam);
+//                        if (!getIsHook()) return;
+//                        // 使用 thisObject 获取当前构造的 Intent 实例
+//                        Intent intent = (Intent) methodHookParam.thisObject;
+//                        if ("GET_JUMP_REPLAY_HOOK".equals(intent.getAction())) {
+//                            return;
+//                        }
+//                        XposedBridge.log("new intent: " + intent);
+//                        filterIntent(intent, "Intent()", null);
+//                    }
+//                }
+//        );
+
+    }
 }
-
-
