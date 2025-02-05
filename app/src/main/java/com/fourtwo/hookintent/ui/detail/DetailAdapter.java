@@ -2,6 +2,7 @@ package com.fourtwo.hookintent.ui.detail;
 
 import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -69,24 +70,29 @@ public class DetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
 
             // Set long press listener for copying data
             dataHolder.itemView.setOnLongClickListener(v -> {
-                ClipboardManager clipboard = (ClipboardManager) v.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-                if (clipboard != null) {
-                    String textToCopy = data.first + ": " + data.second;
-                    ClipData clip = ClipData.newPlainText("Detail Data", textToCopy);
-                    clipboard.setPrimaryClip(clip);
-                    Toast.makeText(v.getContext(), "已复制到剪贴板", Toast.LENGTH_SHORT).show();
-                }
+                AlertDialog.Builder builder = new AlertDialog.Builder(v.getContext());
+                builder.setTitle("选择要复制的内容")
+                        .setItems(new String[]{"复制 Key", "复制 Value"}, (dialog, which) -> {
+                            ClipboardManager clipboard = (ClipboardManager) v.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+                            if (clipboard != null) {
+                                String textToCopy = which == 0 ? data.first : data.second;
+                                ClipData clip = ClipData.newPlainText("Detail Data", textToCopy);
+                                clipboard.setPrimaryClip(clip);
+                                Toast.makeText(v.getContext(), "已复制到剪贴板", Toast.LENGTH_SHORT).show();
+                            }
+                        });
+                builder.show();
                 return true;
             });
 
             // Set touch listener for touch feedback
             dataHolder.itemView.setOnTouchListener(new View.OnTouchListener() {
-                private final int normalColor = Color.WHITE;
-                private final int pressedColor = Color.LTGRAY;
 
                 @SuppressLint("ClickableViewAccessibility")
                 @Override
                 public boolean onTouch(View v, MotionEvent event) {
+                    int normalColor = Color.WHITE;
+                    int pressedColor = Color.LTGRAY;
                     switch (event.getAction()) {
                         case MotionEvent.ACTION_DOWN:
                             startColorAnimation(dataHolder.itemView, normalColor, pressedColor);
@@ -125,7 +131,11 @@ public class DetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
     }
 
     private void startColorAnimation(View view, int startColor, int endColor) {
-        ValueAnimator animator = ValueAnimator.ofArgb(startColor, endColor);
+        ValueAnimator animator = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            animator = ValueAnimator.ofArgb(startColor, endColor);
+        }
+        assert animator != null;
         animator.setDuration(300); // Animation duration in milliseconds
         animator.addUpdateListener(animation -> view.setBackgroundColor((int) animation.getAnimatedValue()));
         animator.start();

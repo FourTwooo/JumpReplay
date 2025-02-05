@@ -31,4 +31,5 @@
     <string name="attachment_summary_off">Only download attachments when manually requested</string>
     <string name="add_text">添加</string>
     <string name="delete">删除</string>
+    <string name="todo">TODO</string>
 </resources>

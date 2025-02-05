@@ -46,24 +46,10 @@ public class IntentData {
                 extrasDetailMap.put("key", key);
                 extrasDetailMap.put("value", value != null ? value.toString(): "null");
                 extrasDetailMap.put("class", value != null ? value.getClass().getName() : "null");
-                // if (value == null || Boolean.parseBoolean(value.getClass().getName())){}
                 extrasList.add(extrasDetailMap);
             }
             intentMap.put("intentExtras", extrasList);
         }
-
-        // Add bundle
-        if (bundle != null) {
-            Map<String, Object> bundleMap = new HashMap<>();
-            for (String key : bundle.keySet()) {
-                Object value = bundle.get(key);
-                bundleMap.put(key, value);
-            }
-            intentMap.put("bundle", bundleMap);
-        }
-
-        // Add request code
-        intentMap.put("requestCode", requestCode);
 
         return intentMap;
     }
@@ -73,46 +59,4 @@ public class IntentData {
         return convertIntentToMap(intent, -1, null);
     }
 
-    // Overload for Intent, Bundle, and source
-    public static Map<String, Object> convertIntentToMap(Intent intent, Bundle bundle) {
-        return convertIntentToMap(intent, -1, bundle);
-    }
-
-    // Overload for Intent, requestCode, and source
-    public static Map<String, Object> convertIntentToMap(Intent intent, int requestCode) {
-        return convertIntentToMap(intent, requestCode, null);
-    }
-
-    public static String convertMapToString(Map<String, Object> map) {
-        StringBuilder map_string = new StringBuilder();
-        map_string.append("{");
-
-        Set<Map.Entry<String, Object>> entrySet = map.entrySet();
-        boolean isFirst = true;
-
-        for (Map.Entry<String, Object> entry : entrySet) {
-            if (!isFirst) {
-                map_string.append(", ");
-            } else {
-                isFirst = false;
-            }
-
-            String key = entry.getKey();
-            Object value = entry.getValue();
-
-            map_string.append("\"").append(key).append("\": ");
-
-            if (value instanceof Map) {
-                // Recursive call for nested maps
-                map_string.append(convertMapToString((Map<String, Object>) value));
-            } else if (value instanceof String) {
-                map_string.append("\"").append(value).append("\"");
-            } else {
-                map_string.append(value);
-            }
-        }
-
-        map_string.append("}");
-        return map_string.toString();
-    }
 }
