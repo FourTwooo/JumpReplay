@@ -43,7 +43,7 @@ import com.fourtwo.hookintent.MainViewModel;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.analysis.JsonHandler;
 import com.fourtwo.hookintent.analysis.UriData;
-import com.fourtwo.hookintent.analysis.extract;
+import com.fourtwo.hookintent.analysis.Extract;
 import com.fourtwo.hookintent.tools.IntentDuplicateChecker;
 import com.fourtwo.hookintent.tools.SchemeResolver;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
@@ -358,8 +358,8 @@ public class HomeFragment extends Fragment {
                         return;
                     }
 
-                    String dataSize = extract.calculateBundleDataSize(bundle);
-                    String time = extract.extractTime(bundle.getString("time"));
+                    String dataSize = Extract.calculateBundleDataSize(bundle);
+                    String time = Extract.extractTime(bundle.getString("time"));
                     String base = intent.getStringExtra("Base");
 
                     String packageName;
@@ -370,7 +370,7 @@ public class HomeFragment extends Fragment {
                         if (handleIntentBase(bundle)) return;
                         ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
                         if (intentExtras != null) {
-                            dataString = extract.extractIntentExtrasString(intentExtras);
+                            dataString = Extract.extractIntentExtrasString(intentExtras);
                         }
                         to = bundle.getString("to");
                         packageName = bundle.getString("componentName");
@@ -387,14 +387,14 @@ public class HomeFragment extends Fragment {
                         if (handleSchemeBase(bundle)) return;
                         String schemeRawUrl = bundle.getString("scheme_raw_url");
                         packageName = SchemeResolver.findAppByUri(context, schemeRawUrl) + "/";
-                        Bundle bundle1 = extract.convertMapToBundle(UriData.convertUriToMap(Uri.parse(schemeRawUrl)));
+                        Bundle bundle1 = Extract.convertMapToBundle(UriData.convertUriToMap(Uri.parse(schemeRawUrl)));
                         bundle.putAll(bundle1);
 
                         if (schemeRawUrl.startsWith("#Intent;") || bundle.getString("authority").equals("null")) {
                             to = schemeRawUrl;
-                            packageName = extract.getIntentSchemeValue(schemeRawUrl, "component");
+                            packageName = Extract.getIntentSchemeValue(schemeRawUrl, "component");
                             if (packageName == null) {
-                                packageName = extract.getIntentSchemeValue(schemeRawUrl, "action") + "/";
+                                packageName = Extract.getIntentSchemeValue(schemeRawUrl, "action") + "/";
                             }
                         } else {
                             to = bundle.getString("scheme") + "://" + bundle.getString("authority") + bundle.getString("path");

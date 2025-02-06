@@ -20,6 +20,7 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
 import com.fourtwo.hookintent.tools.NetworkClient;
+import com.fourtwo.hookintent.Constants;
 import com.google.android.material.navigation.NavigationView;
 
 public class MainActivity extends AppCompatActivity {
@@ -98,7 +99,9 @@ public class MainActivity extends AppCompatActivity {
         View headerView = binding.navView.getHeaderView(0);
         TextView versionTextView = headerView.findViewById(R.id.version);
         String now_version = getAppVersionName(getApplicationContext());
-        networkClient.getVersion("https://api.github.com/repos/FourTwooo/JumpReplay/tags", new NetworkClient.VersionCallback() {
+
+
+        networkClient.getVersion(Constants.GitHub_VERSION_URL, new NetworkClient.VersionCallback() {
             @Override
             public void onVersionReceived(String new_version) {
                 // 处理收到的版本号

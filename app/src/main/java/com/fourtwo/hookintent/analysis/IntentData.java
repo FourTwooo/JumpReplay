@@ -15,18 +15,19 @@ import java.util.Set;
 public class IntentData {
 
     @SuppressLint("SimpleDateFormat")
-    public static Map<String, Object> convertIntentToMap(Intent intent, int requestCode, Bundle bundle) {
+    public static Map<String, Object> convertIntentToMap(Intent intent) {
         Map<String, Object> intentMap = new HashMap<>();
 
         // Add basic intent information
         intentMap.put("time", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a").format(Calendar.getInstance().getTime()));
         intentMap.put("to", intent.getComponent() != null ? intent.getComponent().getClassName() : null);
+
         intentMap.put("action", intent.getAction());
         intentMap.put("clipData", intent.getClipData());
         intentMap.put("flags", intent.getFlags());
         intentMap.put("dataString", intent.getDataString());
         intentMap.put("type", intent.getType());
-        intentMap.put("componentName", extract.extractComponentName(String.valueOf(intent.getComponent())));
+        intentMap.put("componentName", Extract.extractComponentName(String.valueOf(intent.getComponent())));
         intentMap.put("scheme", intent.getScheme());
         intentMap.put("package", intent.getPackage());
 
@@ -52,11 +53,6 @@ public class IntentData {
         }
 
         return intentMap;
-    }
-
-    // Overload for Intent only and source
-    public static Map<String, Object> convertIntentToMap(Intent intent) {
-        return convertIntentToMap(intent, -1, null);
     }
 
 }

@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class extract {
+public class Extract {
     public static String extractComponentName(String componentInfoStr) {
         // Regex pattern to extract the content inside the curly braces
         Pattern pattern = Pattern.compile("\\{([^}]+)\\}");

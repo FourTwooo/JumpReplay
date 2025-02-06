@@ -6,14 +6,13 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 
 import com.fourtwo.hookintent.analysis.IntentData;
 import com.fourtwo.hookintent.analysis.UriData;
-import com.fourtwo.hookintent.analysis.extract;
+import com.fourtwo.hookintent.analysis.Extract;
 
 import java.util.Map;
 import java.util.Objects;
@@ -93,7 +92,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         String finalUri = uri;
         mainHandler.post(() -> {
             try {
-                Bundle bundle = extract.convertMapToBundle(mapData);
+                Bundle bundle = Extract.convertMapToBundle(mapData);
                 Intent intentMsg = new Intent("GET_JUMP_REPLAY_HOOK");
                 intentMsg.putExtra("info", bundle);
                 intentMsg.putExtra("Base", base);

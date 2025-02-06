@@ -15,6 +15,7 @@ import androidx.lifecycle.ViewModelProvider;
 
 import com.fourtwo.hookintent.databinding.FragmentMeBinding;
 import com.fourtwo.hookintent.tools.NetworkClient;
+import com.fourtwo.hookintent.Constants;
 
 import io.noties.markwon.Markwon;
 
@@ -53,8 +54,7 @@ public class MeFragment extends Fragment {
             loadingText.setVisibility(View.VISIBLE);
 
             // 请求Markdown文件内容
-            String url = "https://raw.githubusercontent.com/FourTwooo/JumpReplay/refs/heads/master/README.md";
-            fetchMarkdownFile(url, textView);
+            fetchMarkdownFile(Constants.GitHub_README_URL, textView);
         } else {
             Log.d(TAG, "使用缓存的 README.md");
             Markwon markwon = Markwon.create(requireContext());
