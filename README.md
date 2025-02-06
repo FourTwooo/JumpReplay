@@ -2,6 +2,8 @@
 
 Xposed Hook Android Intent/Scheme
 
+https://github.com/user-attachments/assets/7f32c479-84ba-4698-9a20-f8e82d490428
+
 <img src="https://github.com/user-attachments/assets/cc1c2e44-f5b4-4826-a957-72e727990bc4" width="200"/><img src="https://github.com/user-attachments/assets/72534255-31a9-417d-b030-817cefbf93c2" width="200"/><img src="https://github.com/user-attachments/assets/f4a6f979-22dd-4894-b9d5-f88091f00431" width="200"/>
 
 ## 开发环境
@@ -12,7 +14,6 @@ Xposed Hook Android Intent/Scheme
 | OnePlus6 | Android 11 | EdXposed 4.6.2 | ❌(部分intent无法获取) |
 | 小米6      | MIUI 10.3  | EdXposed 4.6.2 | ❌(需勾选部分系统应用)    |
 
-https://github.com/user-attachments/assets/7f32c479-84ba-4698-9a20-f8e82d490428
 
 ## 目前已知问题
 
