@@ -15,7 +15,7 @@
 | 手机型号     | 系统         | HOOK框架         | 是否正常            |
 |----------|------------|----------------|-----------------|
 | OnePlus6 | Android 10 | LSPosed 1.9.1  | ✅               |
-| OnePlus6 | Android 11 | EdXposed 4.6.2 | ❌(部分intent无法获取) |
+| OnePlus6 | Android 11 | EdXposed 4.6.2 | ✅ |
 | 小米6      | MIUI 10.3  | EdXposed 4.6.2 | ❌(需勾选部分系统应用)    |
 
 https://github.com/user-attachments/assets/7f32c479-84ba-4698-9a20-f8e82d490428
