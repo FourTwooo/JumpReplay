@@ -21,15 +21,40 @@
 
         <activity
             android:name=".MainActivity"
-            android:launchMode="standard"
             android:exported="true"
+            android:launchMode="standard"
             android:theme="@style/Theme.HookIntent.NoActionBar">
+
+            <!-- 主入口 -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
         </activity>
+
+        <activity
+            android:name=".SchemeHandlerActivity"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!--
+                    系统级协议头.看了下源码,
+                    系统会对这些系统头做单独的处理,跟第三方scheme是不同的.
+                    所以这个直接手动添加才是最好的.不然单独再去hook,实在没有必要
+                -->
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+
+                <!-- 自定义协议 -->
+                <data android:scheme="jumpreplay" />
+            </intent-filter>
+        </activity>
+
 
         <meta-data
             android:name="xposedmodule"
@@ -41,5 +66,4 @@
             android:name="xposedminversion"
             android:value="89" />
     </application>
-
 </manifest>

@@ -13,9 +13,9 @@ import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.fourtwo.hookintent.Constants;
 import com.fourtwo.hookintent.databinding.FragmentMeBinding;
 import com.fourtwo.hookintent.tools.NetworkClient;
-import com.fourtwo.hookintent.Constants;
 
 import io.noties.markwon.Markwon;
 

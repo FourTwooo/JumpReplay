@@ -28,6 +28,7 @@ public class JsonHandler {
     public JsonHandler() {
     }
 
+    @SuppressWarnings("unchecked")
     public static Map<String, Object> getFilterKeyJson(Object jsonData) {
         if (jsonData instanceof JSONObject) {
             return toMap((JSONObject) jsonData);
@@ -35,10 +36,12 @@ public class JsonHandler {
         return (Map<String, Object>) jsonData;
     }
 
+    @SuppressWarnings("unchecked")
     public static List<Map<String, Object>> getFilterValueJson(Object jsonData) {
         if (jsonData instanceof JSONArray) {
             return toList((JSONArray) jsonData);
         }
+
         return (List<Map<String, Object>>) jsonData;
     }
 

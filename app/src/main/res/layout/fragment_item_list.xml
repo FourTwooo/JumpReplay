@@ -29,7 +29,8 @@
         android:textColor="@android:color/white"
         android:textSize="8sp"
         app:layout_constraintBottom_toBottomOf="@+id/app_name"
-        app:layout_constraintStart_toEndOf="@+id/icon" />
+        app:layout_constraintStart_toEndOf="@+id/icon"
+        tools:ignore="SmallSp" />
 
     <!-- Space for spacing -->
     <Space
