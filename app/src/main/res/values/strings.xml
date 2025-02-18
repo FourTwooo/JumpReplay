@@ -32,4 +32,5 @@
     <string name="add_text">添加</string>
     <string name="delete">删除</string>
     <string name="todo">TODO</string>
+    <string name="activity_label">意图拦截器</string>
 </resources>

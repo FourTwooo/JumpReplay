@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent;
+package com.fourtwo.hookintent.data;
 
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;

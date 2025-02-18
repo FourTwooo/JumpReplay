@@ -4,7 +4,7 @@
 
     <item
         android:id="@+id/copy_code"
-        android:icon="@drawable/detail_copy_code"
+        android:icon="@drawable/copy"
         android:orderInCategory="1"
         android:title="@string/copy_code"
         app:tint="@color/white"

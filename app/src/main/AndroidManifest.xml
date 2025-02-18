@@ -34,8 +34,13 @@
         </activity>
 
         <activity
-            android:name=".SchemeHandlerActivity"
-            android:exported="true">
+            android:name=".IntentIntercept"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:process=":scheme_process"
+            android:taskAffinity="com.example.scheme_task"
+            android:label="@string/activity_label"
+            android:theme="@style/Theme.HookIntent.NoActionBar">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.VIEW" />
 

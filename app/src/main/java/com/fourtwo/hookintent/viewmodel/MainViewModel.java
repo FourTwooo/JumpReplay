@@ -1,8 +1,10 @@
-package com.fourtwo.hookintent;
+package com.fourtwo.hookintent.viewmodel;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
+
+import com.fourtwo.hookintent.data.ItemData;
 
 import java.util.ArrayList;
 import java.util.List;

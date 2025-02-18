@@ -11,6 +11,7 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.fourtwo.hookintent.databinding.FragmentGalleryBinding;
+import com.fourtwo.hookintent.viewmodel.GalleryViewModel;
 
 public class GalleryFragment extends Fragment {
 

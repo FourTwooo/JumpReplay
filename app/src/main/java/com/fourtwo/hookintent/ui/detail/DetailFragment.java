@@ -15,6 +15,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,10 +32,11 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.ItemData;
+import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.R;
-import com.fourtwo.hookintent.analysis.AmCommandBuilder;
-import com.fourtwo.hookintent.tools.ShellExecutor;
+import com.fourtwo.hookintent.base.AmCommandBuilder;
+import com.fourtwo.hookintent.utils.ShellExecutor;
+import com.fourtwo.hookintent.viewmodel.DetailViewModel;
 import com.google.android.material.tabs.TabLayout;
 
 import java.util.ArrayList;
@@ -189,15 +191,17 @@ public class DetailFragment extends Fragment {
         requireActivity().addMenuProvider(new MenuProvider() {
             @Override
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
-                menu.clear(); // Clear existing menu items to avoid duplication
-                menuInflater.inflate(R.menu.detail_drawer, menu); // Inflate the menu specific to this Fragment
+                menu.clear(); // 清除现有菜单项，避免重复
+                menuInflater.inflate(R.menu.detail_drawer, menu); // 加载菜单
             }
 
             @Override
             public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
                 int itemId = menuItem.getItemId();
                 if (itemId == R.id.copy_code) {
-                    showOptionsDialog();
+                    // 获取菜单项的 View 并传递给 showOptionsDialog
+                    View anchorView = requireActivity().findViewById(R.id.copy_code);
+                    showOptionsDialog(anchorView); // 调用修改后的 showOptionsDialog
                     return true;
                 }
                 return false;
@@ -205,7 +209,7 @@ public class DetailFragment extends Fragment {
         }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
     }
 
-    private void showOptionsDialog() {
+    private void showOptionsDialog(View anchorView) {
         // 获取 Arguments 中的 itemData
         ItemData itemData = null;
         if (getArguments() != null) {
@@ -218,16 +222,12 @@ public class DetailFragment extends Fragment {
             return;
         }
 
-        // Continue with processing itemData
-        Log.d(TAG, "AlertDialogItemData: " + itemData.getAppBundle());
-
         Bundle bundle = itemData.getAppBundle();
         String Base = itemData.getBase();
         List<String> options = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
 
         if (Base.equals("Intent")) {
-
             ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
             boolean hasError = false;
             String activityTemplate = "am start -n %s %s";
@@ -247,8 +247,8 @@ public class DetailFragment extends Fragment {
             actions.add(() -> showAmCommandDialog(activityCommand, finalHasError));
 
             String uriCommand = String.format(intentTemplate, itemData.getUri());
-
             Log.d(TAG, "intentCommand: " + uriCommand);
+
             options.add("intent协议");
             actions.add(() -> showAmCommandDialog(uriCommand, false));
         } else if (Base.equals("Scheme")) {
@@ -260,16 +260,23 @@ public class DetailFragment extends Fragment {
             actions.add(() -> showAmCommandDialog(uriCommand, false));
         }
 
-        // 创建并显示对话框
-        new AlertDialog.Builder(requireContext())
-                .setTitle("选择转换模式")
-                .setItems(options.toArray(new String[0]), (dialog, which) -> {
-                    // 执行用户选择的操作
-                    actions.get(which).run();
-                })
-                .create()
-                .show();
+        // 改用 PopupMenu
+        PopupMenu popupMenu = new PopupMenu(requireContext(), anchorView);
+        for (int i = 0; i < options.size(); i++) {
+            popupMenu.getMenu().add(Menu.NONE, i, i, options.get(i));
+        }
+
+        // 设置菜单项点击事件
+        popupMenu.setOnMenuItemClickListener(item -> {
+            int which = item.getItemId();
+            actions.get(which).run(); // 执行对应的操作
+            return true;
+        });
+
+        // 显示 PopupMenu
+        popupMenu.show();
     }
+
 
     @SuppressLint("SetTextI18n")
     private void showAmCommandDialog(String amCommand, boolean hasError) {

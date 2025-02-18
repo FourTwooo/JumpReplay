@@ -15,9 +15,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.fourtwo.hookintent.analysis.Extract;
-import com.fourtwo.hookintent.analysis.IntentData;
-import com.fourtwo.hookintent.analysis.UriData;
+import com.fourtwo.hookintent.base.Extract;
+import com.fourtwo.hookintent.base.IntentData;
+import com.fourtwo.hookintent.base.UriData;
+import com.fourtwo.hookintent.data.Constants;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -33,10 +34,10 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 
-public class HookIntentStart implements IXposedHookLoadPackage {
+public class IntentCapture implements IXposedHookLoadPackage {
     private Boolean isHook = null;
     private final String myAppPackage = "com.fourtwo.hookintent";
-    private final String myAppClass = "com.fourtwo.hookintent.SchemeHandlerActivity";
+    private final String myAppClass = "com.fourtwo.hookintent.IntentIntercept";
 
     private void sendTaskIntent(String data) {
         Context appContext = getAppContext();
@@ -229,7 +230,6 @@ public class HookIntentStart implements IXposedHookLoadPackage {
             return;
         }
 
-
         XposedBridge.hookAllMethods(
                 hookClass,
                 "queryIntentActivitiesInternal",
@@ -238,14 +238,15 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
 
                         Intent intent = (Intent) param.args[0];
-                        XposedBridge.log("queryIntentActivitiesInternal Scheme: " + intent.getScheme() + " " + intent.toUri(Intent.URI_INTENT_SCHEME));
                         if (intent.getComponent() != null || intent.getScheme() == null) {
                             return;
                         }
+
                         if (myAppPackage.equals(intent.getPackage())) {
                             // 如果是特定的 Intent，不再处理，直接返回
                             return;
                         }
+                        XposedBridge.log("queryIntentActivitiesInternal Scheme: " + intent.getScheme());
 
                         // 获取原始返回值
                         @SuppressWarnings("unchecked")
@@ -262,7 +263,7 @@ public class HookIntentStart implements IXposedHookLoadPackage {
                             }
                         }
 
-                        if (hasHookIntent) {
+                        if (hasHookIntent || originalResult.isEmpty()) {
                             return;
                         }
                         // 构造特殊 Intent，用于主动调用
@@ -334,6 +335,10 @@ public class HookIntentStart implements IXposedHookLoadPackage {
         }
 
         if (loadPackageParam.appInfo == null || (loadPackageParam.appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 1) {
+            XposedHelpers.findAndHookMethod("com.fourtwo.hookintent.IntentIntercept",
+                    loadPackageParam.classLoader, "isSystemXposed",
+                    XC_MethodReplacement.returnConstant(true)
+            );
             handleLoadSystem(loadPackageParam);
         }
 

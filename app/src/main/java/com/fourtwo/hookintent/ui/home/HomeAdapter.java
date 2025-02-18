@@ -25,7 +25,7 @@ import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.ItemData;
+import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.R;
 
 import java.util.ArrayList;

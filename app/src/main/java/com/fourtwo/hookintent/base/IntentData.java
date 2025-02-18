@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent.analysis;
+package com.fourtwo.hookintent.base;
 
 import android.annotation.SuppressLint;
 import android.content.Intent;

@@ -37,15 +37,15 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.Constants;
-import com.fourtwo.hookintent.ItemData;
-import com.fourtwo.hookintent.MainViewModel;
+import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.viewmodel.MainViewModel;
 import com.fourtwo.hookintent.R;
-import com.fourtwo.hookintent.analysis.Extract;
-import com.fourtwo.hookintent.analysis.JsonHandler;
-import com.fourtwo.hookintent.analysis.UriData;
-import com.fourtwo.hookintent.tools.IntentDuplicateChecker;
-import com.fourtwo.hookintent.tools.SchemeResolver;
+import com.fourtwo.hookintent.base.Extract;
+import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.base.UriData;
+import com.fourtwo.hookintent.utils.IntentDuplicateChecker;
+import com.fourtwo.hookintent.utils.SchemeResolver;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.lang.reflect.Method;

@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent.ui.gallery;
+package com.fourtwo.hookintent.viewmodel;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;

@@ -1,10 +1,10 @@
-package com.fourtwo.hookintent.ui.detail;
+package com.fourtwo.hookintent.viewmodel;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-import com.fourtwo.hookintent.ItemData;
+import com.fourtwo.hookintent.data.ItemData;
 
 public class DetailViewModel extends ViewModel {
     private final MutableLiveData<ItemData> itemData = new MutableLiveData<>();

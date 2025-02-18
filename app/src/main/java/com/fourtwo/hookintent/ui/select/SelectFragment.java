@@ -21,7 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
-import com.fourtwo.hookintent.analysis.JsonHandler;
+import com.fourtwo.hookintent.base.JsonHandler;
 
 import java.util.HashMap;
 import java.util.List;

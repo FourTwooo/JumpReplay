@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent.tools;
+package com.fourtwo.hookintent.utils;
 
 import android.os.Bundle;
 import android.util.Log;

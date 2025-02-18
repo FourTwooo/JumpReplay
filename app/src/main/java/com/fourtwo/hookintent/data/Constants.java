@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent;
+package com.fourtwo.hookintent.data;
 
 public final class Constants {
 

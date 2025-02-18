@@ -8,9 +8,13 @@ import android.util.Log;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-public class SchemeHandlerActivity extends Activity {
+public class IntentIntercept extends Activity {
 
-    String TAG = "SchemeHandlerActivity";
+    String TAG = "InterceptActivity";
+
+    private static boolean isSystemXposed() {
+        return false;
+    }
 
     @SuppressLint("SetTextI18n")
     @Override

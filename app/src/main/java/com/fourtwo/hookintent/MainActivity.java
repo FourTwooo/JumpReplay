@@ -18,8 +18,9 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
-import com.fourtwo.hookintent.tools.NetworkClient;
+import com.fourtwo.hookintent.utils.NetworkClient;
 import com.google.android.material.navigation.NavigationView;
 
 public class MainActivity extends AppCompatActivity {

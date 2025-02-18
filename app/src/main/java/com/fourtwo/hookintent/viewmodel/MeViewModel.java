@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent.ui.me;
+package com.fourtwo.hookintent.viewmodel;
 
 
 import androidx.lifecycle.ViewModel;
