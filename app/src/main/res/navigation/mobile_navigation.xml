@@ -44,4 +44,10 @@
         android:id="@+id/nav_select"
         android:name="com.fourtwo.hookintent.ui.select.SelectFragment"
         tools:layout="@layout/fragment_select" />
+
+    <activity
+        android:id="@+id/nav_intercept"
+        android:name="com.fourtwo.hookintent.IntentIntercept"
+        tools:layout="@layout/activity_intent_intercept" />
+
 </navigation>

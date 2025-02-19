@@ -8,6 +8,7 @@
     <string name="action_delete">清空</string>
 
     <string name="menu_home">JumpReplay</string>
+    <string name="menu_home_value">IntentCapture</string>
     <string name="menu_home_list_detail">详情内容</string>
     <string name="menu_gallery">收藏</string>
     <string name="menu_me">关于</string>
@@ -33,4 +34,5 @@
     <string name="delete">删除</string>
     <string name="todo">TODO</string>
     <string name="activity_label">意图拦截器</string>
+    <string name="menu_intercept">意图拦截器</string>
 </resources>

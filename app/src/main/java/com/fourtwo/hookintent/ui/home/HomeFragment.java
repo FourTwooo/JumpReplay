@@ -26,6 +26,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.MenuCompat;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Lifecycle;
@@ -47,6 +48,7 @@ import com.fourtwo.hookintent.base.UriData;
 import com.fourtwo.hookintent.utils.IntentDuplicateChecker;
 import com.fourtwo.hookintent.utils.SchemeResolver;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.navigation.NavigationView;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -505,6 +507,7 @@ public class HomeFragment extends Fragment {
 
         JsonData = new JsonHandler().readJsonFromFile(requireContext());
         Log.d(TAG, "onResume: " + JsonData);
+
 //        // 更新过滤表
 //        SharedPreferences sharedPreferences = requireContext().getSharedPreferences(SelectItemData.SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
 //

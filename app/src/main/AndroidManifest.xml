@@ -38,7 +38,7 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:process=":scheme_process"
-            android:taskAffinity="com.example.scheme_task"
+            android:taskAffinity="com.fourtwo.intercept"
             android:label="@string/activity_label"
             android:theme="@style/Theme.HookIntent.NoActionBar">
             <intent-filter android:priority="1000">
@@ -70,5 +70,8 @@
         <meta-data
             android:name="xposedminversion"
             android:value="89" />
+        <meta-data
+            android:name="xposedscope"
+            android:value="android" />
     </application>
 </manifest>

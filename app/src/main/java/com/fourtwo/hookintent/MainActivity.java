@@ -7,21 +7,26 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.util.Log;
+import android.view.Menu;
 import android.view.View;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.MenuCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
+import androidx.recyclerview.widget.DividerItemDecoration;
 
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
 import com.fourtwo.hookintent.utils.NetworkClient;
 import com.google.android.material.navigation.NavigationView;
+
+import java.lang.reflect.Field;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -122,8 +127,29 @@ public class MainActivity extends AppCompatActivity {
 
         initializeUIComponents();
 
+        // 启用分割线
+//        enableNavigationViewDivider();
     }
 
+    private void enableNavigationViewDivider() {
+        // 获取 NavigationView 的菜单
+        NavigationView navigationView = binding.navView;
+
+        // 获取 NavigationView 的内部 RecyclerView
+        try {
+            Field recyclerViewField = NavigationView.class.getDeclaredField("mMenuView");
+            recyclerViewField.setAccessible(true);
+            Object menuView = recyclerViewField.get(navigationView);
+
+            if (menuView instanceof androidx.recyclerview.widget.RecyclerView) {
+                androidx.recyclerview.widget.RecyclerView recyclerView = (androidx.recyclerview.widget.RecyclerView) menuView;
+                // 设置分割线
+                recyclerView.addItemDecoration(new androidx.recyclerview.widget.DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     private void initializeUIComponents() {
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;

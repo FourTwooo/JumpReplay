@@ -3,15 +3,32 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:showIn="navigation_view">
 
-    <group android:checkableBehavior="single">
-<!--        <item-->
-<!--            android:id="@+id/nav_home"-->
-<!--            android:icon="@drawable/ic_menu_camera"-->
-<!--            android:title="@string/menu_home" />-->
+    <group
+        android:id="@+id/group1"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_home"
+            android:icon="@drawable/capture"
+            android:title="@string/menu_home_value" />
         <item
             android:id="@+id/nav_gallery"
             android:icon="@drawable/gallery"
             android:title="@string/menu_gallery" />
+    </group>
+
+
+    <group
+        android:id="@+id/group2"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_intercept"
+            android:icon="@drawable/intercept"
+            android:title="@string/menu_intercept" />
+    </group>
+
+    <group
+        android:id="@+id/group3"
+        android:checkableBehavior="single">
         <item
             android:id="@+id/nav_me"
             android:icon="@drawable/slideshow"
