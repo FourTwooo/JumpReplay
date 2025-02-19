@@ -23,7 +23,7 @@
 
 https://github.com/user-attachments/assets/ff862eca-fd00-43a0-aaa9-112ba3c71661
 
-**意图拦截**
+**意图拦截(作用域勾选android)**
 
 https://github.com/user-attachments/assets/634184d4-1bf4-4a4f-9502-01e064bdee9b
 
