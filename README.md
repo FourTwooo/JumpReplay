@@ -16,7 +16,18 @@
 | OnePlus6 | Android 11 | EdXposed 4.6.2 | ✅            |
 | 小米6      | MIUI 10.3  | EdXposed 4.6.2 | ❌(需勾选部分系统应用) |
 
-https://github.com/user-attachments/assets/7f32c479-84ba-4698-9a20-f8e82d490428
+---
+## 演示视频
+
+**抓包**
+
+https://github.com/user-attachments/assets/ff862eca-fd00-43a0-aaa9-112ba3c71661
+
+**意图拦截**
+
+https://github.com/user-attachments/assets/634184d4-1bf4-4a4f-9502-01e064bdee9b
+
+---
 
 ### 有bug和改进意见请直接提交Issues或QQ群(1021904342)联系我
 ### 项目免费开源..请遵守GPL3.0.如果你喜欢项目请点个Star支持一下.
