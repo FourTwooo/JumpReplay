@@ -327,7 +327,7 @@ modified object code on the User Product (for example, the work has
 been installed in ROM).
 
   The requirement to provide Installation Information does not include a
-requirement to continue to provide support service, warranty, or updates
+requirement to continue to provide support com.fourtwo.hookintent.service, warranty, or updates
 for a work that has been modified or installed by the recipient, or for
 the User Product in which it has been modified or installed.  Access to a
 network may be denied when the modification itself materially and
@@ -377,7 +377,7 @@ that material) supplement the terms of this License with terms:
     authors of the material; or
 
     e) Declining to grant rights under trademark law for use of some
-    trade names, trademarks, or service marks; or
+    trade names, trademarks, or com.fourtwo.hookintent.service marks; or
 
     f) Requiring indemnification of licensors and authors of that
     material by anyone who conveys the material (or modified versions of

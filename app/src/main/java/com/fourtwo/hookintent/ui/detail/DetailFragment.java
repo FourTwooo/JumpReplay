@@ -32,9 +32,9 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
+import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.utils.ShellExecutor;
 import com.fourtwo.hookintent.viewmodel.DetailViewModel;
 import com.google.android.material.tabs.TabLayout;
@@ -109,7 +109,7 @@ public class DetailFragment extends Fragment {
             urlTextView.setText(itemData.getItem_from());
 
             // Define the keys in the desired order
-            List<String> keys = Arrays.asList("FunctionCall", "time", "from", "to", "scheme_raw_url");
+            List<String> keys = Arrays.asList("FunctionCall", "time", "packageName", "from", "to", "scheme_raw_url");
 
             // Create a map to store the Bundle data
             Map<String, String> dataMap = new HashMap<>();

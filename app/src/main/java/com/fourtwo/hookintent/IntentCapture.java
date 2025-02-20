@@ -19,6 +19,8 @@ import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.IntentData;
 import com.fourtwo.hookintent.base.UriData;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.service.MessengerClient;
+import com.fourtwo.hookintent.service.MessengerService;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -35,46 +37,52 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 
 public class IntentCapture implements IXposedHookLoadPackage {
-    private Boolean isHook = null;
+
+    private MessengerClient client = null;
+    private Context applicationContext = null;
+
+    private String packageName;
+    private Boolean isHook = false;
+
+    private Boolean isService = false;
     private final String myAppPackage = "com.fourtwo.hookintent";
     private final String myAppClass = "com.fourtwo.hookintent.IntentIntercept";
 
-    private void sendTaskIntent(String data) {
-        Context appContext = getAppContext();
-        if (appContext != null) {
-            Handler mainHandler = new Handler(Looper.getMainLooper());
-            mainHandler.post(() -> {
-                try {
-                    Intent intentMsg = new Intent("GET_JUMP_REPLAY_HOOK");
-                    intentMsg.putExtra(Constants.DATA, data);
-                    intentMsg.putExtra(Constants.TYPE, "msg");
-                    appContext.sendBroadcast(intentMsg);
-                } catch (Exception e) {
-                    XposedBridge.log("HandlerException Error sending intent" + e);
+    private Boolean getIsHook() {
+
+        if (client != null && !isService) {
+            client.sendMessageAsync(MessengerService.MSG_IS_HOOK, null, true, new MessengerClient.ResultCallback() {
+                @Override
+                public void onResult(Bundle result) {
+                    int resultCode = result.getInt("resultCode");
+                    String resultData = result.getString("resultData");
+                    isHook = (resultCode == 1);
+                    isService = true;
+                    XposedBridge.log(isHook + " Client Async Result: resultCode=" + resultCode + ", resultData=" + resultData);
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    XposedBridge.log("Client Error during async call" + e);
                 }
             });
-        }
-    }
-
-    private Boolean getIsHook() {
-        if (isHook == null) {
-            sendTaskIntent(Constants.GET_IS_HOOK);
-            return false;
+            return isHook;
         }
         return isHook;
     }
 
     private String getStackTraceString() {
-        Throwable throwable = new Throwable();
-        StackTraceElement[] stackTrace = throwable.getStackTrace();
-        StringBuilder stackTraceString = new StringBuilder();
-        for (StackTraceElement element : stackTrace) {
-            stackTraceString.append(element.toString()).append("\n");
-        }
-        return stackTraceString.toString();
+        return "";
+//        Throwable throwable = new Throwable();
+//        StackTraceElement[] stackTrace = throwable.getStackTrace();
+//        StringBuilder stackTraceString = new StringBuilder();
+//        for (StackTraceElement element : stackTrace) {
+//            stackTraceString.append(element.toString()).append("\n");
+//        }
+//        return stackTraceString.toString();
     }
 
-    private void sendBroadcastSafely(Map<String, Object> mapData, String base, String StackTraceString) {
+    private void sendBroadcastSafely(Map<String, Object> mapData, String base, String stackTraceString) {
         Context appContext = getAppContext();
         String uri = "";
         if (appContext == null) return;
@@ -85,23 +93,28 @@ public class IntentCapture implements IXposedHookLoadPackage {
         if (!mapData.containsKey("from")) {
             mapData.put("from", appContext.getClass().getName());
         }
+
         Handler mainHandler = new Handler(Looper.getMainLooper());
         String finalUri = uri;
         mainHandler.post(() -> {
             try {
+                // 转换为 Bundle 类型
                 Bundle bundle = Extract.convertMapToBundle(mapData);
-                Intent intentMsg = new Intent("GET_JUMP_REPLAY_HOOK");
-                intentMsg.putExtra("info", bundle);
-                intentMsg.putExtra("Base", base);
-                intentMsg.putExtra(Constants.TYPE, "data");
-                intentMsg.putExtra("stack_trace", StackTraceString);
-                intentMsg.putExtra("uri", finalUri);
-                appContext.sendBroadcast(intentMsg);
+                bundle.putString("Base", base);
+                bundle.putString(Constants.TYPE, "data");
+                bundle.putString("stack_trace", stackTraceString);
+                bundle.putString("uri", finalUri);
+                bundle.putString("packageName", packageName);
+
+                // 使用 MessengerClient 发送数据
+                client.sendMessageAsync(MessengerService.MSG_SEND_DATA, bundle, false, null);
+
             } catch (Exception e) {
-                XposedBridge.log("HandlerException Error sending intent" + e);
+                XposedBridge.log("HandlerException Error sending data: " + e);
             }
         });
     }
+
 
     private void filterScheme(String scheme_raw_url, String FunctionCall) {
         if (scheme_raw_url != null) {
@@ -130,8 +143,12 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     private Context getAppContext() {
         try {
-            Object activityThread = XposedHelpers.callStaticMethod(ActivityThread.class, "currentActivityThread");
-            return (Context) XposedHelpers.callMethod(activityThread, "getApplication");
+            if (applicationContext == null) {
+                Object activityThread = XposedHelpers.callStaticMethod(ActivityThread.class, "currentActivityThread");
+                return (Context) XposedHelpers.callMethod(activityThread, "getApplication");
+            } else {
+                return applicationContext;
+            }
         } catch (Exception e) {
             XposedBridge.log("getAppContext Failed to get context" + e);
             return null;
@@ -280,6 +297,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
                         dynamicArgs[2] = PackageManager.MATCH_DEFAULT_ONLY; // 设置 flags，仅匹配默认组件
 
                         // 调用 queryIntentActivitiesInternal
+                        @SuppressWarnings("unchecked")
                         List<ResolveInfo> myAppResolveInfos = (List<ResolveInfo>) XposedHelpers.callMethod(
                                 param.thisObject, // 当前 Hook 的类实例
                                 "queryIntentActivitiesInternal",
@@ -321,6 +339,37 @@ public class IntentCapture implements IXposedHookLoadPackage {
                     }
                 }
         );
+        //        /* PendingIntent.getActivity */
+//        XposedBridge.hookAllMethods(XposedHelpers.findClass("android.app.PendingIntent", classLoader), "getActivity", new XC_MethodHook() {
+//            @Override
+//            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+//                super.beforeHookedMethod(methodHookParam);
+//                if (!getIsHook()) return;
+//                Context context = (Context) methodHookParam.args[0];
+//                Intent intent = (Intent) methodHookParam.args[2];
+//                XposedBridge.log("PendingIntent.getActivity" + intent);
+//                filterIntent(intent, "PendingIntent.getActivity", context.getClass().getName());
+//            }
+//        });
+//
+//
+////         Intent()
+//        XposedBridge.hookAllConstructors(XposedHelpers.findClass("android.content.Intent", classLoader),
+//                new XC_MethodHook() {
+//                    @Override
+//                    protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+//                        super.afterHookedMethod(methodHookParam);
+//                        if (!getIsHook()) return;
+//                        // 使用 thisObject 获取当前构造的 Intent 实例
+//                        Intent intent = (Intent) methodHookParam.thisObject;
+//                        if ("GET_JUMP_REPLAY_HOOK".equals(intent.getAction())) {
+//                            return;
+//                        }
+//                        XposedBridge.log("new intent: " + intent);
+//                        filterIntent(intent, "Intent()", null);
+//                    }
+//                }
+//        );
 
     }
 
@@ -335,39 +384,11 @@ public class IntentCapture implements IXposedHookLoadPackage {
         }
 
         if (loadPackageParam.appInfo == null || (loadPackageParam.appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 1) {
-            XposedHelpers.findAndHookMethod("com.fourtwo.hookintent.IntentIntercept",
-                    loadPackageParam.classLoader, "isSystemXposed",
-                    XC_MethodReplacement.returnConstant(true)
-            );
             handleLoadSystem(loadPackageParam);
+            return;
         }
 
-        XposedHelpers.findAndHookMethod(
-                Application.class,
-                "onCreate",
-                new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        super.afterHookedMethod(param);
-                        Application application = (Application) param.thisObject;
-
-                        BroadcastReceiver receiver = new BroadcastReceiver() {
-                            @Override
-                            public void onReceive(Context context, Intent intent) {
-                                String DataType = intent.getStringExtra(Constants.TYPE);
-                                if (Objects.equals(DataType, Constants.SET_IS_HOOK)) {
-                                    isHook = intent.getBooleanExtra(Constants.DATA, false);
-                                    //XposedBridge.log("Constants.SET_IS_HOOK " + isHook);
-                                }
-                            }
-                        };
-                        // 注册接收器
-                        IntentFilter filter = new IntentFilter("SET_JUMP_REPLAY_HOOK");
-                        application.registerReceiver(receiver, filter);
-                        XposedBridge.log(application.getClass().getName() + "注册广播接收");
-                    }
-                }
-        );
+        packageName = loadPackageParam.packageName;
 
         XposedHelpers.findAndHookMethod(
                 Application.class,
@@ -377,9 +398,15 @@ public class IntentCapture implements IXposedHookLoadPackage {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         super.afterHookedMethod(param);
-                        Context context = (Context) param.args[0];
-                        ClassLoader classLoader = context.getClassLoader();
-
+                        applicationContext = (Context) param.args[0];
+                        ClassLoader classLoader = applicationContext.getClassLoader();
+                        if (client == null) {
+                            client = new MessengerClient(applicationContext);
+                            client.registerPassiveCallback(data -> {
+                                isHook = data.getBoolean("isHook");
+                                XposedBridge.log("Client Received hook state: " + isHook);
+                            });
+                        }
                         // Hook methods
                         hookMethods(classLoader);
                     }
@@ -471,38 +498,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 filterScheme(scheme, "Intent.toUri");
             }
         });
-
-//        /* PendingIntent.getActivity */
-//        XposedBridge.hookAllMethods(XposedHelpers.findClass("android.app.PendingIntent", classLoader), "getActivity", new XC_MethodHook() {
-//            @Override
-//            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-//                super.beforeHookedMethod(methodHookParam);
-//                if (!getIsHook()) return;
-//                Context context = (Context) methodHookParam.args[0];
-//                Intent intent = (Intent) methodHookParam.args[2];
-//                XposedBridge.log("PendingIntent.getActivity" + intent);
-//                filterIntent(intent, "PendingIntent.getActivity", context.getClass().getName());
-//            }
-//        });
-//
-//
-////         Intent()
-//        XposedBridge.hookAllConstructors(XposedHelpers.findClass("android.content.Intent", classLoader),
-//                new XC_MethodHook() {
-//                    @Override
-//                    protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-//                        super.afterHookedMethod(methodHookParam);
-//                        if (!getIsHook()) return;
-//                        // 使用 thisObject 获取当前构造的 Intent 实例
-//                        Intent intent = (Intent) methodHookParam.thisObject;
-//                        if ("GET_JUMP_REPLAY_HOOK".equals(intent.getAction())) {
-//                            return;
-//                        }
-//                        XposedBridge.log("new intent: " + intent);
-//                        filterIntent(intent, "Intent()", null);
-//                    }
-//                }
-//        );
 
     }
 }
