@@ -11,7 +11,7 @@ android {
         minSdk 20
         targetSdk 33
         versionCode 1
-        versionName "1.4.0"
+        versionName "1.4.1"
 
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -32,10 +32,15 @@ android {
     }
     sourceSets {
         main {
+            aidl.srcDirs = ['src/main/aidl']
+
             assets {
                 srcDirs 'src\\main\\assets'
             }
         }
+    }
+    buildFeatures {
+        aidl true
     }
 }
 

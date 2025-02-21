@@ -89,6 +89,9 @@ public class MessengerService extends Service {
                 case MSG_GET_DATA:
                     // 模拟获取数据
                     String data1 = getData();
+                    Bundle m = msg.getData();
+                    m.getString("Base");
+                    Log.d(TAG, "handleMessage: " + m);
                     // 返回结果
                     sendReply(msg.replyTo, msg.what, msg.arg1, 0, data1);
                     break;
@@ -153,7 +156,6 @@ public class MessengerService extends Service {
                 msg.setData(bundle);
                 client.send(msg); // 尝试向客户端发送消息
             } catch (RemoteException e) {
-                Log.e(TAG, "Failed to notify client. Removing invalid client.", e);
                 clients.remove(i); // 移除无效的客户端
             }
         }

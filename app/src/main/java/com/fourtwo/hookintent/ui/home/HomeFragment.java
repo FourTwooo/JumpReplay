@@ -1,15 +1,9 @@
 package com.fourtwo.hookintent.ui.home;
 
 import android.annotation.SuppressLint;
-import android.content.BroadcastReceiver;
-import android.content.Context;
-import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.res.ColorStateList;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
-import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -29,7 +23,6 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Lifecycle;
-import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
@@ -39,16 +32,12 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
-import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;
-import com.fourtwo.hookintent.base.UriData;
-import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
-import com.fourtwo.hookintent.utils.HookStatusManager;
-import com.fourtwo.hookintent.utils.IntentDuplicateChecker;
-import com.fourtwo.hookintent.utils.SchemeResolver;
-import com.fourtwo.hookintent.viewmodel.MainViewModel;
 import com.fourtwo.hookintent.service.MessengerService;
+import com.fourtwo.hookintent.utils.DataProcessor;
+import com.fourtwo.hookintent.utils.HookStatusManager;
+import com.fourtwo.hookintent.viewmodel.MainViewModel;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.lang.reflect.Method;
@@ -63,9 +52,9 @@ public class HomeFragment extends Fragment {
     private RecyclerView recyclerView;
     private TextView emptyView;
     private HomeAdapter adapter;
-    private final IntentDuplicateChecker IntentDuplicateChecker = new IntentDuplicateChecker();
-    private final IntentDuplicateChecker SchemeDuplicateChecker = new IntentDuplicateChecker();
     private MainViewModel viewModel;
+
+    private DataProcessor dataProcessor;
 
     private FloatingActionButton fab;
     private static boolean isHook = false; // 保留 isHook 状态
@@ -236,192 +225,29 @@ public class HomeFragment extends Fragment {
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(simpleItemTouchCallback);
         itemTouchHelper.attachToRecyclerView(recyclerView);
 
+        // 初始化 DataProcessor
+        dataProcessor = new DataProcessor(requireContext(), viewModel);
+        dataProcessor.setJsonData(JsonData);
+
+        Log.d(TAG, "onViewCreated: MessengerService");
         // 观察 MessengerService 的 liveDataTrigger
         MessengerService.liveDataTrigger.observe(getViewLifecycleOwner(), trigger -> {
             if (trigger != null && trigger) {
                 // 逐条处理队列中的数据
-                ConcurrentLinkedQueue<Bundle> queue = MessengerService.getInstance().getDataQueue();
+                MessengerService Instance = MessengerService.getInstance();
+                Log.d(TAG, "onViewCreated: " + Instance);
+                if (Instance == null) {
+                    return;
+                }
+                ConcurrentLinkedQueue<Bundle> queue = Instance.getDataQueue();
                 while (!queue.isEmpty()) {
                     Bundle data = queue.poll(); // 从队列中取出数据
                     if (data != null) {
-                        processReceivedData(data); // 处理数据
+                        dataProcessor.processReceivedData(data); // 使用 DataProcessor 处理数据
                     }
                 }
             }
         });
-    }
-
-    // 处理接收到的数据
-    private void processReceivedData(Bundle data) {
-        try {
-            Log.d(TAG, "Received data in HomeFragment: " + data);
-            if (data == null) {
-                return;
-            }
-
-            // 数据处理逻辑
-            String base = data.getString("Base");
-            String stackTrace = data.getString("stack_trace");
-            String uri = data.getString("uri");
-            data.remove("stack_trace");
-            data.remove("uri");
-            data.remove("Base");
-            Bundle bundle = data;
-
-            // 数据过滤逻辑
-            if (filterData(base, bundle)) {
-                return;
-            }
-
-            // 其他数据处理逻辑（保留原有代码逻辑）
-            String dataSize = Extract.calculateBundleDataSize(bundle);
-            String time = Extract.extractTime(bundle.getString("time"));
-            String packageName;
-            String to = "";
-            String dataString = "";
-
-            if ("Intent".equals(base)) {
-                if (handleIntentBase(bundle)) return;
-                ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
-                if (intentExtras != null) {
-                    dataString = Extract.extractIntentExtrasString(intentExtras);
-                }
-                to = bundle.getString("to");
-                packageName = bundle.getString("componentName");
-                if (Objects.equals(packageName, "null") && !Objects.equals(bundle.getString("dataString"), "null")) {
-                    packageName = SchemeResolver.findAppByUri(requireContext(), bundle.getString("dataString")) + "/";
-                    to = bundle.getString("dataString");
-                }
-                if (Objects.equals(packageName, "null") && !Objects.equals(bundle.getString("action"), "null")) {
-                    packageName = SchemeResolver.findAppByUri(requireContext(), bundle.getString("action")) + "/";
-                    to = bundle.getString("action");
-                }
-                Log.d(TAG, "packageName" + ": " + packageName);
-            } else if ("Scheme".equals(base)) {
-                if (handleSchemeBase(bundle)) return;
-                String schemeRawUrl = bundle.getString("scheme_raw_url");
-                packageName = SchemeResolver.findAppByUri(requireContext(), schemeRawUrl) + "/";
-                Bundle bundle1 = Extract.convertMapToBundle(UriData.convertUriToMap(Uri.parse(schemeRawUrl)));
-                bundle.putAll(bundle1);
-
-                if (schemeRawUrl.startsWith("#Intent;") || bundle.getString("authority").equals("null")) {
-                    to = schemeRawUrl;
-                    packageName = Extract.getIntentSchemeValue(schemeRawUrl, "component");
-                    if (packageName == null) {
-                        packageName = Extract.getIntentSchemeValue(schemeRawUrl, "action") + "/";
-                    }
-                } else {
-                    to = bundle.getString("scheme") + "://" + bundle.getString("authority") + bundle.getString("path");
-                }
-                dataString = bundle.getString("query");
-                if ("null".equals(dataString)) {
-                    dataString = "";
-                }
-            } else {
-                return;
-            }
-
-            // 获取应用信息
-            HomeAppInfoHelper.AppInfo appInfo = getAppInfo(requireContext(), packageName);
-            String appName = appInfo.getAppName();
-            Drawable appIcon = appInfo.getAppIcon();
-
-            // 创建 ItemData
-            ItemData itemData = new ItemData(appIcon, appName, to, dataString, time, String.format("%s B", dataSize), bundle, base, stackTrace, uri);
-            viewModel.addIntentData(itemData);
-        } catch (Exception e) {
-            Log.e(TAG, "Error processing data", e);
-        }
-    }
-
-    public boolean isFilterMatched(Map<String, Object> schemeData, String key, String valueToMatch) {
-        List<Map<String, Object>> itemList = JsonHandler.getFilterValueJson(schemeData.get(key));
-        if (itemList == null) {
-            return false;
-        }
-
-        for (Map<String, Object> item : itemList) {
-            Boolean type = (Boolean) item.get("type");
-            String text = (String) item.get("text");
-
-            if (Boolean.TRUE.equals(type) && valueToMatch.equalsIgnoreCase(text)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean handleIntentBase(Bundle bundle) {
-        Log.d(TAG, "removeBundle: " + bundle);
-        return IntentDuplicateChecker.isDuplicate(bundle);
-    }
-
-    private boolean handleSchemeBase(Bundle bundle) {
-        Log.d(TAG, "removeBundle: " + bundle);
-        return SchemeDuplicateChecker.isDuplicate(bundle);
-    }
-
-    private HomeAppInfoHelper.AppInfo getAppInfo(Context context, String packageName) {
-        HomeAppInfoHelper homeAppInfoHelper = new HomeAppInfoHelper(context);
-        HomeAppInfoHelper.AppInfo appInfo = homeAppInfoHelper.getAppInfo(packageName);
-        if (appInfo != null) {
-            return appInfo;
-        }
-        return new HomeAppInfoHelper.AppInfo(
-                "未知应用" + ("/".equals(packageName) || "null".equals(packageName) ? "" : String.format("(%s)", packageName)),
-                ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)
-        );
-    }
-
-    // 数据过滤方法
-    private boolean filterData(String base, Bundle bundle) {
-        boolean is_filter = false;
-
-        String functionCall = bundle.getString("FunctionCall");
-        String from = bundle.getString("from");
-
-        switch (base) {
-            case "Intent":
-                Map<String, Object> intentData = JsonHandler.getFilterKeyJson(JsonData.get("intent"));
-                assert intentData != null;
-                if (isFilterMatched(intentData, "FunctionCall", functionCall)) {
-                    is_filter = true;
-                }
-                if (!is_filter && isFilterMatched(intentData, "from", from)) {
-                    is_filter = true;
-                }
-                break;
-            case "Scheme":
-                String scheme_url = bundle.getString("scheme_raw_url");
-                if (scheme_url == null) {
-                    is_filter = true;
-                    break;
-                }
-                String scheme = Uri.parse(scheme_url).getScheme();
-                if (scheme == null) {
-                    is_filter = true;
-                    break;
-                }
-
-                Map<String, Object> schemeData = JsonHandler.getFilterKeyJson(JsonData.get("scheme"));
-                assert schemeData != null;
-
-                if (isFilterMatched(schemeData, "FunctionCall", functionCall)) {
-                    is_filter = true;
-                }
-
-                if (!is_filter && isFilterMatched(schemeData, "from", from)) {
-                    is_filter = true;
-                }
-
-                if (!is_filter && isFilterMatched(schemeData, "scheme", scheme)) {
-                    is_filter = true;
-                }
-                break;
-            default:
-                break;
-        }
-        return is_filter;
     }
 
     private void updateFabAppearance() {
@@ -504,6 +330,8 @@ public class HomeFragment extends Fragment {
 
         JsonData = new JsonHandler().readJsonFromFile(requireContext());
         Log.d(TAG, "onResume: " + JsonData);
+
+        dataProcessor.setJsonData(JsonData);
 
 //        // 更新过滤表
 //        SharedPreferences sharedPreferences = requireContext().getSharedPreferences(SelectItemData.SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);

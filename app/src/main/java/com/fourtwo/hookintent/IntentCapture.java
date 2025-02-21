@@ -2,7 +2,6 @@ package com.fourtwo.hookintent;
 
 import android.app.ActivityThread;
 import android.app.Application;
-import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -17,16 +16,22 @@ import android.os.Looper;
 
 import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.IntentData;
+import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.base.UriData;
-import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.service.MessengerClient;
 import com.fourtwo.hookintent.service.MessengerService;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -49,16 +54,15 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private final String myAppClass = "com.fourtwo.hookintent.IntentIntercept";
 
     private Boolean getIsHook() {
-
+//        XposedBridge.log("isHook: " + isHook);
         if (client != null && !isService) {
             client.sendMessageAsync(MessengerService.MSG_IS_HOOK, null, true, new MessengerClient.ResultCallback() {
                 @Override
                 public void onResult(Bundle result) {
                     int resultCode = result.getInt("resultCode");
-                    String resultData = result.getString("resultData");
                     isHook = (resultCode == 1);
                     isService = true;
-                    XposedBridge.log(isHook + " Client Async Result: resultCode=" + resultCode + ", resultData=" + resultData);
+//                    XposedBridge.log(isHook + " Client Async Result: resultCode=" + resultCode + ", resultData=" + resultData);
                 }
 
                 @Override
@@ -72,47 +76,49 @@ public class IntentCapture implements IXposedHookLoadPackage {
     }
 
     private String getStackTraceString() {
-        return "";
-//        Throwable throwable = new Throwable();
-//        StackTraceElement[] stackTrace = throwable.getStackTrace();
-//        StringBuilder stackTraceString = new StringBuilder();
-//        for (StackTraceElement element : stackTrace) {
-//            stackTraceString.append(element.toString()).append("\n");
-//        }
-//        return stackTraceString.toString();
+//        return "";
+        Throwable throwable = new Throwable();
+        StackTraceElement[] stackTrace = throwable.getStackTrace();
+        StringBuilder stackTraceString = new StringBuilder();
+        for (StackTraceElement element : stackTrace) {
+            stackTraceString.append(element.toString()).append("\n");
+        }
+        return stackTraceString.toString();
     }
 
     private void sendBroadcastSafely(Map<String, Object> mapData, String base, String stackTraceString) {
         Context appContext = getAppContext();
-        String uri = "";
         if (appContext == null) return;
-        if (mapData.containsKey("uri")) {
-            uri = (String) mapData.get("uri");
-            mapData.remove("uri");
-        }
         if (!mapData.containsKey("from")) {
             mapData.put("from", appContext.getClass().getName());
         }
 
-        Handler mainHandler = new Handler(Looper.getMainLooper());
-        String finalUri = uri;
-        mainHandler.post(() -> {
-            try {
-                // 转换为 Bundle 类型
-                Bundle bundle = Extract.convertMapToBundle(mapData);
-                bundle.putString("Base", base);
-                bundle.putString(Constants.TYPE, "data");
-                bundle.putString("stack_trace", stackTraceString);
-                bundle.putString("uri", finalUri);
-                bundle.putString("packageName", packageName);
+        // 接收到 MSG_SEND_DATA 请求时
+        Bundle bundle = Extract.convertMapToBundle(mapData);
+        bundle.putString("Base", base);
+        bundle.putString("packageName", packageName);
+        bundle.putString("stack_trace", stackTraceString);
 
-                // 使用 MessengerClient 发送数据
-                client.sendMessageAsync(MessengerService.MSG_SEND_DATA, bundle, false, null);
-
-            } catch (Exception e) {
-                XposedBridge.log("HandlerException Error sending data: " + e);
-            }
-        });
+        addMessage(bundle);
+//        Handler mainHandler = new Handler(Looper.getMainLooper());
+//        mainHandler.post(() -> {
+//            try {
+//
+//                List<Bundle> batch = new ArrayList<>();
+//
+//                // 从队列中取出所有数据
+//                batch.add(bundle);
+//
+//                String batchDataJson = JsonHandler.toJson(batch);
+//                Bundle batchBundle = new Bundle();
+//                batchBundle.putString("batch_data_binder", batchDataJson);
+//                // 使用 MessengerClient 发送数据
+//                client.sendMessageAsync(MessengerService.MSG_SEND_DATA, batchBundle, false, null);
+//
+//            } catch (Exception e) {
+//                XposedBridge.log("HandlerException Error sending data: " + e);
+//            }
+//        });
     }
 
 
@@ -135,9 +141,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
         if (from != null) {
             MapData.put("from", from);
         }
-
-        Bundle extras = intent.getExtras();
-        XposedBridge.log("intent.getDataString() " + extras);
+        XposedBridge.log("filterIntent:" + MapData);
         sendBroadcastSafely(MapData, "Intent", getStackTraceString());
     }
 
@@ -154,86 +158,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
             return null;
         }
     }
-
-    private void HookClass(XC_LoadPackage.LoadPackageParam loadPackageParam, String classNameToHook) {
-        try {
-            // 获取目标类的 Class 对象
-            Class<?> clazz = XposedHelpers.findClass(classNameToHook, loadPackageParam.classLoader);
-
-            // 获取类中的所有方法
-            Method[] methods = clazz.getDeclaredMethods();
-
-            // 对每个方法进行 hook
-            for (Method method : methods) {
-                XposedBridge.hookMethod(method, new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                        // 构造参数输出
-                        StringBuilder paramDetails = new StringBuilder();
-
-                        if (methodHookParam.args != null && methodHookParam.args.length > 0) {
-                            for (int i = 0; i < methodHookParam.args.length; i++) {
-                                Object arg = methodHookParam.args[i];
-                                String className = (arg != null) ? arg.getClass().getName() : "null";
-                                String toStringValue = (arg != null) ? arg.toString() : "null";
-
-                                // 拼接参数信息
-                                paramDetails
-                                        .append(className)
-                                        .append(": ")
-                                        .append(toStringValue);
-
-                                // 如果不是最后一个参数，加上分隔符
-                                if (i < methodHookParam.args.length - 1) {
-                                    paramDetails.append("; ");
-                                }
-                            }
-                        } else {
-                            paramDetails.append("无参数");
-                        }
-
-                        // 打印日志
-                        XposedBridge.log("Method called: " + method.getName() + " | 参数详情: " + paramDetails);
-
-                    }
-                });
-            }
-        } catch (Throwable t) {
-            XposedBridge.log("Failed to hook class: " + classNameToHook);
-            XposedBridge.log(t);
-        }
-    }
-
-    private void logParams(XC_MethodHook.MethodHookParam methodHookParam) {
-        // 构造参数输出
-        StringBuilder paramDetails = new StringBuilder();
-
-        if (methodHookParam.args != null && methodHookParam.args.length > 0) {
-            for (int i = 0; i < methodHookParam.args.length; i++) {
-                Object arg = methodHookParam.args[i];
-                String className = (arg != null) ? arg.getClass().getName() : "null";
-                String toStringValue = (arg != null) ? arg.toString() : "null";
-
-                // 拼接参数信息
-                paramDetails
-                        .append(className)
-                        .append(": ")
-                        .append(toStringValue);
-
-                // 如果不是最后一个参数，加上分隔符
-                if (i < methodHookParam.args.length - 1) {
-                    paramDetails.append("; ");
-                }
-            }
-        } else {
-            paramDetails.append("无参数");
-        }
-
-        // 打印日志
-        XposedBridge.log("参数详情: " + paramDetails);
-
-    }
-
 
     public void handleLoadSystem(XC_LoadPackage.LoadPackageParam loadPackageParam) {
 
@@ -409,6 +333,9 @@ public class IntentCapture implements IXposedHookLoadPackage {
                         }
                         // Hook methods
                         hookMethods(classLoader);
+
+                        // 启动定时分流检测
+                        startBatchSender();
                     }
                 }
         );
@@ -500,4 +427,131 @@ public class IntentCapture implements IXposedHookLoadPackage {
         });
 
     }
+
+    /**
+     *  调试测试代码
+     */
+    private void HookClass(XC_LoadPackage.LoadPackageParam loadPackageParam, String classNameToHook) {
+        try {
+            // 获取目标类的 Class 对象
+            Class<?> clazz = XposedHelpers.findClass(classNameToHook, loadPackageParam.classLoader);
+
+            // 获取类中的所有方法
+            Method[] methods = clazz.getDeclaredMethods();
+
+            // 对每个方法进行 hook
+            for (Method method : methods) {
+                XposedBridge.hookMethod(method, new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+                        // 构造参数输出
+                        StringBuilder paramDetails = new StringBuilder();
+
+                        if (methodHookParam.args != null && methodHookParam.args.length > 0) {
+                            for (int i = 0; i < methodHookParam.args.length; i++) {
+                                Object arg = methodHookParam.args[i];
+                                String className = (arg != null) ? arg.getClass().getName() : "null";
+                                String toStringValue = (arg != null) ? arg.toString() : "null";
+
+                                // 拼接参数信息
+                                paramDetails
+                                        .append(className)
+                                        .append(": ")
+                                        .append(toStringValue);
+
+                                // 如果不是最后一个参数，加上分隔符
+                                if (i < methodHookParam.args.length - 1) {
+                                    paramDetails.append("; ");
+                                }
+                            }
+                        } else {
+                            paramDetails.append("无参数");
+                        }
+
+                        // 打印日志
+                        XposedBridge.log("Method called: " + method.getName() + " | 参数详情: " + paramDetails);
+
+                    }
+                });
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("Failed to hook class: " + classNameToHook);
+            XposedBridge.log(t);
+        }
+    }
+
+    private void logParams(XC_MethodHook.MethodHookParam methodHookParam) {
+        // 构造参数输出
+        StringBuilder paramDetails = new StringBuilder();
+
+        if (methodHookParam.args != null && methodHookParam.args.length > 0) {
+            for (int i = 0; i < methodHookParam.args.length; i++) {
+                Object arg = methodHookParam.args[i];
+                String className = (arg != null) ? arg.getClass().getName() : "null";
+                String toStringValue = (arg != null) ? arg.toString() : "null";
+
+                // 拼接参数信息
+                paramDetails
+                        .append(className)
+                        .append(": ")
+                        .append(toStringValue);
+
+                // 如果不是最后一个参数，加上分隔符
+                if (i < methodHookParam.args.length - 1) {
+                    paramDetails.append("; ");
+                }
+            }
+        } else {
+            paramDetails.append("无参数");
+        }
+
+        // 打印日志
+        XposedBridge.log("参数详情: " + paramDetails);
+
+    }
+
+    /**
+     * 定义线程安全的队列，存储待发送的消息
+     */
+    private final BlockingQueue<Bundle> messageQueue = new LinkedBlockingQueue<>();
+
+    // 将数据添加到队列中
+    public void addMessage(Bundle bundle) {
+        try {
+            // 将数据放入队列，线程安全
+            messageQueue.put(bundle);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            XposedBridge.log("Error adding message to queue: " + e);
+        }
+    }
+
+    // 定时任务，批量发送消息
+    private void startBatchSender() {
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+        // 每隔固定时间执行一次
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                // 批量取出队列中的数据
+                List<Bundle> batch = new ArrayList<>();
+                messageQueue.drainTo(batch); // 将队列中的所有数据取出
+
+                // 如果有数据，则发送
+                if (!batch.isEmpty()) {
+                    String batchDataJson = JsonHandler.toJson(batch);
+                    Bundle batchBundle = new Bundle();
+                    batchBundle.putString("batch_data_binder", batchDataJson);
+
+                    // 使用 MessengerClient 发送数据
+                    client.sendMessageAsync(MessengerService.MSG_SEND_DATA, batchBundle, false, null);
+                }
+            } catch (Exception e) {
+                XposedBridge.log("Error sending batch data: " + e);
+            }
+        }, 0, 1000, TimeUnit.MILLISECONDS); // 初始延迟为0，每隔500ms执行一次
+    }
+
+
+
 }

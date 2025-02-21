@@ -105,7 +105,7 @@ public class Extract {
     public static String getIntentSchemeValue(String intentUri, String key) {
         // Check if the string starts with the expected prefix
         if (!intentUri.startsWith("#Intent;")) {
-            throw new IllegalArgumentException("Not a valid Intent URI");
+            return null;
         }
 
         // Look for 'component=' and find the value

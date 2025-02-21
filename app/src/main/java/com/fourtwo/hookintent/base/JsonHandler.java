@@ -1,6 +1,7 @@
 package com.fourtwo.hookintent.base;
 
 import android.content.Context;
+import android.os.Bundle;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -142,6 +143,33 @@ public class JsonHandler {
         return map;
     }
 
+    // 将 Bundle 转换为 Map<String, Object>
+    private static Map<String, Object> toMap(Bundle bundle) {
+        Map<String, Object> map = new HashMap<>();
+        for (String key : bundle.keySet()) {
+            Object value = bundle.get(key);
+            if (value instanceof Bundle) {
+                // 递归转换内部的 Bundle
+                map.put(key, toMap((Bundle) value));
+            } else if (value instanceof ArrayList) {
+                // 如果是 ArrayList，尝试转换为 List<Map<String, Object>> 或 List<Object>
+                List<Object> list = new ArrayList<>();
+                for (Object item : (ArrayList<?>) value) {
+                    if (item instanceof Map) {
+                        list.add(new JSONObject((Map<?, ?>) item));
+                    } else {
+                        list.add(item);
+                    }
+                }
+                map.put(key, list); // 存入转换后的列表
+            } else {
+                map.put(key, value); // 普通类型直接存入
+            }
+        }
+        return map;
+    }
+
+
     // 辅助方法：将 JSONArray 转换为 List<Map<String, Object>>
     private static List<Map<String, Object>> toList(JSONArray array) {
         List<Map<String, Object>> list = new ArrayList<>();
@@ -155,5 +183,86 @@ public class JsonHandler {
         }
         return list;
     }
+
+    // 将 List<Bundle> 转换为 JSON 字符串
+    public static String toJson(List<Bundle> bundleList) {
+        JSONArray jsonArray = new JSONArray();
+        for (Bundle bundle : bundleList) {
+            // 将 Bundle 转换为 Map
+            Map<String, Object> map = toMap(bundle);
+
+            // 将 Map 转换为 JSONObject
+            JSONObject jsonObject = new JSONObject(map);
+
+            // 添加到 JSONArray
+            jsonArray.put(jsonObject);
+        }
+        return jsonArray.toString();
+    }
+
+    // 将 JSON 字符串转换为 List<Bundle>
+    public static List<Bundle> fromJson(String json) {
+        List<Bundle> bundleList = new ArrayList<>();
+        try {
+            JSONArray jsonArray = new JSONArray(json);
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                Bundle bundle = toBundle(jsonObject);
+                bundleList.add(bundle);
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Error converting JSON to List<Bundle>", e);
+        }
+        return bundleList;
+    }
+
+
+    // 辅助方法：将 JSONObject 转换为 Bundle
+    private static Bundle toBundle(JSONObject jsonObject) {
+        Bundle bundle = new Bundle();
+        Iterator<String> keys = jsonObject.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            try {
+                Object value = jsonObject.get(key);
+                if (value instanceof JSONObject) {
+                    // 如果值是 JSONObject，递归转换为 Bundle
+                    bundle.putBundle(key, toBundle((JSONObject) value));
+                } else if (value instanceof JSONArray) {
+                    // 如果值是 JSONArray，尝试还原为 ArrayList
+                    ArrayList<Object> list = new ArrayList<>();
+                    JSONArray jsonArray = (JSONArray) value;
+                    for (int i = 0; i < jsonArray.length(); i++) {
+                        Object item = jsonArray.get(i);
+                        if (item instanceof JSONObject) {
+                            list.add(toMap((JSONObject) item)); // 转换 JSONObject 为 Map
+                        } else {
+                            list.add(item); // 其他类型直接添加
+                        }
+                    }
+                    bundle.putSerializable(key, list); // 用 Serializable 存储 ArrayList
+                } else if (value == JSONObject.NULL) {
+                    bundle.putString(key, null); // 处理 null 值
+                } else if (value instanceof String) {
+                    bundle.putString(key, (String) value);
+                } else if (value instanceof Integer) {
+                    bundle.putInt(key, (Integer) value);
+                } else if (value instanceof Boolean) {
+                    bundle.putBoolean(key, (Boolean) value);
+                } else if (value instanceof Double) {
+                    bundle.putDouble(key, (Double) value);
+                } else if (value instanceof Long) {
+                    bundle.putLong(key, (Long) value);
+                } else {
+                    bundle.putString(key, value.toString()); // 其他类型转为字符串
+                }
+            } catch (JSONException e) {
+                Log.e(TAG, "Error converting JSONObject to Bundle", e);
+            }
+        }
+        return bundle;
+    }
+
+
 }
 
