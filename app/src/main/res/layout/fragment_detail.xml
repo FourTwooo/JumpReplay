@@ -1,5 +1,6 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/white"
@@ -9,6 +10,7 @@
     <TextView
         android:id="@+id/urlTextView"
         android:layout_width="0dp"
+        android:text="@string/activity"
         android:layout_height="wrap_content"
         android:paddingBottom="8dp"
         android:textSize="18sp"
@@ -26,13 +28,15 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/urlTextView"
-        app:layout_constraintVertical_bias="0">
+        app:layout_constraintVertical_bias="0"
+        tools:ignore="UnknownId" >
 
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/dataRecyclerView"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:divider="#e0e0e0"
+            tools:listitem="@layout/item_data"
             android:dividerHeight="1dp" />
 
         <TextView

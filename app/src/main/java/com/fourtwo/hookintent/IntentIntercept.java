@@ -3,8 +3,11 @@ package com.fourtwo.hookintent;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
+import android.view.View;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -41,10 +44,38 @@ public class IntentIntercept extends AppCompatActivity {
         Log.d(TAG, "onCreate: " + intent);
 
         // 设置 TextView 的内容为 Intent 的 URI
-        contentBinding.urlTextView.setText(intent.toUri(Intent.URI_INTENT_SCHEME));
+        String initialUri = intent.toUri(Intent.URI_INTENT_SCHEME);
+        contentBinding.urlTextView.setText(initialUri);
 
-        // 设置按钮点击事件
-        contentBinding.btnReloadIntent.setOnClickListener(view -> {
+        // 设置重置按钮初始状态为隐藏
+        binding.resetButton.setVisibility(View.GONE);
+
+        // 监听编辑框内容的变化
+        contentBinding.urlTextView.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // 如果编辑框内容变化，显示重置按钮
+                if (!s.toString().equals(initialUri)) {
+                    binding.resetButton.setVisibility(View.VISIBLE);
+                } else {
+                    binding.resetButton.setVisibility(View.GONE);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        // 设置重置按钮点击事件
+        binding.resetButton.setOnClickListener(view -> {
+            contentBinding.urlTextView.setText(initialUri);
+        });
+
+        // 设置发送按钮点击事件
+        binding.btnReloadIntent.setOnClickListener(view -> {
             Log.d(TAG, "重新调用 Intent 按钮被点击");
 
             // 获取当前的 Intent

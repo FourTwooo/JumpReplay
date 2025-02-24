@@ -35,4 +35,6 @@
     <string name="todo">TODO</string>
     <string name="activity_label">意图拦截器</string>
     <string name="menu_intercept">意图拦截器</string>
+    <string name="search">搜索</string>
+    <string name="activity">Activity</string>
 </resources>

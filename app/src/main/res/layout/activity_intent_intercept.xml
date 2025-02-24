@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".IntentIntercept">
+    tools:context=".IntentIntercept"
+    android:background="@android:color/white">
 
+    <!-- AppBar -->
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -17,11 +20,55 @@
             android:layout_height="?attr/actionBarSize"
             android:background="#888888"
             app:popupTheme="@style/Theme.HookIntent.PopupOverlay" />
-
     </com.google.android.material.appbar.AppBarLayout>
 
+    <!-- 主内容布局 -->
     <include
         android:id="@+id/content_main"
         layout="@layout/content_intercept_main" />
+
+    <!-- 底部悬浮按钮区域 -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@android:color/white"
+        android:padding="16dp"
+        app:layout_constraintTop_toBottomOf="@id/content_main"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:elevation="8dp">
+
+        <!-- 左侧按钮：重置为默认值 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reset_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="@color/orange"
+            android:text="重置为初始值"
+            android:textColor="@android:color/white"
+            app:cornerRadius="50dp"
+            app:layout_constraintEnd_toStartOf="@id/btn_reload_intent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:iconGravity="start" />
+
+        <!-- 右侧按钮：发送编辑过的意图 -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_reload_intent"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="@color/teal_700"
+            android:text="发送意图"
+            android:textColor="@android:color/white"
+            app:cornerRadius="50dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/reset_button"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:iconGravity="start" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

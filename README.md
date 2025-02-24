@@ -1,6 +1,9 @@
 # JumpReplay
 
-![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/FourTwooo/JumpReplay?label=version&logo=github) [![加入QQ群](https://img.shields.io/badge/QQ群-1021904342-blue?logo=qq)](https://qm.qq.com/cgi-bin/qm/qr?k=6JWWosRVV0rtISqQKNVU5QY8KT0sBQP8&jump_from=webapi&authKey=kvD0trmJvJiWSeFVv1+WTUYBpalYGKh+dF3zgfpLDuByEmZF2wT8XXwC8QuT/tzQ) ![License](https://img.shields.io/badge/license-GPL%203.0-blue) ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/FourTwooo/JumpReplay/total?logo=github)
+[![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/FourTwooo/JumpReplay?label=version&logo=github)](https://github.com/FourTwooo/JumpReplay/releases) 
+[![加入QQ群](https://img.shields.io/badge/QQ群-1021904342-blue?logo=qq)](https://qm.qq.com/cgi-bin/qm/qr?k=6JWWosRVV0rtISqQKNVU5QY8KT0sBQP8&jump_from=webapi&authKey=kvD0trmJvJiWSeFVv1+WTUYBpalYGKh+dF3zgfpLDuByEmZF2wT8XXwC8QuT/tzQ) 
+[![License](https://img.shields.io/badge/license-GPL%203.0-blue)](https://raw.githubusercontent.com/FourTwooo/JumpReplay/refs/heads/master/LICENSE) 
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/FourTwooo/JumpReplay/total?logo=github)
 
 **Xposed Hook Android Intent/Scheme**
 
@@ -22,11 +25,11 @@
 ---
 ## 演示视频
 
-**抓包**
+**抓包(作用域勾选对应应用)**
 
 https://github.com/user-attachments/assets/ff862eca-fd00-43a0-aaa9-112ba3c71661
 
-**意图拦截(作用域勾选android)**
+**拦截(作用域勾选系统框架)**
 
 https://github.com/user-attachments/assets/634184d4-1bf4-4a4f-9502-01e064bdee9b
 
