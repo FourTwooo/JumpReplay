@@ -16,7 +16,8 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             android:background="#888888"
-            app:popupTheme="@style/Theme.HookIntent.PopupOverlay" />
+            app:popupTheme="@style/Theme.HookIntent.PopupOverlay"
+            tools:menu="@menu/home_drawer"/>
 
     </com.google.android.material.appbar.AppBarLayout>
 

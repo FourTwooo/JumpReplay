@@ -10,8 +10,8 @@ android {
         applicationId "com.fourtwo.hookintent"
         minSdk 20
         targetSdk 33
-        versionCode 1
-        versionName "1.4.1"
+        versionCode
+        versionName "1.4.3"
 
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

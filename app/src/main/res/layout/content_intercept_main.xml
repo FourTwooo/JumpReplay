@@ -5,30 +5,68 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:fitsSystemWindows="true"
+    android:padding="16dp"
     app:layout_behavior="@string/appbar_scrolling_view_behavior"
-    tools:context=".IntentIntercept"
-    android:padding="16dp">
+    tools:context=".IntentIntercept">
 
     <!-- 可编辑的多行输入框 -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/url_input_layout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        style="@style/RoundedTextInputLayout">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/url_text_view"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="textMultiLine|textUri"
+            android:layout_height="match_parent"
             android:gravity="top|start"
-            android:scrollbars="vertical"
-            android:overScrollMode="always"
+            android:inputType="textMultiLine|textUri"
             android:minHeight="150dp"
+            android:overScrollMode="always"
             android:padding="8dp"
-            android:text="https://www.baidu.com" />
+            android:scrollbars="vertical" />
+
     </com.google.android.material.textfield.TextInputLayout>
+
+    <!-- 空白分隔控件 -->
+    <Space
+        android:id="@+id/space_between"
+        android:layout_width="0dp"
+        android:layout_height="16dp"
+        app:layout_constraintTop_toBottomOf="@id/url_input_layout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- 匹配应用标题 -->
+    <TextView
+        android:id="@+id/match_apps"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="8dp"
+        android:text="@string/match_apps"
+        android:textColor="@color/teal_700"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/space_between" />
+
+    <!-- RecyclerView 用于显示匹配的应用 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recycler_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/match_apps"
+        tools:itemCount="2"
+        tools:listitem="@layout/item_intent_match" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

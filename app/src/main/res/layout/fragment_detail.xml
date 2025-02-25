@@ -37,6 +37,7 @@
             android:layout_height="match_parent"
             android:divider="#e0e0e0"
             tools:listitem="@layout/item_data"
+            tools:itemCount="3"
             android:dividerHeight="1dp" />
 
         <TextView
@@ -47,9 +48,9 @@
             android:gravity="start"
             android:padding="16dp"
             android:scrollbars="vertical"
-            android:text="This is static text for NEW tab."
             android:textSize="16sp"
-            android:visibility="gone" />
+            android:visibility="gone"
+            tools:ignore="UnusedAttribute" />
 
     </FrameLayout>
 

@@ -1,35 +1,19 @@
 <resources>
     <string name="app_name">JumpReplay</string>
-    <string name="navigation_drawer_open">Open navigation drawer</string>
-    <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="nav_header_subtitle">https://github.com/FourTwooo/JumpReplay</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">更多选项</string>
     <string name="action_delete">清空</string>
 
-    <string name="menu_home">JumpReplay</string>
-    <string name="menu_home_value">IntentCapture</string>
-    <string name="menu_home_list_detail">详情内容</string>
+    <string name="menu_home">IntentCapture</string>
+    <string name="menu_detail">详情内容</string>
     <string name="menu_gallery">收藏</string>
     <string name="menu_me">关于</string>
-    <!-- TODO: Remove or change this placeholder text -->
-    <string name="hello_blank_fragment">Hello blank fragment</string>
+
     <string name="empty_view">点击按钮开启HOOK</string>
     <string name="copy_code">复制命令</string>
-    <!-- Preference Titles -->
-    <string name="messages_header">Messages</string>
-    <string name="sync_header">Sync</string>
-
-    <!-- Messages Preferences -->
-    <string name="signature_title">Your signature</string>
-    <string name="reply_title">Default reply action</string>
 
     <!-- Sync Preferences -->
-    <string name="sync_title">Sync email periodically</string>
-    <string name="attachment_title">Download incoming attachments</string>
-    <string name="attachment_summary_on">Automatically download attachments for incoming emails
-    </string>
-    <string name="attachment_summary_off">Only download attachments when manually requested</string>
     <string name="add_text">添加</string>
     <string name="delete">删除</string>
     <string name="todo">TODO</string>
@@ -37,4 +21,9 @@
     <string name="menu_intercept">意图拦截器</string>
     <string name="search">搜索</string>
     <string name="activity">Activity</string>
+    <string name="reset_intent">重置为初始值</string>
+    <string name="send_intent">发送意图</string>
+    <string name="intent_app_name">应用名称</string>
+    <string name="intent_app_activity">com.example.app\ncom.example.app.MainActivity</string>
+    <string name="match_apps">匹配应用: </string>
 </resources>

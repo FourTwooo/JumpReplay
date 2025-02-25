@@ -18,6 +18,7 @@
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:navGraph="@navigation/mobile_navigation"
-        app:defaultNavHost="true" />
+        app:defaultNavHost="true"
+        tools:ignore="FragmentTagUsage" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

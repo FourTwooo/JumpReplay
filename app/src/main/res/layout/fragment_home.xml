@@ -52,6 +52,7 @@
         app:layout_constraintTop_toBottomOf="@id/searchEditText"
         app:layout_constraintVertical_bias="0.0"
         tools:listitem="@layout/fragment_item_list"
+        tools:itemCount="2"
         tools:ignore="NotSibling" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
