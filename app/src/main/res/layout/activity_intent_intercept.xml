@@ -25,19 +25,21 @@
     <!-- 主内容布局 -->
     <include
         android:id="@+id/content_main"
-        layout="@layout/content_intercept_main" />
+        layout="@layout/content_intercept_main"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior"
+        android:layout_marginBottom="44dp" />
 
-    <!-- 底部悬浮按钮区域 -->
+    <!-- 底部嵌入布局 -->
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/bottom_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:background="#DADADA"
         android:elevation="8dp"
-        android:padding="16dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/content_main"
-        tools:ignore="UnusedAttribute">
+        android:padding="6dp">
 
         <!-- 左侧按钮：重置为初始值 -->
         <com.google.android.material.button.MaterialButton
@@ -51,10 +53,10 @@
             android:textStyle="bold"
             app:cornerRadius="50dp"
             app:iconGravity="start"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/btn_reload_intent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintEnd_toStartOf="@id/btn_reload_intent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
         <!-- 右侧按钮：发送意图 -->
         <com.google.android.material.button.MaterialButton
@@ -68,10 +70,10 @@
             android:textStyle="bold"
             app:cornerRadius="50dp"
             app:iconGravity="start"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/reset_button"
-            app:layout_constraintTop_toTopOf="parent" />
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent" />
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -10,15 +9,26 @@
     app:layout_behavior="@string/appbar_scrolling_view_behavior"
     tools:context=".IntentIntercept">
 
+    <!-- 复选框 -->
+    <CheckBox
+        android:id="@+id/enable_feature_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="0dp"
+        android:text="@string/is_root"
+        android:textSize="14sp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
     <!-- 可编辑的多行输入框 -->
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/url_input_layout"
+        style="@style/RoundedTextInputLayout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        style="@style/RoundedTextInputLayout">
+        app:layout_constraintTop_toBottomOf="@id/enable_feature_checkbox">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/url_text_view"
@@ -26,11 +36,11 @@
             android:layout_height="match_parent"
             android:gravity="top|start"
             android:inputType="textMultiLine|textUri"
-            android:minHeight="150dp"
+            android:maxLines="6"
+            android:minLines="6"
             android:overScrollMode="always"
             android:padding="8dp"
             android:scrollbars="vertical" />
-
     </com.google.android.material.textfield.TextInputLayout>
 
     <!-- 空白分隔控件 -->
@@ -38,15 +48,16 @@
         android:id="@+id/space_between"
         android:layout_width="0dp"
         android:layout_height="16dp"
-        app:layout_constraintTop_toBottomOf="@id/url_input_layout"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toBottomOf="@id/url_input_layout" />
 
     <!-- 匹配应用标题 -->
     <TextView
         android:id="@+id/match_apps"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:paddingBottom="2dp"
         android:layout_marginBottom="8dp"
         android:text="@string/match_apps"
         android:textColor="@color/teal_700"

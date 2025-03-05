@@ -10,4 +10,12 @@
         app:tint="@color/white"
         app:showAsAction="ifRoom" />
 
+    <item
+        android:id="@+id/star"
+        android:icon="@drawable/star"
+        android:orderInCategory="0"
+        android:title="@string/star"
+        app:tint="@color/white"
+        app:showAsAction="ifRoom" />
+
 </menu>

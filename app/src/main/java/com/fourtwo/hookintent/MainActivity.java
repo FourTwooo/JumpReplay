@@ -2,13 +2,14 @@ package com.fourtwo.hookintent;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -20,7 +21,9 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
+import com.fourtwo.hookintent.databinding.AppBarMainBinding;
 import com.fourtwo.hookintent.utils.NetworkClient;
+import com.fourtwo.hookintent.utils.RootServiceHelper;
 import com.google.android.material.navigation.NavigationView;
 
 public class MainActivity extends AppCompatActivity {
@@ -39,34 +42,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         // 恢复必要的状态
-    }
-
-    @SuppressLint("BatteryLife")
-    private void checkAndRequestBatteryOptimization() {
-        PowerManager powerManager = (PowerManager) getSystemService(POWER_SERVICE);
-
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//            if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(getPackageName())) {
-//                new AlertDialog.Builder(this)
-//                        .setTitle("需要关闭电池优化")
-//                        .setMessage("为了保证应用可以在后台正常运行，数据不会丢失，请关闭电池优化。")
-//                        .setPositiveButton("确定", new DialogInterface.OnClickListener() {
-//                            public void onClick(DialogInterface dialog, int which) {
-//                                Intent intent = new Intent();
-//                                intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-//                                intent.setData(Uri.parse("package:" + getPackageName()));
-//                                startActivity(intent);
-//                            }
-//                        })
-//                        .setNegativeButton("取消", new DialogInterface.OnClickListener() {
-//                            public void onClick(DialogInterface dialog, int which) {
-//                                // 用户取消，什么也不做
-//                            }
-//                        })
-//                        .setIcon(android.R.drawable.ic_dialog_alert)
-//                        .show();
-//            }
-//        }
     }
 
     public static String getAppVersionName(Context context) {
@@ -90,8 +65,6 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         // 初始化 NetworkClient
         NetworkClient networkClient = new NetworkClient();
-
-        checkAndRequestBatteryOptimization();
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -117,13 +90,30 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-        setSupportActionBar(binding.appBarMain.toolbar);
+        AppBarMainBinding appbarMain = AppBarMainBinding.bind(binding.getRoot().findViewById(R.id.app_bar_main));
+        setSupportActionBar(appbarMain.toolbar);
 
         initializeUIComponents();
 
+//        RootUtils.isRoot();
+        // 绑定 RootService
+        RootServiceHelper.bindRootService(this);
+
     }
 
+    public void isRootStartActivity(Intent intent, Boolean isRoot) {
+        try {
+            if (isRoot) {
+                RootServiceHelper.startActivityAsRoot(this, intent);
+            } else {
+                startActivity(intent);
+            }
+            Toast.makeText(this, "调用成功", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            Log.e(TAG, "无法启动新的 Intent: " + e.getMessage(), e);
+            Toast.makeText(this, "调用失败", Toast.LENGTH_SHORT).show();
+        }
+    }
 
     private void initializeUIComponents() {
         DrawerLayout drawer = binding.drawerLayout;
@@ -140,6 +130,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        RootServiceHelper.unbindRootService(this);
     }
 
     @Override
