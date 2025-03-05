@@ -2,14 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--用于进程通信-->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--查询所有应用程序-->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
+
+    <!--电池优化-->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
 
     <application
+        android:name=".MainApplication"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -21,9 +27,15 @@
         tools:targetApi="31">
 
         <service
+            android:name=".service.RootActivityService"
+            android:permission="com.topjohnwu.libsu.SERVICE_PERMISSION"
+            tools:ignore="WrongManifestParent" />
+
+        <service
             android:name=".service.MessengerService"
             android:enabled="true"
-            android:exported="true"/>
+            android:exported="true"
+            tools:ignore="ExportedService" />
 
         <activity
             android:name=".MainActivity"

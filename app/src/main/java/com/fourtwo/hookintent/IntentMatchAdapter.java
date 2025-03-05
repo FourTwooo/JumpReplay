@@ -20,10 +20,16 @@ public class IntentMatchAdapter extends RecyclerView.Adapter<IntentMatchAdapter.
 
     private final Context context;
     private final List<IntentMatchItem> items;
+    private final OnIntentMatchClickListener listener; // 回调接口
 
-    public IntentMatchAdapter(Context context, List<IntentMatchItem> items) {
+    public interface OnIntentMatchClickListener {
+        void onIntentMatchClick(Intent intent); // 定义点击事件的回调方法
+    }
+
+    public IntentMatchAdapter(Context context, List<IntentMatchItem> items, OnIntentMatchClickListener listener) {
         this.context = context;
         this.items = items;
+        this.listener = listener; // 保存传入的监听器
     }
 
     @NonNull
@@ -46,11 +52,10 @@ public class IntentMatchAdapter extends RecyclerView.Adapter<IntentMatchAdapter.
         // 设置包名和活动路径
         holder.appDetails.setText(item.getAppDetails());
 
-        // 打开按钮点击事件
+        // 打开按钮点击事件，通过回调传递给外部
         holder.openButton.setOnClickListener(v -> {
-            Intent intent = item.getIntent();
-            if (intent != null) {
-                context.startActivity(intent);
+            if (listener != null) {
+                listener.onIntentMatchClick(item.getIntent());
             }
         });
     }

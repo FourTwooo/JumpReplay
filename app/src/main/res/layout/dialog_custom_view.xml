@@ -1,33 +1,65 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp">
 
-    <ScrollView
+    <!-- 复选框 -->
+    <CheckBox
+        android:id="@+id/enable_feature_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="28dp"
+        android:layout_marginEnd="4dp"
+        android:scaleX="0.7"
+        android:scaleY="0.7"
+        android:text="@string/is_root"
+        android:textSize="16sp"
+        android:layout_gravity="start"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:ignore="RtlSymmetry" />
+
+    <!-- 使用 MaterialCardView 包裹 ScrollView -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/scroll_card_view"
         android:layout_width="327dp"
         android:layout_height="150dp"
-        android:background="@color/teal_200">
+        android:layout_marginBottom="16dp"
+        android:background="@android:color/transparent"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="4dp"
+        app:strokeColor="@color/teal_700"
+        app:strokeWidth="4dp">
 
-        <EditText
-            android:id="@+id/command_edit_text"
+        <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="AM Command"
-            android:textSize="16sp"
-            android:background="@android:color/transparent"
-            android:scrollbars="vertical"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:longClickable="true" />
-    </ScrollView>
+            android:layout_height="match_parent"
+            android:background="@android:color/transparent">
+
+            <EditText
+                android:id="@+id/command_edit_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@android:color/transparent"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:longClickable="true"
+                android:padding="6dp"
+                android:scrollbars="vertical"
+                android:text="AM Command"
+                android:textSize="14sp"
+                tools:ignore="Autofill,HardcodedText,LabelFor,TextFields" />
+        </ScrollView>
+
+    </com.google.android.material.card.MaterialCardView>
 
     <TextView
         android:id="@+id/hint_text_view"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingBottom="8dp"
-        android:text="Hint"
         android:textColor="@android:color/holo_red_dark"
         android:textStyle="bold"
         android:visibility="gone" />
@@ -45,24 +77,25 @@
             android:layout_weight="1" />
 
         <!-- 左边的按钮 -->
-        <Button
-            android:id="@+id/su_code_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="调用" />
 
-        <!-- 空间填充 -->
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
-
-        <!-- 右边的按钮 -->
         <Button
             android:id="@+id/copy_button"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="复制" />
+            android:text="@string/copy_am_code" />
+        <!-- 空间填充 -->
+        <Space
+            android:layout_width="80dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <!-- 右边的按钮 -->
+
+        <Button
+            android:id="@+id/su_code_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/call_su_code" />
 
         <!-- 空间填充 -->
         <Space

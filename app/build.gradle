@@ -8,8 +8,8 @@ android {
 
     defaultConfig {
         applicationId "com.fourtwo.hookintent"
-        minSdk 20
-        targetSdk 33
+        minSdk 21
+        targetSdk 34
         versionCode
         versionName "1.4.3"
 
@@ -27,12 +27,14 @@ android {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
+
     buildFeatures {
         viewBinding true
     }
     sourceSets {
         main {
             aidl.srcDirs = ['src/main/aidl']
+            res.srcDirs = ['src/main/res']
 
             assets {
                 srcDirs 'src\\main\\assets'
@@ -45,11 +47,19 @@ android {
 }
 
 dependencies {
+    compileOnly project(path: ':hiddenapi')
+
+    implementation "org.lsposed.hiddenapibypass:hiddenapibypass:4.3"
+
+    def libsuVersion = '6.0.0'
+    implementation "com.github.topjohnwu.libsu:core:${libsuVersion}"
+    implementation "com.github.topjohnwu.libsu:service:${libsuVersion}"  // 关键
+
+
     implementation 'androidx.multidex:multidex:2.0.1'
     implementation 'com.squareup.okhttp3:okhttp:4.9.3'
 
     implementation 'io.noties.markwon:image:4.6.2'
-//    implementation 'io.noties.markwon:image-picasso:4.6.2'
     implementation 'io.noties.markwon:core:4.6.2'
     implementation 'io.noties.markwon:html:4.6.2'
     implementation 'io.noties.markwon:ext-tables:4.6.2'

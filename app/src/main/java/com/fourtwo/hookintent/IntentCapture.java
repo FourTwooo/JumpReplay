@@ -45,7 +45,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     private String packageName;
     private Boolean isHook = false;
-
     private Boolean isService = false;
     private final String myAppPackage = "com.fourtwo.hookintent";
     private final String myAppClass = "com.fourtwo.hookintent.IntentIntercept";

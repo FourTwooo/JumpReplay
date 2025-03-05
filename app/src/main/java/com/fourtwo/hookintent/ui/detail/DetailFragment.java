@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
@@ -14,6 +15,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -32,13 +34,18 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.MainActivity;
+import com.fourtwo.hookintent.MainApplication;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
 import com.fourtwo.hookintent.data.ItemData;
-import com.fourtwo.hookintent.utils.ShellExecutor;
 import com.fourtwo.hookintent.viewmodel.DetailViewModel;
 import com.google.android.material.tabs.TabLayout;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URISyntaxException;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -49,10 +56,12 @@ import java.util.Objects;
 public class DetailFragment extends Fragment {
 
     private String TAG = "DetailFragment";
-    private static final String  ARG_ITEM_DATA = "itemData";
+    private static final String ARG_ITEM_DATA = "itemData";
     private RecyclerView recyclerView;
     private TextView urlTextView;
     private TabLayout tabLayout;
+
+    private MainActivity mainActivity;
 
     @SuppressLint("MissingInflatedId")
     @Nullable
@@ -242,22 +251,24 @@ public class DetailFragment extends Fragment {
             }
             String activityCommand = String.format(activityTemplate, packageName, buildAmCommand);
 
-            options.add("activity命令");
+            options.add("am命令");
             boolean finalHasError = hasError;
-            actions.add(() -> showAmCommandDialog(activityCommand, finalHasError));
+            actions.add(() -> showAmCommandDialog(activityCommand, finalHasError, "am命令"));
 
-            String uriCommand = String.format(intentTemplate, itemData.getUri());
+//            String uriCommand = String.format(intentTemplate, itemData.getUri());
+            String uriCommand = itemData.getUri();
             Log.d(TAG, "intentCommand: " + uriCommand);
 
-            options.add("intent协议");
-            actions.add(() -> showAmCommandDialog(uriCommand, false));
+            options.add("intentUri");
+            actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri"));
         } else if (Base.equals("Scheme")) {
-            String uriTemplate = "am start -d \"%s\"";
-            String uriCommand = String.format(uriTemplate, itemData.getAppBundle().getString("scheme_raw_url"));
+//            String uriTemplate = "am start -d \"%s\"";
+//            String uriCommand = String.format(uriTemplate, itemData.getAppBundle().getString("scheme_raw_url"));
+            String uriCommand = itemData.getAppBundle().getString("scheme_raw_url");
 
             Log.d(TAG, "schemeCommand: " + uriCommand);
-            options.add("scheme协议");
-            actions.add(() -> showAmCommandDialog(uriCommand, false));
+            options.add("schemeUri");
+            actions.add(() -> showAmCommandDialog(uriCommand, false, "schemeUri"));
         }
 
         // 改用 PopupMenu
@@ -277,9 +288,13 @@ public class DetailFragment extends Fragment {
         popupMenu.show();
     }
 
-
+    /**
+     * @param amCommand  命令
+     * @param hasError   命令是否异常
+     * @param optionName 类型
+     */
     @SuppressLint("SetTextI18n")
-    private void showAmCommandDialog(String amCommand, boolean hasError) {
+    private void showAmCommandDialog(String amCommand, boolean hasError, String optionName) {
         // 使用 LayoutInflater 加载自定义视图
         LayoutInflater inflater = LayoutInflater.from(requireContext());
         View dialogView = inflater.inflate(R.layout.dialog_custom_view, null);
@@ -289,6 +304,13 @@ public class DetailFragment extends Fragment {
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) TextView hintTextView = dialogView.findViewById(R.id.hint_text_view);
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button copyButton = dialogView.findViewById(R.id.copy_button);
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button suCodeButton = dialogView.findViewById(R.id.su_code_button);
+        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) CheckBox enableFeatureCheckbox = dialogView.findViewById(R.id.enable_feature_checkbox);
+
+
+        try {
+            amCommand = URLDecoder.decode(amCommand, StandardCharsets.UTF_8.name());
+        } catch (UnsupportedEncodingException ignored) {
+        }
 
         commandTextView.setText(amCommand); // 确保文本足够长以测试滚动
         commandTextView.setMovementMethod(new ScrollingMovementMethod());
@@ -299,8 +321,17 @@ public class DetailFragment extends Fragment {
         }
 
         suCodeButton.setOnClickListener(v -> {
-            ShellExecutor.executeCommandInBackground("su -c '" + commandTextView.getText() + "'");
-            Toast.makeText(requireContext(), "已执行", Toast.LENGTH_SHORT).show();
+            mainActivity = (MainActivity) getActivity();
+            if (!Objects.equals(optionName, "am命令")) {
+                try {
+                    Intent newIntent = Intent.parseUri(String.valueOf(commandTextView.getText()), 0);
+                    mainActivity.isRootStartActivity(newIntent, enableFeatureCheckbox.isChecked());
+                } catch (URISyntaxException e) {
+                    throw new RuntimeException(e);
+                }
+            } else {
+                MainApplication.executeCommand(String.valueOf(commandTextView.getText()), enableFeatureCheckbox.isChecked(), requireContext());
+            }
         });
 
         copyButton.setOnClickListener(v -> {
