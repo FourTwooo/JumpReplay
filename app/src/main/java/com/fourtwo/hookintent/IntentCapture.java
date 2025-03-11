@@ -1,5 +1,6 @@
 package com.fourtwo.hookintent;
 
+import android.annotation.SuppressLint;
 import android.app.ActivityThread;
 import android.app.Application;
 import android.content.ComponentName;
@@ -12,18 +13,17 @@ import android.content.pm.ResolveInfo;
 import android.os.Build;
 import android.os.Bundle;
 
-import com.fourtwo.hookintent.base.Extract;
-import com.fourtwo.hookintent.base.IntentData;
+import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.JsonHandler;
-import com.fourtwo.hookintent.base.UriData;
 import com.fourtwo.hookintent.service.MessengerClient;
 import com.fourtwo.hookintent.service.MessengerService;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -82,63 +82,45 @@ public class IntentCapture implements IXposedHookLoadPackage {
         return stackTraceString.toString();
     }
 
-    private void sendBroadcastSafely(Map<String, Object> mapData, String base, String stackTraceString) {
+    @SuppressLint("SimpleDateFormat")
+    private void sendBroadcastSafely(Bundle bundle) {
         Context appContext = getAppContext();
         if (appContext == null) return;
-        if (!mapData.containsKey("from")) {
-            mapData.put("from", appContext.getClass().getName());
+        if (!bundle.containsKey("from")) {
+            bundle.putString("from", appContext.getClass().getName());
         }
 
         // 接收到 MSG_SEND_DATA 请求时
-        Bundle bundle = Extract.convertMapToBundle(mapData);
-        bundle.putString("Base", base);
+        bundle.putString("time", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a").format(Calendar.getInstance().getTime()));
         bundle.putString("packageName", packageName);
-        bundle.putString("stack_trace", stackTraceString);
+        bundle.putString("stack_trace", getStackTraceString());
 
         addMessage(bundle);
-//        Handler mainHandler = new Handler(Looper.getMainLooper());
-//        mainHandler.post(() -> {
-//            try {
-//
-//                List<Bundle> batch = new ArrayList<>();
-//
-//                // 从队列中取出所有数据
-//                batch.add(bundle);
-//
-//                String batchDataJson = JsonHandler.toJson(batch);
-//                Bundle batchBundle = new Bundle();
-//                batchBundle.putString("batch_data_binder", batchDataJson);
-//                // 使用 MessengerClient 发送数据
-//                client.sendMessageAsync(MessengerService.MSG_SEND_DATA, batchBundle, false, null);
-//
-//            } catch (Exception e) {
-//                XposedBridge.log("HandlerException Error sending data: " + e);
-//            }
-//        });
     }
 
-
     private void filterScheme(String scheme_raw_url, String FunctionCall) {
-        if (scheme_raw_url != null) {
-            Map<String, Object> MapData = UriData.GetMap(scheme_raw_url);
-            MapData.put("FunctionCall", FunctionCall);
-            sendBroadcastSafely(MapData, "Scheme", getStackTraceString());
+        if (scheme_raw_url == null) {
+            return;
         }
+        Bundle bundle = new Bundle();
+        bundle.putString("FunctionCall", FunctionCall);
+        bundle.putString("Base", "Scheme");
+        bundle.putString("scheme_raw_url", scheme_raw_url);
+        sendBroadcastSafely(bundle);
     }
 
     private void filterIntent(Intent intent, String FunctionCall, String from) {
-        intent.putExtra("skipToUriHook", true);
         String uri = intent.toUri(Intent.URI_INTENT_SCHEME);
-        uri = uri.replace("B.skipToUriHook=true;", "");
-        intent.removeExtra("skipToUriHook");
-        Map<String, Object> MapData = IntentData.convertIntentToMap(intent);
-        MapData.put("FunctionCall", FunctionCall);
-        MapData.put("uri", uri);
-        if (from != null) {
-            MapData.put("from", from);
-        }
-        XposedBridge.log("filterIntent:" + MapData);
-        sendBroadcastSafely(MapData, "Intent", getStackTraceString());
+        Bundle bundle = DataConverter.convertIntentToBundle(intent);
+        bundle.putString("FunctionCall", FunctionCall);
+        bundle.putString("Base", "Intent");
+        bundle.putString("uri", uri);
+        bundle.putString("from", from);
+        sendBroadcastSafely(bundle);
+    }
+
+    private void filterCustomize(String FunctionCall, Bundle bundle) {
+        sendBroadcastSafely(bundle);
     }
 
     private Context getAppContext() {
@@ -410,22 +392,22 @@ public class IntentCapture implements IXposedHookLoadPackage {
             }
         });
 
-        XposedHelpers.findAndHookMethod("android.content.Intent", classLoader, "toUri", int.class, new XC_MethodHook() {
-            @Override
-            protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.afterHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                Intent intent = (Intent) methodHookParam.thisObject;
-                if (intent.hasExtra("skipToUriHook")) return;
-                String scheme = (String) methodHookParam.getResult();
-                filterScheme(scheme, "Intent.toUri");
-            }
-        });
+//        XposedHelpers.findAndHookMethod("android.content.Intent", classLoader, "toUri", int.class, new XC_MethodHook() {
+//            @Override
+//            protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+//                super.afterHookedMethod(methodHookParam);
+//                if (!getIsHook()) return;
+//                Intent intent = (Intent) methodHookParam.thisObject;
+//                if (intent.hasExtra("skipToUriHook")) return;
+//                String scheme = (String) methodHookParam.getResult();
+//                filterScheme(scheme, "Intent.toUri");
+//            }
+//        });
 
     }
 
     /**
-     *  调试测试代码
+     * 调试测试代码
      */
     private void HookClass(XC_LoadPackage.LoadPackageParam loadPackageParam, String classNameToHook) {
         try {
@@ -547,7 +529,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
             }
         }, 0, 1000, TimeUnit.MILLISECONDS); // 初始延迟为0，每隔500ms执行一次
     }
-
 
 
 }

@@ -10,17 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Extract {
-    public static String extractComponentName(String componentInfoStr) {
-        // Regex pattern to extract the content inside the curly braces
-        Pattern pattern = Pattern.compile("\\{([^}]+)\\}");
-        Matcher matcher = pattern.matcher(componentInfoStr);
 
-        if (matcher.find()) {
-            return matcher.group(1); // Return the content inside the braces
-        } else {
-            return componentInfoStr; // Return the original string if pattern not matched
-        }
-    }
 
     public static String extractTime(String fullTime) {
         if (fullTime != null && fullTime.contains(" ")) {
@@ -33,15 +23,6 @@ public class Extract {
         return ""; // 返回空字符串如果格式不符
     }
 
-    public static String extractDataSize(String input) {
-        Pattern pattern = Pattern.compile("dataSize=(\\d+)");
-        Matcher matcher = pattern.matcher(input);
-
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return "";
-    }
 
     public static String calculateBundleDataSize(Bundle bundle) {
         // 使用 Parcel 将 Bundle 序列化
@@ -76,30 +57,6 @@ public class Extract {
         }
 
         return formattedString;
-    }
-
-    public static Bundle convertMapToBundle(Map<String, Object> mapData) {
-        Bundle bundle = new Bundle();
-        for (Map.Entry<String, Object> entry : mapData.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            if (value == null) {
-                bundle.putString(key, "null");
-            } else if (value instanceof String) {
-                bundle.putString(key, (String) value);
-            } else if (value instanceof Integer) {
-                bundle.putInt(key, (Integer) value);
-            } else if (value instanceof Boolean) {
-                bundle.putBoolean(key, (Boolean) value);
-            } else if (value instanceof ArrayList) {
-                bundle.putStringArrayList(key, (ArrayList<String>) value);
-            } else if (value instanceof byte[]) {
-                bundle.putByteArray(key, (byte[]) value);
-            } else {
-                bundle.putString(key, value.toString());
-            }
-        }
-        return bundle;
     }
 
     public static String getIntentSchemeValue(String intentUri, String key) {

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
+import android.util.Log;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,15 +20,21 @@ public class HomeAppInfoHelper {
     }
 
     public AppInfo getAppInfo(String componentName) {
-        if (Objects.equals(componentName, "/") || componentName == null) return null;
+        if (componentName == null) return null;
+
+        String packageName;
+        if (Objects.equals(componentName, "/")) {
+            packageName = componentName.split("/")[0];
+        } else {
+            packageName = componentName;
+        }
+
+        Log.d("HomeAppInfoHelper", "getAppInfo: " + packageName + " " + componentName);
 
         // Check if the info is already cached
         if (cache.containsKey(componentName)) {
             return cache.get(componentName);
         }
-
-        // Parse the package name from the component
-        String packageName = componentName.split("/")[0];
 
         // Try to find the application info
         AppInfo appInfo = findAppInfo(packageName);

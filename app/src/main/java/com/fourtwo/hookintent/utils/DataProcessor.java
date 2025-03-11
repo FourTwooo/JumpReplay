@@ -9,9 +9,9 @@ import android.util.Log;
 import androidx.core.content.ContextCompat;
 
 import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;
-import com.fourtwo.hookintent.base.UriData;
 import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.ui.home.HomeAppInfoHelper;
 import com.fourtwo.hookintent.viewmodel.MainViewModel;
@@ -48,12 +48,6 @@ public class DataProcessor {
                 return;
             }
 
-            // 从 Binder 中获取批量数据
-//            AIDL_MSG_SEND_DATA batchBinder = AIDL_MSG_SEND_DATA.Stub.asInterface(data.getBinder("batch_data_binder"));
-//            if (batchBinder == null) {return;}
-
-            // 从 Binder 中获取 JSON 字符串
-//            String batchDataJson = batchBinder.GET_MSG_SEND_DATA();
             String batchDataJson = data.getString("batch_data_binder");
 
             // 将 JSON 字符串解析为 List<Bundle>
@@ -82,40 +76,40 @@ public class DataProcessor {
                 String dataSize = Extract.calculateBundleDataSize(bundle);
                 String time = Extract.extractTime(bundle.getString("time"));
                 String packageName = "";
-                String to = "";
+                String component = "";
                 String dataString = "";
 
                 if ("Intent".equals(base)) {
                     if (handleIntentBase(bundle)) continue;
-                    ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
+                    component = bundle.getString("component");
+                    packageName = component;
+                    ArrayList<?> intentExtras = (ArrayList<?>) bundle.getSerializable("intentExtras");
                     if (intentExtras != null) {
                         dataString = Extract.extractIntentExtrasString(intentExtras);
                     }
-                    to = bundle.getString("to");
-                    packageName = bundle.getString("componentName");
-                    if (Objects.equals(packageName, "null") && !Objects.equals(bundle.getString("dataString"), "null")) {
-                        packageName = SchemeResolver.findAppByUri(context, bundle.getString("dataString")) + "/";
-                        to = bundle.getString("dataString");
+                    if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("dataString"), "null")) {
+                        packageName = SchemeResolver.findAppByUri(context, bundle.getString("dataString"));
+                        component = bundle.getString("dataString");
                     }
-                    if (Objects.equals(packageName, "null") && !Objects.equals(bundle.getString("action"), "null")) {
-                        packageName = SchemeResolver.findAppByUri(context, bundle.getString("action")) + "/";
-                        to = bundle.getString("action");
+                    if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("action"), "null")) {
+                        packageName = SchemeResolver.findAppByUri(context, bundle.getString("action"));
+                        component = bundle.getString("action");
                     }
                 } else if ("Scheme".equals(base)) {
                     if (handleSchemeBase(bundle)) continue;
                     String schemeRawUrl = bundle.getString("scheme_raw_url");
-                    packageName = SchemeResolver.findAppByUri(context, schemeRawUrl) + "/";
-                    Bundle bundle1 = Extract.convertMapToBundle(UriData.convertUriToMap(Uri.parse(schemeRawUrl)));
+                    packageName = SchemeResolver.findAppByUri(context, schemeRawUrl);
+                    Bundle bundle1 = DataConverter.convertUriToBundle(Uri.parse(schemeRawUrl));
                     bundle.putAll(bundle1);
 
                     if (schemeRawUrl.startsWith("#Intent;") || bundle.getString("authority").equals("null")) {
-                        to = schemeRawUrl;
+                        component = schemeRawUrl;
                         packageName = Extract.getIntentSchemeValue(schemeRawUrl, "component");
                         if (packageName == null) {
-                            packageName = Extract.getIntentSchemeValue(schemeRawUrl, "action") + "/";
+                            packageName = Extract.getIntentSchemeValue(schemeRawUrl, "action");
                         }
                     } else {
-                        to = bundle.getString("scheme") + "://" + bundle.getString("authority") + bundle.getString("path");
+                        component = bundle.getString("scheme") + "://" + bundle.getString("authority") + bundle.getString("path");
                     }
                     dataString = bundle.getString("query");
                     if ("null".equals(dataString)) {
@@ -131,7 +125,7 @@ public class DataProcessor {
                 Drawable appIcon = appInfo.getAppIcon();
 
                 // 创建 ItemData
-                ItemData itemData = new ItemData(appIcon, appName, to, dataString, time, String.format("%s B", dataSize), bundle, base, stackTrace, uri);
+                ItemData itemData = new ItemData(appIcon, appName, component, dataString, time, String.format("%s B", dataSize), bundle, base, stackTrace, uri);
                 viewModel.addIntentData(itemData);
 
             }

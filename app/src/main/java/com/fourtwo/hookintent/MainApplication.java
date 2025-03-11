@@ -16,7 +16,7 @@ public class MainApplication extends Application {
 
     final String TAG = "MainApplication";
 
-    Boolean isRoot = false;
+    static Boolean isRoot = false;
 
     static {
         Shell.enableVerboseLogging = BuildConfig.DEBUG;
@@ -26,23 +26,26 @@ public class MainApplication extends Application {
     }
 
     public static void executeCommand(String command, Boolean Root, Context context) {
-        if (Root) {
-            Shell.cmd("su root", command).submit(result -> {
-                if (result.isSuccess()) {
-                    Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
-                }
-            });
-        } else {
-            Shell.cmd("su shell", command).submit(result -> {
-                if (result.isSuccess()) {
-                    Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
-                }
-            });
+        if (isRoot) {
+            if (Root) {
+                Shell.cmd("su root", command).submit(result -> {
+                    if (result.isSuccess()) {
+                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                Shell.cmd("su shell", command).submit(result -> {
+                    if (result.isSuccess()) {
+                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
         }
+
     }
 
     @Override
