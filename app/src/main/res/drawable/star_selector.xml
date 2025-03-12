@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- 收藏状态 -->
+    <item
+        android:drawable="@drawable/star_filled"
+        android:state_checked="true" />
+
+    <!-- 未收藏状态 -->
+    <item
+        android:drawable="@drawable/star_outline"
+        android:state_checked="false" />
+
+</selector>

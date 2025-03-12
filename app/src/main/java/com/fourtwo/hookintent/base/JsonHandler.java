@@ -122,7 +122,7 @@ public class JsonHandler {
     }
 
     // 辅助方法：将 JSONObject 转换为 Map<String, Object>
-    private static Map<String, Object> toMap(JSONObject jsonObject) {
+    public static Map<String, Object> toMap(JSONObject jsonObject) {
         Map<String, Object> map = new HashMap<>();
         Iterator<String> keys = jsonObject.keys();
         while (keys.hasNext()) {
@@ -144,7 +144,7 @@ public class JsonHandler {
     }
 
     // 将 Bundle 转换为 Map<String, Object>
-    private static Map<String, Object> toMap(Bundle bundle) {
+    public static Map<String, Object> toMap(Bundle bundle) {
         Map<String, Object> map = new HashMap<>();
         for (String key : bundle.keySet()) {
             Object value = bundle.get(key);
@@ -218,7 +218,7 @@ public class JsonHandler {
 
 
     // 辅助方法：将 JSONObject 转换为 Bundle
-    private static Bundle toBundle(JSONObject jsonObject) {
+    public static Bundle toBundle(JSONObject jsonObject) {
         Bundle bundle = new Bundle();
         Iterator<String> keys = jsonObject.keys();
         while (keys.hasNext()) {

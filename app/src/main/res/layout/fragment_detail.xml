@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/white"
-    android:padding="16dp">
+    android:padding="2dp">
 
     <!-- Always visible URL TextView -->
     <TextView
@@ -13,7 +13,7 @@
         android:text="@string/activity"
         android:layout_height="wrap_content"
         android:paddingBottom="8dp"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -36,7 +36,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:divider="#e0e0e0"
-            tools:listitem="@layout/item_data"
+            tools:listitem="@layout/detail_item_data"
             tools:itemCount="3"
             android:dividerHeight="1dp" />
 

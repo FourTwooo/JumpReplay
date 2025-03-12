@@ -14,6 +14,7 @@ import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.ui.home.HomeAppInfoHelper;
+import com.fourtwo.hookintent.ui.star.StarViewModel;
 import com.fourtwo.hookintent.viewmodel.MainViewModel;
 
 import java.util.ArrayList;
@@ -25,16 +26,18 @@ public class DataProcessor {
     private static final String TAG = "DataProcessor";
 
     private final Context context;
-    private final MainViewModel viewModel;
     private final IntentDuplicateChecker intentDuplicateChecker;
     private final IntentDuplicateChecker schemeDuplicateChecker;
-    private Map<String, Object> JsonData; // 新增 JsonData 变量
+    private Map<String, Object> JsonData;
 
-    public DataProcessor(Context context, MainViewModel viewModel) {
+    public DataProcessor(Context context) {
         this.context = context;
-        this.viewModel = viewModel;
         this.intentDuplicateChecker = new IntentDuplicateChecker();
         this.schemeDuplicateChecker = new IntentDuplicateChecker();
+    }
+
+    public interface DataProcessedCallback {
+        void onDataProcessed(ItemData itemData);
     }
 
     // 新增方法：设置 JsonData
@@ -42,7 +45,84 @@ public class DataProcessor {
         this.JsonData = jsonData;
     }
 
-    public void processReceivedData(Bundle data) {
+    public void processBundle(Bundle bundle, DataProcessedCallback callback) {
+        String base = bundle.getString("Base");
+        String stackTrace = bundle.getString("stack_trace");
+        String uri = bundle.getString("uri");
+        String time = Extract.extractTime(bundle.getString("time"));
+        if (filterData(base, bundle) && !JsonData.isEmpty()) {
+            return;
+        }
+        Log.d(TAG, "processBundle1: " + bundle.getString("time"));
+        String dataSize = Extract.calculateBundleDataSize(bundle);
+        String packageName;
+        String component;
+        String dataString = "";
+
+        if ("Intent".equals(base)) {
+            if (handleIntentBase(bundle) && !JsonData.isEmpty()) return;
+            component = bundle.getString("component");
+            packageName = component;
+            ArrayList<?> intentExtras = (ArrayList<?>) bundle.getSerializable("intentExtras");
+            if (intentExtras != null) {
+                dataString = Extract.extractIntentExtrasString(intentExtras);
+            }
+            if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("dataString"), "null")) {
+                packageName = SchemeResolver.findAppByUri(context, bundle.getString("dataString"));
+                component = bundle.getString("dataString");
+            }
+            if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("action"), "null")) {
+                packageName = SchemeResolver.findAppByUri(context, bundle.getString("action"));
+                component = bundle.getString("action");
+            }
+        } else if ("Scheme".equals(base)) {
+            if (handleSchemeBase(bundle) && !JsonData.isEmpty()) return;
+            String schemeRawUrl = bundle.getString("scheme_raw_url");
+            packageName = SchemeResolver.findAppByUri(context, schemeRawUrl);
+            Bundle bundle1 = DataConverter.convertUriToBundle(Uri.parse(schemeRawUrl));
+            bundle.putAll(bundle1);
+
+            if (schemeRawUrl.startsWith("#Intent;") || bundle.getString("authority").equals("null")) {
+                component = schemeRawUrl;
+                packageName = Extract.getIntentSchemeValue(schemeRawUrl, "component");
+                if (packageName == null) {
+                    packageName = Extract.getIntentSchemeValue(schemeRawUrl, "action");
+                }
+            } else {
+                component = bundle.getString("scheme") + "://" + bundle.getString("authority") + bundle.getString("path");
+            }
+            dataString = bundle.getString("query");
+            if ("null".equals(dataString)) {
+                dataString = "";
+            }
+        } else {
+            return;
+        }
+
+        HomeAppInfoHelper.AppInfo appInfo = getAppInfo(context, packageName);
+        String appName = appInfo.getAppName();
+        Drawable appIcon = appInfo.getAppIcon();
+
+        Log.d(TAG, "processBundle end: " + bundle.getString("time"));
+        ItemData itemData = new ItemData(
+                appIcon,
+                appName,
+                component,
+                dataString,
+                time,
+                String.format("%s B", dataSize),
+                bundle,
+                base,
+                stackTrace,
+                uri
+        );
+
+        if (callback != null) {
+            callback.onDataProcessed(itemData);
+        }
+    }
+
+    public void processReceivedData(Bundle data, DataProcessedCallback callback) {
         try {
             if (data == null) {
                 return;
@@ -50,86 +130,12 @@ public class DataProcessor {
 
             String batchDataJson = data.getString("batch_data_binder");
 
-            // 将 JSON 字符串解析为 List<Bundle>
             List<Bundle> bundles = JsonHandler.fromJson(batchDataJson);
             Log.d(TAG, "processReceivedData: " + bundles.size());
-            // 遍历解析每个 Bundle 的数据
+
             for (Bundle bundle : bundles) {
-                String base = bundle.getString("Base");
-                String stackTrace = bundle.getString("stack_trace");
-                String uri = bundle.getString("uri");
-
-                // 数据处理逻辑
-                bundle.remove("stack_trace");
-                bundle.remove("uri");
-                bundle.remove("Base");
-
-                // 你可以在这里对单个 Bundle 做进一步处理
-                Log.d(TAG, "Processed bundle: bundle=" + bundle);
-
-                // 数据过滤逻辑
-                if (filterData(base, bundle)) {
-                    continue;
-                }
-
-                // 其他数据处理逻辑
-                String dataSize = Extract.calculateBundleDataSize(bundle);
-                String time = Extract.extractTime(bundle.getString("time"));
-                String packageName = "";
-                String component = "";
-                String dataString = "";
-
-                if ("Intent".equals(base)) {
-                    if (handleIntentBase(bundle)) continue;
-                    component = bundle.getString("component");
-                    packageName = component;
-                    ArrayList<?> intentExtras = (ArrayList<?>) bundle.getSerializable("intentExtras");
-                    if (intentExtras != null) {
-                        dataString = Extract.extractIntentExtrasString(intentExtras);
-                    }
-                    if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("dataString"), "null")) {
-                        packageName = SchemeResolver.findAppByUri(context, bundle.getString("dataString"));
-                        component = bundle.getString("dataString");
-                    }
-                    if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("action"), "null")) {
-                        packageName = SchemeResolver.findAppByUri(context, bundle.getString("action"));
-                        component = bundle.getString("action");
-                    }
-                } else if ("Scheme".equals(base)) {
-                    if (handleSchemeBase(bundle)) continue;
-                    String schemeRawUrl = bundle.getString("scheme_raw_url");
-                    packageName = SchemeResolver.findAppByUri(context, schemeRawUrl);
-                    Bundle bundle1 = DataConverter.convertUriToBundle(Uri.parse(schemeRawUrl));
-                    bundle.putAll(bundle1);
-
-                    if (schemeRawUrl.startsWith("#Intent;") || bundle.getString("authority").equals("null")) {
-                        component = schemeRawUrl;
-                        packageName = Extract.getIntentSchemeValue(schemeRawUrl, "component");
-                        if (packageName == null) {
-                            packageName = Extract.getIntentSchemeValue(schemeRawUrl, "action");
-                        }
-                    } else {
-                        component = bundle.getString("scheme") + "://" + bundle.getString("authority") + bundle.getString("path");
-                    }
-                    dataString = bundle.getString("query");
-                    if ("null".equals(dataString)) {
-                        dataString = "";
-                    }
-                } else {
-                    continue;
-                }
-
-                // 获取应用信息
-                HomeAppInfoHelper.AppInfo appInfo = getAppInfo(context, packageName);
-                String appName = appInfo.getAppName();
-                Drawable appIcon = appInfo.getAppIcon();
-
-                // 创建 ItemData
-                ItemData itemData = new ItemData(appIcon, appName, component, dataString, time, String.format("%s B", dataSize), bundle, base, stackTrace, uri);
-                viewModel.addIntentData(itemData);
-
+                processBundle(bundle, callback);
             }
-
 
         } catch (Exception e) {
             Log.e(TAG, "Error processing data", e);
@@ -137,12 +143,12 @@ public class DataProcessor {
     }
 
     private boolean handleIntentBase(Bundle bundle) {
-        Log.d(TAG, "Removing duplicate Intent bundle: " + bundle);
+//        Log.d(TAG, "Removing duplicate Intent bundle: " + bundle);
         return intentDuplicateChecker.isDuplicate(bundle);
     }
 
     private boolean handleSchemeBase(Bundle bundle) {
-        Log.d(TAG, "Removing duplicate Scheme bundle: " + bundle);
+//        Log.d(TAG, "Removing duplicate Scheme bundle: " + bundle);
         return schemeDuplicateChecker.isDuplicate(bundle);
     }
 
@@ -186,7 +192,7 @@ public class DataProcessor {
         switch (base) {
             case "Intent":
                 Map<String, Object> intentData = JsonHandler.getFilterKeyJson(JsonData.get("intent"));
-                assert intentData != null;
+                if (intentData == null) return false;
                 if (isFilterMatched(intentData, "FunctionCall", functionCall)) {
                     is_filter = true;
                 }
@@ -207,7 +213,7 @@ public class DataProcessor {
                 }
 
                 Map<String, Object> schemeData = JsonHandler.getFilterKeyJson(JsonData.get("scheme"));
-                assert schemeData != null;
+                if (schemeData == null) return false;
 
                 if (isFilterMatched(schemeData, "FunctionCall", functionCall)) {
                     is_filter = true;

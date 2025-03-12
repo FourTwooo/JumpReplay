@@ -20,6 +20,7 @@ import com.fourtwo.hookintent.data.IntentMatchItem;
 import com.fourtwo.hookintent.databinding.ActivityIntentInterceptBinding;
 import com.fourtwo.hookintent.databinding.ContentInterceptMainBinding;
 import com.fourtwo.hookintent.utils.RootServiceHelper;
+import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
@@ -90,6 +91,13 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
         setSupportActionBar(binding.toolbar);
 
         contentBinding = ContentInterceptMainBinding.bind(binding.getRoot().findViewById(R.id.content_main));
+
+        contentBinding.enableFeatureCheckbox.setChecked(SharedPreferencesUtils.getBoolean(this, "interceptIsRoot"));
+
+        contentBinding.enableFeatureCheckbox.setOnCheckedChangeListener((buttonView, isChecked1) -> {
+            // 将复选框状态存入 SharedPreferences
+            SharedPreferencesUtils.putBoolean(this, "interceptIsRoot", isChecked1);
+        });
     }
 
     /**

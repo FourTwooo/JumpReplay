@@ -23,10 +23,14 @@
 
     <!-- Other fragments -->
     <fragment
-        android:id="@+id/nav_gallery"
+        android:id="@+id/nav_star"
         android:name="com.fourtwo.hookintent.ui.star.StarFragment"
         android:label="@string/menu_gallery"
-        tools:layout="@layout/fragment_gallery" />
+        tools:layout="@layout/fragment_star">
+        <action
+            android:id="@+id/action_nav_home_to_nav_detail"
+            app:destination="@id/nav_detail" />
+    </fragment>
 
     <fragment
         android:id="@+id/nav_me"

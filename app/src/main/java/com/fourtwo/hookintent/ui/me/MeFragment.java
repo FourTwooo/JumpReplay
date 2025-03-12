@@ -16,7 +16,6 @@ import androidx.lifecycle.ViewModelProvider;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.databinding.FragmentMeBinding;
 import com.fourtwo.hookintent.utils.NetworkClient;
-import com.fourtwo.hookintent.viewmodel.MeViewModel;
 
 import io.noties.markwon.Markwon;
 import io.noties.markwon.ext.tables.TablePlugin;

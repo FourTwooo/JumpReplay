@@ -12,9 +12,10 @@
 
     <item
         android:id="@+id/star"
-        android:icon="@drawable/star"
+        android:icon="@drawable/star_selector"
         android:orderInCategory="0"
         android:title="@string/star"
+        android:checkable="true"
         app:tint="@color/white"
         app:showAsAction="ifRoom" />
 

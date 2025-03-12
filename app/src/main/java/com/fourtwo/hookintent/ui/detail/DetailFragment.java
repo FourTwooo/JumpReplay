@@ -38,9 +38,16 @@ import com.fourtwo.hookintent.MainActivity;
 import com.fourtwo.hookintent.MainApplication;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
+import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.base.LocalDatabaseManager;
+import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
-import com.fourtwo.hookintent.viewmodel.DetailViewModel;
+import com.fourtwo.hookintent.utils.HashUtil;
+import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.tabs.TabLayout;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
@@ -60,8 +67,11 @@ public class DetailFragment extends Fragment {
     private RecyclerView recyclerView;
     private TextView urlTextView;
     private TabLayout tabLayout;
-
     private MainActivity mainActivity;
+
+    private LocalDatabaseManager dbManager;
+    private JSONObject jsonObject;
+    private ItemData itemData = null;
 
     @SuppressLint("MissingInflatedId")
     @Nullable
@@ -81,7 +91,6 @@ public class DetailFragment extends Fragment {
         tabLayout.addTab(tabLayout.newTab().setText("StackTrace"));
 
         // 从 Arguments 获取 ItemData
-        ItemData itemData = null;
         if (getArguments() != null) {
             itemData = getArguments().getParcelable(ARG_ITEM_DATA);
         }
@@ -117,33 +126,44 @@ public class DetailFragment extends Fragment {
             urlTextView = view.findViewById(R.id.urlTextView);
             urlTextView.setText(itemData.getItem_from());
 
-            // Define the keys in the desired order
-            List<String> keys = Arrays.asList("FunctionCall", "time", "packageName", "from", "to", "scheme_raw_url");
+            List<String> keys = Arrays.asList("FunctionCall", "time", "packageName", "from", "component", "scheme_raw_url");
 
-            // Create a map to store the Bundle data
             Map<String, String> dataMap = new HashMap<>();
             Bundle bundle = itemData.getAppBundle();
+
+            Map<String, Object> map = JsonHandler.toMap(bundle);
+            jsonObject = new JSONObject();
+            try {
+                jsonObject.put(Constants.SQL_DATA, new JSONObject(map).toString());
+                jsonObject.put(Constants.SQL_HASH, HashUtil.hash(map.toString(), "SHA-256"));
+            } catch (Exception e) {
+                Log.e(TAG, "onCreateView: ", e);
+            }
             for (String key : bundle.keySet()) {
                 Object value = bundle.get(key);
                 dataMap.put(key, value != null ? value.toString() : "null");
             }
 
-            // Create the dataList following the specified order
             List<Pair<String, String>> dataList = new ArrayList<>();
 
-            // Add prioritized keys first
             for (String key : keys) {
                 if (dataMap.containsKey(key)) {
                     dataList.add(new Pair<>(key, dataMap.get(key)));
-                    dataMap.remove(key);  // Remove the added key from the map
+                    dataMap.remove(key);
                 }
             }
 
-            // Add a special empty pair to indicate the separator
-            dataList.add(new Pair<>("separator", ""));  // Use a special key to identify the separator
+            dataList.add(new Pair<>("separator", ""));
 
-            // Add the remaining keys that were not specified in the order
+            List<String> no_print_keys = Arrays.asList("stack_trace", "Base", "uri");
+
             for (Map.Entry<String, String> entry : dataMap.entrySet()) {
+                if (no_print_keys.contains(entry.getKey())) {
+                    continue;
+                }
+                if (Objects.equals(entry.getValue(), "null")){
+                    continue;
+                }
                 dataList.add(new Pair<>(entry.getKey(), entry.getValue()));
             }
 
@@ -155,6 +175,7 @@ public class DetailFragment extends Fragment {
             dividerItemDecoration.setDrawable(Objects.requireNonNull(ContextCompat.getDrawable(requireContext(), R.drawable.divider)));
             recyclerView.addItemDecoration(dividerItemDecoration);
         }
+
 
         return view;
     }
@@ -168,6 +189,16 @@ public class DetailFragment extends Fragment {
         }
     }
 
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        // 初始化数据库管理类
+        dbManager = new LocalDatabaseManager(requireContext());
+
+        // 打开数据库
+        dbManager.openDatabase(Constants.STAR_DB_NAME);
+    }
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -198,10 +229,31 @@ public class DetailFragment extends Fragment {
         }
 
         requireActivity().addMenuProvider(new MenuProvider() {
+            boolean isStarred = false; // 是否已收藏的状态
+
             @Override
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menu.clear(); // 清除现有菜单项，避免重复
                 menuInflater.inflate(R.menu.detail_drawer, menu); // 加载菜单
+
+                // 动态设置收藏按钮图标
+                try {
+                    String _hash = jsonObject.getString(Constants.SQL_HASH); // 获取 _hash
+                    dbManager.createTable(Constants.STAR_TABLE_NAME); // 确保表存在
+
+                    // 检查数据库中是否存在该 _hash
+                    isStarred = dbManager.is_exists(Constants.STAR_TABLE_NAME, _hash);
+
+                    // 根据状态设置收藏图标
+                    MenuItem starMenuItem = menu.findItem(R.id.star);
+                    if (isStarred) {
+                        starMenuItem.setIcon(R.drawable.star_filled); // 已收藏图标
+                    } else {
+                        starMenuItem.setIcon(R.drawable.star_outline); // 未收藏图标
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "onCreateMenu: ", e);
+                }
             }
 
             @Override
@@ -212,10 +264,39 @@ public class DetailFragment extends Fragment {
                     View anchorView = requireActivity().findViewById(R.id.copy_code);
                     showOptionsDialog(anchorView); // 调用修改后的 showOptionsDialog
                     return true;
+                } else if (itemId == R.id.star) {
+                    try {
+                        String _hash = jsonObject.getString(Constants.SQL_HASH); // 获取 _hash
+                        dbManager.createTable(Constants.STAR_TABLE_NAME); // 确保表存在
+
+                        // 切换收藏状态
+                        if (isStarred) {
+                            // 如果已收藏，执行取消收藏操作
+                            boolean isDeleted = dbManager.deleteData(Constants.STAR_TABLE_NAME, _hash);
+                            if (isDeleted) {
+                                isStarred = false;
+                                menuItem.setIcon(R.drawable.star_outline); // 更新图标为未收藏
+                                Toast.makeText(requireContext(), "取消收藏成功", Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(requireContext(), "取消收藏失败", Toast.LENGTH_SHORT).show();
+                            }
+                        } else {
+                            // 如果未收藏，执行收藏操作
+                            dbManager.insertOrUpdateData(Constants.STAR_TABLE_NAME, jsonObject);
+                            isStarred = true;
+                            menuItem.setIcon(R.drawable.star_filled); // 更新图标为已收藏
+                            Toast.makeText(requireContext(), "收藏成功", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(requireContext(), "操作失败", Toast.LENGTH_SHORT).show();
+                    }
+                    return true;
                 }
                 return false;
             }
         }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
+
     }
 
     private void showOptionsDialog(View anchorView) {
@@ -240,7 +321,6 @@ public class DetailFragment extends Fragment {
             ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
             boolean hasError = false;
             String activityTemplate = "am start -n %s %s";
-            String intentTemplate = "am start \"%s\"";
             String packageName = bundle.getString("componentName");
             String buildAmCommand = "";
             if (intentExtras != null) {
@@ -255,15 +335,12 @@ public class DetailFragment extends Fragment {
             boolean finalHasError = hasError;
             actions.add(() -> showAmCommandDialog(activityCommand, finalHasError, "am命令"));
 
-//            String uriCommand = String.format(intentTemplate, itemData.getUri());
             String uriCommand = itemData.getUri();
             Log.d(TAG, "intentCommand: " + uriCommand);
 
             options.add("intentUri");
             actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri"));
         } else if (Base.equals("Scheme")) {
-//            String uriTemplate = "am start -d \"%s\"";
-//            String uriCommand = String.format(uriTemplate, itemData.getAppBundle().getString("scheme_raw_url"));
             String uriCommand = itemData.getAppBundle().getString("scheme_raw_url");
 
             Log.d(TAG, "schemeCommand: " + uriCommand);
@@ -306,6 +383,12 @@ public class DetailFragment extends Fragment {
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button suCodeButton = dialogView.findViewById(R.id.su_code_button);
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) CheckBox enableFeatureCheckbox = dialogView.findViewById(R.id.enable_feature_checkbox);
 
+        enableFeatureCheckbox.setChecked(SharedPreferencesUtils.getBoolean(requireContext(), "detailIsRoot"));
+
+        enableFeatureCheckbox.setOnCheckedChangeListener((buttonView, isChecked1) -> {
+            // 将复选框状态存入 SharedPreferences
+            SharedPreferencesUtils.putBoolean(requireContext(), "detailIsRoot", isChecked1);
+        });
 
         try {
             amCommand = URLDecoder.decode(amCommand, StandardCharsets.UTF_8.name());
@@ -347,5 +430,13 @@ public class DetailFragment extends Fragment {
                 .create();
 
         dialog.show();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (dbManager != null) {
+            dbManager.closeDatabase();
+        }
     }
 }

@@ -55,7 +55,7 @@ public class DetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
             view.setBackgroundResource(android.R.color.darker_gray);  // Set a different color for separator
             return new SeparatorViewHolder(view);
         } else {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_data, parent, false);
+            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.detail_item_data, parent, false);
             return new DataViewHolder(view);
         }
     }

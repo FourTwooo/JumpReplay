@@ -226,7 +226,7 @@ public class HomeFragment extends Fragment {
         itemTouchHelper.attachToRecyclerView(recyclerView);
 
         // 初始化 DataProcessor
-        dataProcessor = new DataProcessor(requireContext(), viewModel);
+        dataProcessor = new DataProcessor(requireContext());
         dataProcessor.setJsonData(JsonData);
 
         Log.d(TAG, "onViewCreated: MessengerService");
@@ -243,7 +243,7 @@ public class HomeFragment extends Fragment {
                 while (!queue.isEmpty()) {
                     Bundle data = queue.poll(); // 从队列中取出数据
                     if (data != null) {
-                        dataProcessor.processReceivedData(data); // 使用 DataProcessor 处理数据
+                        dataProcessor.processReceivedData(data, itemData -> viewModel.addIntentData(itemData)); // 使用 DataProcessor 处理数据
                     }
                 }
             }
