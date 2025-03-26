@@ -12,15 +12,30 @@
     <!-- 复选框 -->
     <CheckBox
         android:id="@+id/enable_feature_checkbox"
-        android:layout_width="wrap_content"
+        android:layout_width="30dp"
         android:layout_height="wrap_content"
         android:padding="0dp"
-        android:text="@string/is_root"
         android:textSize="14sp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        tools:ignore="MissingConstraints" />
+
+    <!-- 下拉列表 -->
 
     <!-- 可编辑的多行输入框 -->
+
+    <Spinner
+        android:id="@+id/dropdown_spinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginTop="11dp"
+        android:spinnerMode="dropdown"
+        android:entries="@array/items_array"
+        app:layout_constraintStart_toEndOf="@+id/enable_feature_checkbox"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:ignore="MissingConstraints" />
+
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/url_input_layout"
         style="@style/RoundedTextInputLayout"

@@ -26,10 +26,14 @@ import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> implements Filterable {
 
@@ -95,22 +99,21 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
         holder.timestamp.setText(item.getTimestamp());
         holder.dataSize.setText(item.getDataSize());
 
-        String base = item.getBase();
-        holder.badge.setText(base);
+        String category = item.getCategory();
+        holder.category.setText(category);
         Context context = holder.itemView.getContext();
-        Drawable drawable = ContextCompat.getDrawable(context, R.drawable.badge_background);
-        if (drawable instanceof GradientDrawable) {
-            GradientDrawable background = (GradientDrawable) drawable;
-            if (base.contains("Scheme")) {
-                background.setColor(Color.parseColor("#47AA4B"));
-            } else {
-                background.setColor(Color.parseColor("#CE1A7EAC"));
-            }
 
-            holder.badge.setBackground(background);
+        Drawable drawable = ContextCompat.getDrawable(context, R.drawable.badge_background);
+        if (!(drawable instanceof GradientDrawable)) {return;}
+        GradientDrawable background = (GradientDrawable) drawable;
+        String COLORS_CONFIG = SharedPreferencesUtils.getStr(context, Constants.COLORS_CONFIG);
+        Map<String, String> COLORS = JsonHandler.jsonToMap(COLORS_CONFIG);
+        if (COLORS.containsKey(category)) {
+            background.setColor(Color.parseColor(COLORS.get(category)));
         } else {
-            holder.badge.setBackgroundColor(Color.GRAY);
+            background.setColor(Color.GRAY);
         }
+        holder.category.setBackground(background);
 
         holder.itemView.setOnClickListener(v -> {
             NavController navController = Navigation.findNavController((Activity) v.getContext(), R.id.nav_host_fragment_content_main);
@@ -162,7 +165,7 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
     private void showPopupWindow(View view, ItemData item) {
         // 实现弹出窗口逻辑，例如使用PopupWindow或AlertDialog
         AlertDialog.Builder builder = new AlertDialog.Builder(view.getContext());
-        builder.setTitle(item.getBase())
+        builder.setTitle(item.getCategory())
                 .setMessage(item.getItem_from() + "\n\n" + item.getItem_data())
                 .setPositiveButton("OK", (dialog, which) -> dialog.dismiss())
                 .show();
@@ -213,15 +216,15 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
         ImageView icon;
-        TextView appName, item_from, item_data, timestamp, dataSize, badge;
+        TextView appName, item_from, item_data, timestamp, dataSize, category;
 
         public ViewHolder(@NonNull View itemView) {
             super(itemView);
             icon = itemView.findViewById(R.id.icon);
             appName = itemView.findViewById(R.id.app_name);
-            badge = itemView.findViewById(R.id.badge);
+            category = itemView.findViewById(R.id.category);
             item_from = itemView.findViewById(R.id.item_from);
-            item_data = itemView.findViewById(R.id.item_data);
+            item_data = itemView.findViewById(R.id.package_name);
             timestamp = itemView.findViewById(R.id.timestamp);
             dataSize = itemView.findViewById(R.id.data_size);
         }

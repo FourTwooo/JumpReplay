@@ -11,14 +11,14 @@ public class ItemData implements Parcelable {
     private final String item_from;
     private final String item_data;
     private final String timestamp;
-    private final String Base;
+    private final String category;
     private final String dataSize;
     private final Bundle bundle;
     private final String stack_trace;
     private final String uri;
 
     // 构造函数
-    public ItemData(Drawable icon, String appName, String item_from, String item_data, String timestamp, String dataSize, Bundle bundle, String Base, String stack_trace, String uri) {
+    public ItemData(Drawable icon, String appName, String item_from, String item_data, String timestamp, String dataSize, Bundle bundle, String category, String stack_trace, String uri) {
         this.icon = icon;
         this.appName = appName;
         this.item_from = item_from;
@@ -26,7 +26,7 @@ public class ItemData implements Parcelable {
         this.timestamp = timestamp;
         this.dataSize = dataSize;
         this.bundle = bundle;
-        this.Base = Base;
+        this.category = category;
         this.stack_trace = stack_trace;
         this.uri = uri;
     }
@@ -38,7 +38,7 @@ public class ItemData implements Parcelable {
         item_from = in.readString();
         item_data = in.readString();
         timestamp = in.readString();
-        Base = in.readString();
+        category = in.readString();
         dataSize = in.readString();
         bundle = in.readBundle(getClass().getClassLoader());
         stack_trace = in.readString();
@@ -69,7 +69,7 @@ public class ItemData implements Parcelable {
         parcel.writeString(item_from);
         parcel.writeString(item_data);
         parcel.writeString(timestamp);
-        parcel.writeString(Base);
+        parcel.writeString(category);
         parcel.writeString(dataSize);
         parcel.writeBundle(bundle);
         parcel.writeString(stack_trace);
@@ -81,9 +81,6 @@ public class ItemData implements Parcelable {
         return icon;
     }
 
-    public void setIcon(Drawable icon) {
-        this.icon = icon;
-    }
 
     public String getAppName() {
         return appName;
@@ -109,8 +106,8 @@ public class ItemData implements Parcelable {
         return bundle;
     }
 
-    public String getBase() {
-        return Base;
+    public String getCategory() {
+        return category;
     }
 
     public String getStackTrace() {

@@ -3,8 +3,6 @@ package com.fourtwo.hookintent.utils;
 import android.os.Bundle;
 import android.util.Log;
 
-import com.fourtwo.hookintent.base.Extract;
-
 public class IntentDuplicateChecker {
     private String lastBundleString = "";
 
@@ -21,14 +19,14 @@ public class IntentDuplicateChecker {
 
         String FunctionCall = newBundle.getString("FunctionCall");
         String From = newBundle.getString("from");
-        String Base = newBundle.getString("Base");
+        String Category = newBundle.getString("category");
         String stack_trace = newBundle.getString("stack_trace");
         String uri = newBundle.getString("uri");
         String time = newBundle.getString("time");
 
         newBundle.remove("stack_trace");
         newBundle.remove("uri");
-        newBundle.remove("Base");
+        newBundle.remove("category");
         newBundle.remove("time");
         newBundle.remove("FunctionCall");
         newBundle.remove("from");
@@ -45,7 +43,7 @@ public class IntentDuplicateChecker {
         newBundle.putString("from", From);
         newBundle.putString("stack_trace", stack_trace);
         newBundle.putString("uri", uri);
-        newBundle.putString("Base", Base);
+        newBundle.putString("category", Category);
         newBundle.putString("time", time);
         return isDuplicate;
     }

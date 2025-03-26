@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent.ui.home;
+package com.fourtwo.hookintent.utils;
 
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -10,12 +10,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-public class HomeAppInfoHelper {
+public class AppInfoHelper {
 
     private final PackageManager packageManager;
     private final Map<String, AppInfo> cache = new HashMap<>();
 
-    public HomeAppInfoHelper(Context context) {
+    public AppInfoHelper(Context context) {
         this.packageManager = context.getPackageManager();
     }
 
@@ -29,7 +29,7 @@ public class HomeAppInfoHelper {
             packageName = componentName;
         }
 
-        Log.d("HomeAppInfoHelper", "getAppInfo: " + packageName + " " + componentName);
+        Log.d("AppInfoHelper", "getAppInfo: " + packageName + " " + componentName);
 
         // Check if the info is already cached
         if (cache.containsKey(componentName)) {

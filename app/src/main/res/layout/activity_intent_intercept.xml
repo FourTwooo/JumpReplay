@@ -19,8 +19,9 @@
             android:layout_height="?attr/actionBarSize"
             android:background="#888888"
             app:popupTheme="@style/Theme.HookIntent.PopupOverlay"
-            tools:menu="@menu/main" />
+            tools:menu="@menu/intercept_main_drawer" />
     </com.google.android.material.appbar.AppBarLayout>
+
 
     <!-- 主内容布局 -->
     <include
@@ -30,6 +31,7 @@
         android:layout_height="match_parent"
         app:layout_behavior="@string/appbar_scrolling_view_behavior"
         android:layout_marginBottom="44dp" />
+
 
     <!-- 底部嵌入布局 -->
     <androidx.constraintlayout.widget.ConstraintLayout

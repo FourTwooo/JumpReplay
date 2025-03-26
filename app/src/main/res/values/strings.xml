@@ -29,4 +29,14 @@
     <string name="is_root">使用root</string>
     <string name="star">收藏</string>
     <string name="settings">配置</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="disabled">禁用</string>
+    <string name="add_link">创建快捷方式</string>
+
+    <string-array name="items_array">
+        <item>使用root</item>
+        <item>使用Shizuku - 系统助手</item>
+    </string-array>
+
 </resources>

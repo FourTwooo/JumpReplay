@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- 移除列表选项 -->
+    <item
+        android:id="@+id/remove_list"
+        android:icon="@drawable/add_link"
+        android:orderInCategory="0"
+        android:tint="@color/white"
+        android:title="@string/add_link"
+        app:showAsAction="ifRoom" />
+
+    <item
+        android:id="@+id/disabled"
+        android:icon="@drawable/disabled"
+        android:title="@string/disabled"
+        app:showAsAction="never" />
+
+
+</menu>

@@ -333,17 +333,6 @@ public class HomeFragment extends Fragment {
 
         dataProcessor.setJsonData(JsonData);
 
-//        // 更新过滤表
-//        SharedPreferences sharedPreferences = requireContext().getSharedPreferences(SelectItemData.SHARED_PREFERENCES_NAME, Context.MODE_PRIVATE);
-//
-//        String STAND_ARD_SCHEMES = sharedPreferences.getString(SelectItemData.SHARED_SCHEMES_NAME, null);
-//        if (STAND_ARD_SCHEMES == null) {
-//            SharedPreferences.Editor editor = sharedPreferences.edit();
-//            editor.putString(SelectItemData.SHARED_SCHEMES_NAME, SelectItemData.SHARED_SCHEMES_VALUE);
-//            editor.apply();
-//        }
-//        Map<String, ?> allEntries = sharedPreferences.getAll();
-//        Log.d(TAG, "onResume: " + allEntries);
     }
 
     @Override

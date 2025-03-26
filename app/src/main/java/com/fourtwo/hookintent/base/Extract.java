@@ -10,7 +10,17 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Extract {
+    public static String extractComponent(String componentInfoStr) {
+        // Regex pattern to extract the content inside the curly braces
+        Pattern pattern = Pattern.compile("\\{([^}]+)\\}");
+        Matcher matcher = pattern.matcher(componentInfoStr);
 
+        if (matcher.find()) {
+            return matcher.group(1); // Return the content inside the braces
+        } else {
+            return componentInfoStr; // Return the original string if pattern not matched
+        }
+    }
 
     public static String extractTime(String fullTime) {
         if (fullTime != null && fullTime.contains(" ")) {

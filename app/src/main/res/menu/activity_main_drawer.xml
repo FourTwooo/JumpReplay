@@ -14,20 +14,27 @@
             android:id="@+id/nav_star"
             android:icon="@drawable/star_filled"
             android:title="@string/menu_gallery" />
-<!--        <item-->
-<!--            android:id="@+id/nav_settings"-->
-<!--            android:icon="@drawable/settings"-->
-<!--            android:title="@string/settings" />-->
+        <item
+            android:id="@+id/nav_settings"
+            android:icon="@drawable/settings"
+            android:title="@string/settings" />
     </group>
 
 
     <group
         android:id="@+id/group2"
         android:checkableBehavior="single">
+
         <item
             android:id="@+id/nav_intercept"
             android:icon="@drawable/intercept"
             android:title="@string/menu_intercept" />
+
+        <item
+            android:id="@+id/nav_disabled"
+            android:icon="@drawable/disabled"
+            android:title="@string/disabled" />
+
     </group>
 
     <group

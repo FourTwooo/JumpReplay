@@ -52,6 +52,11 @@ public class MainApplication extends Application {
     public void onCreate() {
         super.onCreate();
 
+        // 开启系统隐藏API
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            HiddenApiBypass.addHiddenApiExemptions("L");
+        }
+
         // ROOT提权
         Shell.getShell(shell -> {
             if (isRoot = shell.isRoot()) {
@@ -61,10 +66,7 @@ public class MainApplication extends Application {
             }
         });
 
-        // 开启系统隐藏API
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            HiddenApiBypass.addHiddenApiExemptions("");
-        }
+
     }
 
 }

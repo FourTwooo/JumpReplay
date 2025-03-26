@@ -13,9 +13,6 @@ import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.ItemData;
-import com.fourtwo.hookintent.ui.home.HomeAppInfoHelper;
-import com.fourtwo.hookintent.ui.star.StarViewModel;
-import com.fourtwo.hookintent.viewmodel.MainViewModel;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,12 +43,14 @@ public class DataProcessor {
     }
 
     public void processBundle(Bundle bundle, DataProcessedCallback callback) {
-        String base = bundle.getString("Base");
+        String category = bundle.getString("category");
         String stackTrace = bundle.getString("stack_trace");
         String uri = bundle.getString("uri");
         String time = Extract.extractTime(bundle.getString("time"));
-        if (filterData(base, bundle) && !JsonData.isEmpty()) {
-            return;
+        if (!JsonData.isEmpty()) {
+            if (filterData(category, bundle)) {
+                return;
+            }
         }
         Log.d(TAG, "processBundle1: " + bundle.getString("time"));
         String dataSize = Extract.calculateBundleDataSize(bundle);
@@ -59,8 +58,10 @@ public class DataProcessor {
         String component;
         String dataString = "";
 
-        if ("Intent".equals(base)) {
-            if (handleIntentBase(bundle) && !JsonData.isEmpty()) return;
+        if ("Intent".equals(category)) {
+            if (!JsonData.isEmpty()) {
+                if (handleIntentBase(bundle)) return;
+            }
             component = bundle.getString("component");
             packageName = component;
             ArrayList<?> intentExtras = (ArrayList<?>) bundle.getSerializable("intentExtras");
@@ -75,8 +76,10 @@ public class DataProcessor {
                 packageName = SchemeResolver.findAppByUri(context, bundle.getString("action"));
                 component = bundle.getString("action");
             }
-        } else if ("Scheme".equals(base)) {
-            if (handleSchemeBase(bundle) && !JsonData.isEmpty()) return;
+        } else if ("Scheme".equals(category)) {
+            if (!JsonData.isEmpty()) {
+                if (handleSchemeBase(bundle)) return;
+            }
             String schemeRawUrl = bundle.getString("scheme_raw_url");
             packageName = SchemeResolver.findAppByUri(context, schemeRawUrl);
             Bundle bundle1 = DataConverter.convertUriToBundle(Uri.parse(schemeRawUrl));
@@ -96,14 +99,16 @@ public class DataProcessor {
                 dataString = "";
             }
         } else {
-            return;
+            packageName = bundle.getString("packageName");
+            component = bundle.getString("title");
+            dataString = bundle.getString("data");
         }
 
-        HomeAppInfoHelper.AppInfo appInfo = getAppInfo(context, packageName);
+        AppInfoHelper.AppInfo appInfo = getAppInfo(context, packageName);
         String appName = appInfo.getAppName();
         Drawable appIcon = appInfo.getAppIcon();
 
-        Log.d(TAG, "processBundle end: " + bundle.getString("time"));
+        Log.d(TAG, "processBundle end: " + category);
         ItemData itemData = new ItemData(
                 appIcon,
                 appName,
@@ -112,7 +117,7 @@ public class DataProcessor {
                 time,
                 String.format("%s B", dataSize),
                 bundle,
-                base,
+                category,
                 stackTrace,
                 uri
         );
@@ -152,13 +157,13 @@ public class DataProcessor {
         return schemeDuplicateChecker.isDuplicate(bundle);
     }
 
-    private HomeAppInfoHelper.AppInfo getAppInfo(Context context, String packageName) {
-        HomeAppInfoHelper homeAppInfoHelper = new HomeAppInfoHelper(context);
-        HomeAppInfoHelper.AppInfo appInfo = homeAppInfoHelper.getAppInfo(packageName);
+    private AppInfoHelper.AppInfo getAppInfo(Context context, String packageName) {
+        AppInfoHelper appInfoHelper = new AppInfoHelper(context);
+        AppInfoHelper.AppInfo appInfo = appInfoHelper.getAppInfo(packageName);
         if (appInfo != null) {
             return appInfo;
         }
-        return new HomeAppInfoHelper.AppInfo(
+        return new AppInfoHelper.AppInfo(
                 "未知应用" + ("/".equals(packageName) || "null".equals(packageName) ? "" : String.format("(%s)", packageName)),
                 ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)
         );

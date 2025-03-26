@@ -22,6 +22,7 @@ public class DataConverter {
         bundle.putInt("flags", intent.getFlags());
         bundle.putString("dataString", intent.getDataString());
         bundle.putString("type", intent.getType());
+        bundle.putString("componentClassName", Extract.extractComponent(String.valueOf(intent.getComponent())));
         bundle.putString("component", intent.getComponent() != null ? intent.getComponent().getClassName() : null);
         bundle.putString("scheme", intent.getScheme());
         bundle.putString("package", intent.getPackage());

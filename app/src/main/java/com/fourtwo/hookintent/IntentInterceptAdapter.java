@@ -16,7 +16,7 @@ import com.fourtwo.hookintent.data.IntentMatchItem;
 
 import java.util.List;
 
-public class IntentMatchAdapter extends RecyclerView.Adapter<IntentMatchAdapter.ViewHolder> {
+public class IntentInterceptAdapter extends RecyclerView.Adapter<IntentInterceptAdapter.ViewHolder> {
 
     private final Context context;
     private final List<IntentMatchItem> items;
@@ -26,7 +26,7 @@ public class IntentMatchAdapter extends RecyclerView.Adapter<IntentMatchAdapter.
         void onIntentMatchClick(Intent intent); // 定义点击事件的回调方法
     }
 
-    public IntentMatchAdapter(Context context, List<IntentMatchItem> items, OnIntentMatchClickListener listener) {
+    public IntentInterceptAdapter(Context context, List<IntentMatchItem> items, OnIntentMatchClickListener listener) {
         this.context = context;
         this.items = items;
         this.listener = listener; // 保存传入的监听器

@@ -1,7 +1,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:padding="16dp">
@@ -11,12 +11,12 @@
         android:id="@+id/enable_feature_checkbox"
         android:layout_width="wrap_content"
         android:layout_height="28dp"
+        android:layout_gravity="start"
         android:layout_marginEnd="4dp"
         android:scaleX="0.7"
         android:scaleY="0.7"
         android:text="@string/is_root"
         android:textSize="16sp"
-        android:layout_gravity="start"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="RtlSymmetry" />
@@ -24,9 +24,9 @@
     <!-- 使用 MaterialCardView 包裹 ScrollView -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/scroll_card_view"
-        android:layout_width="327dp"
+        android:layout_width="match_parent"
         android:layout_height="150dp"
-        android:layout_marginBottom="16dp"
+        android:layout_marginBottom="4dp"
         android:background="@android:color/transparent"
         app:cardCornerRadius="12dp"
         app:cardElevation="4dp"
@@ -57,51 +57,45 @@
 
     <TextView
         android:id="@+id/hint_text_view"
+        android:text="报错"
+        android:textSize="12sp"
+        android:gravity="center"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingBottom="8dp"
+        android:paddingBottom="2dp"
         android:textColor="@android:color/holo_red_dark"
         android:textStyle="bold"
-        android:visibility="gone" />
+        android:visibility="gone"/>
 
-    <!-- 新的水平布局，用于放置两个按钮 -->
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <!-- 空间填充 -->
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
         <!-- 左边的按钮 -->
-
         <Button
             android:id="@+id/copy_button"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="2"
             android:text="@string/copy_am_code" />
-        <!-- 空间填充 -->
-        <Space
-            android:layout_width="80dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
 
-        <!-- 右边的按钮 -->
-
-        <Button
-            android:id="@+id/su_code_button"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/call_su_code" />
-
-        <!-- 空间填充 -->
+        <!-- 中间空白间隔 -->
         <Space
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            android:layout_weight="2" />
 
+        <!-- 右边的按钮 -->
+        <Button
+            android:id="@+id/su_code_button"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:text="@string/call_su_code" />
     </LinearLayout>
+
 </LinearLayout>

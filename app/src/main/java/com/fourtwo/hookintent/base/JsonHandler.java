@@ -263,6 +263,85 @@ public class JsonHandler {
         return bundle;
     }
 
+    public static String serializeHookedRecords(List<Map<String, Object>> hookedRecords) {
+        JSONArray jsonArray = new JSONArray();
+        for (Map<String, Object> record : hookedRecords) {
+            JSONObject jsonObject = new JSONObject(record); // 将 Map 转换为 JSONObject
+            jsonArray.put(jsonObject); // 添加到 JSONArray
+        }
+        return jsonArray.toString(); // 返回 JSON 字符串
+    }
+
+    public static List<Map<String, Object>> deserializeHookedRecords(String jsonString) {
+        List<Map<String, Object>> hookedRecords = new ArrayList<>();
+        try {
+            // 将 JSON 字符串解析为 JSONArray
+            JSONArray jsonArray;
+            try {
+                jsonArray = new JSONArray(jsonString);
+            } catch (java.lang.NullPointerException ignored) {
+                return hookedRecords;
+            }
+
+            // 遍历 JSONArray，将每个 JSONObject 转换为 Map<String, Object>
+            for (int i = 0; i < jsonArray.length(); i++) {
+                JSONObject jsonObject = jsonArray.getJSONObject(i);
+                Map<String, Object> record = new HashMap<>();
+
+                // 使用 keys() 遍历 JSONObject 的键值对
+                Iterator<String> keys = jsonObject.keys();
+                while (keys.hasNext()) {
+                    String key = keys.next();
+                    Object value = jsonObject.get(key); // 保留值的原始类型
+                    record.put(key, value);
+                }
+                hookedRecords.add(record);
+            }
+        } catch (JSONException e) {
+            Log.e(TAG, "Error deserializing JSON to List<Map<String, Object>>", e);
+        }
+        return hookedRecords;
+    }
+
+    /**
+     * 将 JSON 字符串解析为 Map。
+     *
+     * @param jsonData JSON 字符串。
+     * @return 转换后的 Map。
+     */
+    public static Map<String, String> jsonToMap(String jsonData) {
+        Map<String, String> resultMap = new HashMap<>();
+        try {
+            JSONObject jsonObject = new JSONObject(jsonData);
+            Iterator<String> keys = jsonObject.keys(); // 使用 keys() 获取 Iterator
+            while (keys.hasNext()) {
+                String key = keys.next();
+                String value = jsonObject.getString(key);
+                resultMap.put(key, value);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return resultMap;
+    }
+
+    /**
+     * 将 Map 转换为 JSON 字符串。
+     *
+     * @param map 输入的 Map。
+     * @return 转换后的 JSON 字符串。
+     */
+    public static String mapToJson(Map<String, String> map) {
+        JSONObject jsonObject = new JSONObject();
+        try {
+            for (Map.Entry<String, String> entry : map.entrySet()) {
+                jsonObject.put(entry.getKey(), entry.getValue());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return jsonObject.toString();
+    }
 
 }
 

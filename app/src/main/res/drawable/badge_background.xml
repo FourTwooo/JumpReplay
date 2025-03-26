@@ -1,3 +1,4 @@
+<!-- badge_background.xml -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <solid android:color="#CE1A7EAC"/> <!-- 背景颜色 -->

@@ -1,34 +1,27 @@
 package com.fourtwo.hookintent.ui.star;
 
-import android.annotation.SuppressLint;
-import android.graphics.Canvas;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.EditText;
-import android.widget.TextView;
 
-import androidx.core.content.ContextCompat;
-import androidx.recyclerview.widget.DividerItemDecoration;
-import androidx.recyclerview.widget.ItemTouchHelper;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
+import androidx.recyclerview.widget.DividerItemDecoration;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.base.LocalDatabaseManager;
 import com.fourtwo.hookintent.data.Constants;
-import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.databinding.FragmentStarBinding;
 import com.fourtwo.hookintent.ui.home.HomeAdapter;
 import com.fourtwo.hookintent.utils.DataProcessor;
-import com.fourtwo.hookintent.viewmodel.MainViewModel;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -36,7 +29,6 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 public class StarFragment extends Fragment {

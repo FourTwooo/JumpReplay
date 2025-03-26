@@ -1,5 +1,7 @@
 package com.fourtwo.hookintent;
 
+import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -10,9 +12,12 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
@@ -21,8 +26,10 @@ import com.fourtwo.hookintent.databinding.ActivityIntentInterceptBinding;
 import com.fourtwo.hookintent.databinding.ContentInterceptMainBinding;
 import com.fourtwo.hookintent.utils.RootServiceHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
+import com.fourtwo.hookintent.utils.ShizukuSystemServerApi;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -30,15 +37,52 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public class IntentIntercept extends AppCompatActivity implements IntentMatchAdapter.OnIntentMatchClickListener {
+import rikka.shizuku.Shizuku;
+
+public class IntentIntercept extends AppCompatActivity implements IntentInterceptAdapter.OnIntentMatchClickListener {
     private static final String TAG = "IntentIntercept";
 
     private ActivityIntentInterceptBinding binding; // 主布局绑定
     private ContentInterceptMainBinding contentBinding; // 子布局绑定
     private String originalUrlText; // 用于存储初始 URL 内容
 
+    private IntentInterceptAdapter adapter;
+
     private static boolean isSystemXposed() {
         return false;
+    }
+
+    private static final int REQUEST_CODE_BUTTON1 = 1;
+
+    private final Shizuku.OnBinderReceivedListener BINDER_RECEIVED_LISTENER = () -> {
+        if (Shizuku.isPreV11()) {
+            Log.d(TAG, "Shizuku pre-v11 is not supported");
+        } else {
+            Log.d(TAG, "Binder received");
+        }
+    };
+
+    private final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> Log.d(TAG, "Binder dead");
+
+    private final Shizuku.OnRequestPermissionResultListener REQUEST_PERMISSION_RESULT_LISTENER = this::onRequestPermissionsResult;
+
+    private void onRequestPermissionsResult(int requestCode, int grantResult) {
+        if (grantResult == PERMISSION_GRANTED) {
+            switch (requestCode) {
+                case REQUEST_CODE_BUTTON1: {
+                    break;
+                }
+            }
+        } else {
+            Log.d(TAG, "User denied permission");
+        }
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        // 点击返回图标时，自动退出当前 Activity
+        finish();
+        return true; // 返回 true 表示事件已处理
     }
 
     @SuppressLint({"SetTextI18n", "UseCompatLoadingForDrawables"})
@@ -49,46 +93,14 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
         // 绑定 RootService
         RootServiceHelper.bindRootService(this);
         // 初始化布局绑定
-        initBindings();
-
-        // 处理传入的 Intent 数据
-        Intent originalIntent = stripUnwantedFields(getIntent());
-        originalUrlText = extractUrlFromIntent(originalIntent);
-        contentBinding.urlTextView.setText(originalUrlText);
-
-        // 设置 UI 和事件监听
-        setupUI();
-        setupListeners(originalIntent);
-    }
-
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        Log.d(TAG, "onNewIntent: " + intent);
-
-        // 更新当前 Intent
-        setIntent(intent);
-        originalUrlText = extractUrlFromIntent(intent);
-        contentBinding.urlTextView.setText(originalUrlText);
-
-        // 加载符合的应用列表
-        loadMatchingApps(intent);
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        Log.d(TAG, "onCreateOptionsMenu: ");
-        getMenuInflater().inflate(R.menu.main, menu); // 替换为你的菜单文件
-        return true;
-    }
-
-    /**
-     * 初始化布局绑定
-     */
-    private void initBindings() {
         binding = ActivityIntentInterceptBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         setSupportActionBar(binding.toolbar);
+
+        // 启用左上角的返回图标
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true); // 显示返回图标
+        }
 
         contentBinding = ContentInterceptMainBinding.bind(binding.getRoot().findViewById(R.id.content_main));
 
@@ -98,12 +110,13 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
             // 将复选框状态存入 SharedPreferences
             SharedPreferencesUtils.putBoolean(this, "interceptIsRoot", isChecked1);
         });
-    }
 
-    /**
-     * 设置 UI 组件和事件监听
-     */
-    private void setupUI() {
+        // 处理传入的 Intent 数据
+        Intent originalIntent = stripUnwantedFields(getIntent());
+        originalUrlText = extractUrlFromIntent(originalIntent);
+        contentBinding.urlTextView.setText(originalUrlText);
+
+        // 设置 UI 和事件监听
         // 设置重置按钮初始状态为隐藏
         binding.resetButton.setVisibility(View.GONE);
 
@@ -113,13 +126,6 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
         } catch (URISyntaxException e) {
             loadMatchingApps(getIntent());
         }
-    }
-
-    /**
-     * 设置事件监听
-     */
-    private void setupListeners(Intent originalIntent) {
-        // 输入框监听事件：根据 URL 内容动态显示重置按钮和加载应用列表
         contentBinding.urlTextView.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -139,8 +145,70 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
         binding.resetButton.setOnClickListener(view -> contentBinding.urlTextView.setText(originalUrlText));
 
         // 设置发送按钮点击事件
+//        binding.btnReloadIntent.setOnClickListener((v) -> {
+//            String res;
+//            try {
+//                res = ShizukuSystemServerApi.UserManager_getUsers(true, true, true).toString();
+//            } catch (Throwable tr) {
+//                tr.printStackTrace();
+//                res = tr.getMessage();
+//            }
+//            Log.d(TAG, "getUsers: " + res);
+//        });
+
         binding.btnReloadIntent.setOnClickListener(view -> handleReloadIntentClick());
+
+        Shizuku.addBinderReceivedListenerSticky(BINDER_RECEIVED_LISTENER);
+        Shizuku.addBinderDeadListener(BINDER_DEAD_LISTENER);
+        Shizuku.addRequestPermissionResultListener(REQUEST_PERMISSION_RESULT_LISTENER);
+
     }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        Log.d(TAG, "onNewIntent: " + intent);
+
+        // 更新当前 Intent
+        setIntent(intent);
+        originalUrlText = extractUrlFromIntent(intent);
+        contentBinding.urlTextView.setText(originalUrlText);
+
+        // 加载符合的应用列表
+        loadMatchingApps(intent);
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        MenuInflater menuInflater = getMenuInflater();
+        menuInflater.inflate(R.menu.intercept_main_drawer, menu); // 加载菜单
+
+        // 使用反射设置溢出菜单中的图标可见
+        if (menu.getClass().getSimpleName().equalsIgnoreCase("MenuBuilder")) {
+            try {
+                Method method = menu.getClass().getDeclaredMethod("setOptionalIconsVisible", Boolean.TYPE);
+                method.setAccessible(true);
+                method.invoke(menu, true);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return true; // 返回 true 以显示菜单
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem menuItem) {
+        int itemId = menuItem.getItemId();
+        if (itemId == R.id.disabled) {
+            Intent intent = new Intent(this, DisabledActivity.class);
+            intent.putExtra("com.fourtwo.hookintent", "com.fourtwo.hookintent.DisabledActivity");
+            startActivity(intent);
+
+            return true;
+        }
+        return super.onOptionsItemSelected(menuItem);
+    }
+
 
     /**
      * 处理 URL 输入框内容变化
@@ -156,10 +224,20 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
         }
     }
 
+
     private void isRootStartActivity(Intent intent) {
+
         try {
             if (contentBinding.enableFeatureCheckbox.isChecked()) {
-                RootServiceHelper.startActivityAsRoot(this, intent);
+                String SelectedItem = contentBinding.dropdownSpinner.getSelectedItem().toString();
+                String[] itemsArray = getResources().getStringArray(R.array.items_array);
+                if (SelectedItem.equals(itemsArray[0])) {
+                    // 使用root
+                    RootServiceHelper.startActivityAsRoot(this, intent);
+                } else if (SelectedItem.equals(itemsArray[1])) {
+                    // 使用Shizuku - 系统助手
+                    ShizukuSystemServerApi.launchAssistantWithTemporaryReplacement(this, intent);
+                }
             } else {
                 startActivity(intent);
             }
@@ -238,7 +316,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
         }
 
         // 创建适配器并设置监听器
-        IntentMatchAdapter adapter = new IntentMatchAdapter(this, items, this);
+        adapter = new IntentInterceptAdapter(this, items, this);
         contentBinding.recyclerView.setLayoutManager(new LinearLayoutManager(this));
         contentBinding.recyclerView.setAdapter(adapter);
     }
@@ -262,5 +340,10 @@ public class IntentIntercept extends AppCompatActivity implements IntentMatchAda
     protected void onDestroy() {
         super.onDestroy();
         RootServiceHelper.unbindRootService(this);
+
+        Shizuku.removeBinderReceivedListener(BINDER_RECEIVED_LISTENER);
+        Shizuku.removeBinderDeadListener(BINDER_DEAD_LISTENER);
+        Shizuku.removeRequestPermissionResultListener(REQUEST_PERMISSION_RESULT_LISTENER);
+
     }
 }

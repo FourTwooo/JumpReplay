@@ -145,6 +145,4 @@ public class LocalDatabaseManager {
         cursor.close();
         return dataList;
     }
-
-
 }

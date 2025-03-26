@@ -24,6 +24,7 @@ import com.fourtwo.hookintent.databinding.ActivityMainBinding;
 import com.fourtwo.hookintent.databinding.AppBarMainBinding;
 import com.fourtwo.hookintent.utils.NetworkClient;
 import com.fourtwo.hookintent.utils.RootServiceHelper;
+import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.navigation.NavigationView;
 
 public class MainActivity extends AppCompatActivity {
@@ -95,10 +96,15 @@ public class MainActivity extends AppCompatActivity {
 
         initializeUIComponents();
 
-//        RootUtils.isRoot();
         // 绑定 RootService
         RootServiceHelper.bindRootService(this);
 
+        // 初始化类型颜色
+        if (SharedPreferencesUtils.getStr(this, Constants.COLORS_CONFIG) == null) {
+            SharedPreferencesUtils.putStr(this, Constants.COLORS_CONFIG, "{\"Intent\": \"#CE1A7EAC\", \"Scheme\": \"#47AA4B\"}");
+        }
+
+        Log.d(TAG, "onCreate: " + SharedPreferencesUtils.getStr(this, "hooksConfig"));
     }
 
     public void isRootStartActivity(Intent intent, Boolean isRoot) {
@@ -119,7 +125,7 @@ public class MainActivity extends AppCompatActivity {
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_star, R.id.nav_me)
+                R.id.nav_home, R.id.nav_star, R.id.nav_me, R.id.nav_settings)
                 .setOpenableLayout(drawer)
                 .build();
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);

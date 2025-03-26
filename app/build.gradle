@@ -8,10 +8,10 @@ android {
 
     defaultConfig {
         applicationId "com.fourtwo.hookintent"
-        minSdk 21
+        minSdk 24
         targetSdk 34
         versionCode
-        versionName "1.4.5"
+        versionName "1.4.8"
 
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -51,10 +51,15 @@ dependencies {
 
     implementation "org.lsposed.hiddenapibypass:hiddenapibypass:4.3"
 
-    def libsuVersion = '6.0.0'
-    implementation "com.github.topjohnwu.libsu:core:${libsuVersion}"
-    implementation "com.github.topjohnwu.libsu:service:${libsuVersion}"  // 关键
+    // Root提权
+    def libsu_version = '6.0.0'
+    implementation "com.github.topjohnwu.libsu:core:${libsu_version}"
+    implementation "com.github.topjohnwu.libsu:service:${libsu_version}"  // 关键
 
+    // ShiZuKu
+    def shizuku_version = '13.1.5'
+    implementation "dev.rikka.shizuku:api:${shizuku_version}"
+    implementation "dev.rikka.shizuku:provider:${shizuku_version}"
 
     implementation 'androidx.multidex:multidex:2.0.1'
     implementation 'com.squareup.okhttp3:okhttp:4.9.3'
@@ -83,4 +88,8 @@ dependencies {
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+
+    // UI控件
+    implementation 'com.github.yukuku:ambilwarna:2.0.1'
+
 }

@@ -190,7 +190,11 @@ public class MessengerClient {
                     });
                 }
 
-                context.unbindService(this);
+                try {
+                    context.unbindService(this);
+                } catch (java.lang.IllegalArgumentException e) {
+                    Log.e(TAG, "onServiceConnected: 服务端app未开启", e);
+                }
             }
 
             @Override

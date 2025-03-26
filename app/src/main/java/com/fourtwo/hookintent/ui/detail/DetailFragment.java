@@ -46,7 +46,6 @@ import com.fourtwo.hookintent.utils.HashUtil;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.tabs.TabLayout;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
@@ -72,7 +71,17 @@ public class DetailFragment extends Fragment {
     private LocalDatabaseManager dbManager;
     private JSONObject jsonObject;
     private ItemData itemData = null;
+    @Override
+    public void onResume() {
+        super.onResume();
 
+        // 初始化数据库管理类
+        dbManager = new LocalDatabaseManager(requireContext());
+        // 打开数据库
+        dbManager.openDatabase(Constants.STAR_DB_NAME);
+        // 触发菜单重新创建
+        requireActivity().invalidateOptionsMenu();
+    }
     @SuppressLint("MissingInflatedId")
     @Nullable
     @Override
@@ -155,7 +164,7 @@ public class DetailFragment extends Fragment {
 
             dataList.add(new Pair<>("separator", ""));
 
-            List<String> no_print_keys = Arrays.asList("stack_trace", "Base", "uri");
+            List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data");
 
             for (Map.Entry<String, String> entry : dataMap.entrySet()) {
                 if (no_print_keys.contains(entry.getKey())) {
@@ -313,15 +322,15 @@ public class DetailFragment extends Fragment {
         }
 
         Bundle bundle = itemData.getAppBundle();
-        String Base = itemData.getBase();
+        String Category = itemData.getCategory();
         List<String> options = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
 
-        if (Base.equals("Intent")) {
+        if (Category.equals("Intent")) {
             ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
             boolean hasError = false;
             String activityTemplate = "am start -n %s %s";
-            String packageName = bundle.getString("componentName");
+            String packageName = bundle.getString("componentClassName");
             String buildAmCommand = "";
             if (intentExtras != null) {
                 AmCommandBuilder.CommandResult result = AmCommandBuilder.buildAmCommand((List<Map<String, Object>>) intentExtras);
@@ -340,7 +349,7 @@ public class DetailFragment extends Fragment {
 
             options.add("intentUri");
             actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri"));
-        } else if (Base.equals("Scheme")) {
+        } else if (Category.equals("Scheme")) {
             String uriCommand = itemData.getAppBundle().getString("scheme_raw_url");
 
             Log.d(TAG, "schemeCommand: " + uriCommand);
@@ -429,6 +438,10 @@ public class DetailFragment extends Fragment {
                 // .setPositiveButton("关闭", null)
                 .create();
 
+        // 设置弹窗背景为圆角背景
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
+        }
         dialog.show();
     }
 

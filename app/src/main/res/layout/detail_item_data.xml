@@ -14,7 +14,7 @@
         android:text="KEY"
         android:textStyle="bold"
         android:textColor="#333333"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:paddingEnd="8dp"
         tools:ignore="RtlSymmetry" />
 
@@ -25,5 +25,5 @@
         android:layout_weight="3"
         android:layout_height="wrap_content"
         android:textColor="#666666"
-        android:textSize="16sp" />
+        android:textSize="14sp" />
 </LinearLayout>

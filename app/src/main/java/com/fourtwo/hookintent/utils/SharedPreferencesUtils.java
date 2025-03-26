@@ -36,4 +36,17 @@ public class SharedPreferencesUtils {
         SharedPreferences sharedPreferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE);
         return sharedPreferences.getBoolean(key, false); // 默认返回 false
     }
+
+
+    public static void putStr(Context context, String key, String value) {
+        SharedPreferences sharedPreferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(key, value);
+        editor.apply(); // 异步提交
+    }
+
+    public static String getStr(Context context, String key) {
+        SharedPreferences sharedPreferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE);
+        return sharedPreferences.getString(key, null); // 默认返回 false
+    }
 }

@@ -7,8 +7,16 @@ public final class Constants {
         throw new UnsupportedOperationException("Cannot instantiate utility class.");
     }
 
-    //
+    // Provider Config
+    public static final String INTERNAL_HOOKS_CONFIG = "internalHooksConfig";
 
+    public static final String EXTERNAL_HOOKS_CONFIG = "externalHooksConfig";
+
+    public static final String DISABLED_SCHEME = "disabledScheme";
+
+    public static final String COLORS_CONFIG = "Colors";
+
+    //  数据库字段名
     public static final String PACKAGE = "包名";
 
     public static final String FUNCTION = "方法";

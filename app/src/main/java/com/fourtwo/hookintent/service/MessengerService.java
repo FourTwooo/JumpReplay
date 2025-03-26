@@ -90,7 +90,7 @@ public class MessengerService extends Service {
                     // 模拟获取数据
                     String data1 = getData();
                     Bundle m = msg.getData();
-                    m.getString("Base");
+                    m.getString("category");
                     Log.d(TAG, "handleMessage: " + m);
                     // 返回结果
                     sendReply(msg.replyTo, msg.what, msg.arg1, 0, data1);
