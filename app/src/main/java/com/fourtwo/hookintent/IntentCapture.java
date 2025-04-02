@@ -4,7 +4,9 @@ import android.annotation.SuppressLint;
 import android.app.ActivityThread;
 import android.app.Application;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.ApplicationInfo;
@@ -113,6 +115,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
         // 接收到 MSG_SEND_DATA 请求时
         bundle.putString("time", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a").format(Calendar.getInstance().getTime()));
         bundle.putString("packageName", packageName);
+        bundle.putString("processName", DataConverter.getCurrentProcessName(appContext));
         bundle.putString("stack_trace", getStackTraceString());
 
         addMessage(bundle);
@@ -341,10 +344,31 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     }
 
+
+    // 确保整个进程只会Hook一次
+    public void Hook(XC_LoadPackage.LoadPackageParam loadPackageParam) {
+        if (loadPackageParam.appInfo == null || (loadPackageParam.appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 1) {
+            hookSystemMethods(applicationContext);
+            return;
+        }
+
+        if (!isHostApp) {
+            if (client == null) {
+                client = new MessengerClient(applicationContext);
+                client.registerPassiveCallback(data -> {
+                    isHook = data.getBoolean("isHook");
+                    XposedBridge.log("Client Received hook state: " + isHook);
+                });
+            }
+            // 启动定时分流检测
+            startBatchSender();
+        }
+        hookMethods(applicationContext);
+    }
+
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam loadPackageParam) {
         packageName = loadPackageParam.packageName;
-
         if (loadPackageParam.packageName.equals(myAppPackage)) {
             XposedHelpers.findAndHookMethod("com.fourtwo.hookintent.ui.home.HomeFragment", loadPackageParam.classLoader, "isXposed", XC_MethodReplacement.returnConstant(true));
             isHostApp = true;
@@ -352,31 +376,29 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
         RecordXposedBridge.isHostApp = isHostApp;
 
+        // 偶然发现有些机型(LGE Nexus 5X[Android 8.1.0])居然Application attach不会触发
+        XposedHelpers.findAndHookMethod(ContextWrapper.class, "attachBaseContext", Context.class, new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
+                        super.afterHookedMethod(param);
+                        if (applicationContext == null) {
+                            XposedBridge.log(packageName + ": xposed挂载成功 attachBaseContext");
+                            applicationContext = (Context) param.args[0];
+                            Hook(loadPackageParam);
+                        }
+                    }
+                }
+        );
+
         XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 super.afterHookedMethod(param);
-                applicationContext = (Context) param.args[0];
-
-                if (loadPackageParam.appInfo == null || (loadPackageParam.appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 1) {
-                    hookSystemMethods(applicationContext);
-                    return;
+                if (applicationContext == null) {
+                    applicationContext = (Context) param.args[0];
+                    XposedBridge.log(packageName + ": xposed挂载成功 attach");
+                    Hook(loadPackageParam);
                 }
-
-                if (!isHostApp) {
-                    if (client == null) {
-                        client = new MessengerClient(applicationContext);
-                        client.registerPassiveCallback(data -> {
-                            isHook = data.getBoolean("isHook");
-                            XposedBridge.log("Client Received hook state: " + isHook);
-                        });
-                    }
-                    // 启动定时分流检测
-                    startBatchSender();
-                }
-                hookMethods(applicationContext);
-
-
             }
         });
     }
@@ -478,11 +500,22 @@ public class IntentCapture implements IXposedHookLoadPackage {
             }
         });
 
-        String HookedRecords = JsonHandler.serializeHookedRecords(RecordXposedBridge.getHookedRecords());
-        XposedBridge.log("hookAllMethods: " + HookedRecords);
-        if (isHostApp) {
-            SharedPreferencesUtils.putStr(applicationContext, Constants.INTERNAL_HOOKS_CONFIG, HookedRecords);
+        if (internalHooksConfig == null) {
+            String HookedRecords = JsonHandler.serializeHookedRecords(RecordXposedBridge.getHookedRecords());
+            XposedBridge.log("hookAllMethods: " + HookedRecords);
+            if (isHostApp) {
+                SharedPreferencesUtils.putStr(applicationContext, Constants.INTERNAL_HOOKS_CONFIG, HookedRecords);
+            } else {
+                // LSPatch适配
+                ContentValues values = new ContentValues();
+                values.put("value", HookedRecords);
+                applicationContext.getContentResolver().insert(
+                        CONFIG_URI,
+                        values
+                );
+            }
         }
+
 
         //  用户自定义HOOK
         String externalHooksConfig = HooksConfig.get("externalHooksConfig");

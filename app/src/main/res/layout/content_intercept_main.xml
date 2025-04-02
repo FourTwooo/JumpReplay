@@ -20,19 +20,16 @@
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="MissingConstraints" />
 
-    <!-- 下拉列表 -->
-
-    <!-- 可编辑的多行输入框 -->
 
     <Spinner
         android:id="@+id/dropdown_spinner"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
         android:layout_marginTop="11dp"
         android:spinnerMode="dropdown"
         android:entries="@array/items_array"
         app:layout_constraintStart_toEndOf="@+id/enable_feature_checkbox"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         tools:ignore="MissingConstraints" />
 

@@ -37,29 +37,6 @@ public class ShizukuSystemServerApi {
         }
     };
 
-    public static void checkPackageManagerLevel(Object iPackageManager) {
-        try {
-            // 确保传入的对象是 IPackageManager 接口的实现
-            if (!(iPackageManager instanceof IInterface)) {
-                Log.d(TAG, "传入的对象不是 IPackageManager 实现");
-                return;
-            }
-
-            // 通过反射检查是否能够调用系统级方法
-            Method grantRuntimePermissionMethod = iPackageManager.getClass().getDeclaredMethod(
-                    "grantRuntimePermission",
-                    String.class, String.class, int.class
-            );
-            grantRuntimePermissionMethod.setAccessible(true);
-
-            Log.d(TAG, "IPackageManager权限：具有调用系统方法的能力（可能是系统权限或更高级别权限）");
-        } catch (NoSuchMethodException e) {
-            Log.d(TAG, "IPackageManager权限：没有系统权限（普通用户权限）");
-        } catch (Exception e) {
-            Log.e(TAG, "检查 IPackageManager 权限时发生异常", e);
-        }
-    }
-
     private static boolean requestShizukuPermission() {
         if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
             Log.d(TAG, "requestShizukuPermission: 已拥有权限");
@@ -129,7 +106,7 @@ public class ShizukuSystemServerApi {
                 // Restore the original Assistant component in Settings.Secure
                 Settings.Secure.putString(context.getContentResolver(), ASSISTANT, currentAssistant);
             } catch (Throwable e) {
-                e.printStackTrace();
+                Log.d(TAG, "launchAssistantWithTemporaryReplacement: " + e);
             }
         }
     }
@@ -140,17 +117,5 @@ public class ShizukuSystemServerApi {
             return IUserManager.Stub.asInterface(new ShizukuBinderWrapper(SystemServiceHelper.getSystemService(Context.USER_SERVICE)));
         }
     };
-
-    public static List<UserInfo> UserManager_getUsers(boolean excludePartial, boolean excludeDying, boolean excludePreCreated) throws RemoteException {
-        if (Build.VERSION.SDK_INT >= 30) {
-            return USER_MANAGER.get().getUsers(excludePartial, excludeDying, excludePreCreated);
-        } else {
-            try {
-                return USER_MANAGER.get().getUsers(excludeDying);
-            } catch (NoSuchFieldError e) {
-                return USER_MANAGER.get().getUsers(excludePartial, excludeDying, excludePreCreated);
-            }
-        }
-    }
 
 }

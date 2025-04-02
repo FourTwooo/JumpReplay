@@ -57,6 +57,15 @@ public class ConfigProvider extends ContentProvider {
     @Nullable
     @Override
     public Uri insert(@NonNull Uri uri, @Nullable ContentValues values) {
+        if (values != null) {
+            String value = values.getAsString("value");
+
+            // 将数据存储到 SharedPreferences
+            SharedPreferencesUtils.putStr(getContext(), Constants.INTERNAL_HOOKS_CONFIG, value);
+
+            // 返回新的数据 URI
+            return Uri.withAppendedPath(CONFIG_URI, Constants.INTERNAL_HOOKS_CONFIG);
+        }
         return null;
     }
 

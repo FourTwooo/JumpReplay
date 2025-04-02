@@ -16,7 +16,10 @@
         <!-- Customize your theme here. -->
     </style>
 
-    <style name="Theme.HookIntent.NoActionBar">
+    <style name="Theme.HookIntent.NoActionBar" mce_bogus="1">
+        <item name="android:windowAnimationStyle">@style/AnimationActivity</item>
+        <item name="android:windowNoTitle">true</item>
+
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
@@ -51,4 +54,35 @@
     <style name="RoundedCornersShape" parent="ShapeAppearance.MaterialComponents.SmallComponent">
         <item name="cornerSize">12dp</item>
     </style>
+
+
+    <style name="AnimationActivity" mce_bogus="1" parent="@android:style/Animation.Activity">
+        <!-- 打开新 Activity 时 -->
+        <item name="android:activityOpenEnterAnimation">@anim/slide_in_right</item> <!-- 从右侧滑入 -->
+        <item name="android:activityOpenExitAnimation">@anim/slide_out_left
+        </item> <!-- 当前 Activity 滑出到左侧 -->
+
+        <!-- 关闭当前 Activity 时 -->
+        <item name="android:activityCloseEnterAnimation">@anim/slide_in_left
+        </item> <!-- 返回时，新 Activity 从左侧滑入 -->
+        <item name="android:activityCloseExitAnimation">@anim/slide_out_right
+        </item> <!-- 当前 Activity 滑出到右侧 -->
+
+        <!-- 窗口级动画 -->
+        <!--        <item name="android:windowEnterAnimation">@anim/slide_out_left</item>-->
+        <!--        <item name="android:windowExitAnimation">@anim/slide_in_right</item>-->
+
+    </style>
+
+    <style name="TransparentActivity" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- 设置窗口为透明 -->
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@android:style/Animation.Dialog</item>
+    </style>
+
+
 </resources>

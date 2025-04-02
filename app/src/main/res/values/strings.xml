@@ -35,8 +35,15 @@
     <string name="add_link">创建快捷方式</string>
 
     <string-array name="items_array">
-        <item>使用root</item>
-        <item>使用Shizuku - 系统助手</item>
+        <item>root</item>
+        <item>Shizuku - 系统助手</item>
+    </string-array>
+
+
+    <string-array name="packages_array">
+        <item>所有应用</item>
+        <item>用户应用</item>
+        <item>系统应用</item>
     </string-array>
 
 </resources>

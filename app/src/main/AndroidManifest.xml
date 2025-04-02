@@ -3,7 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--修改系统助手-->
-    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
 
     <!--用于进程通信-->
@@ -17,6 +18,8 @@
     <!--电池优化-->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!--创建快捷方式-->
+    <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT"/>
 
     <application
         android:name=".MainApplication"
@@ -50,7 +53,7 @@
         <service
             android:name=".service.RootActivityService"
             android:permission="com.topjohnwu.libsu.SERVICE_PERMISSION"
-            tools:ignore="Instantiatable"/>
+            tools:ignore="Instantiatable" />
 
         <service
             android:name=".service.MessengerService"
@@ -82,6 +85,7 @@
             <intent-filter android:priority="1000">
 
                 <action android:name="android.intent.action.VIEW" />
+
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
@@ -99,8 +103,8 @@
         </activity>
 
 
-        <!--        android:launchMode="singleTask"-->
-        <!--        android:process=":scheme_process"-->
+<!--                android:launchMode="singleTask"-->
+<!--                android:process=":scheme_process"-->
         <activity
             android:name=".DisabledActivity"
             android:exported="false"
@@ -108,6 +112,14 @@
             android:taskAffinity="com.fourtwo.intercept"
             android:theme="@style/Theme.HookIntent.NoActionBar" />
 
+
+        <activity
+            android:name=".ShortcutActivity"
+            android:theme="@style/TransparentActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:finishOnTaskLaunch="true" />
 
         <meta-data
             android:name="xposedmodule"

@@ -6,6 +6,10 @@ import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
 import android.util.Log;
 
+import androidx.core.content.ContextCompat;
+
+import com.fourtwo.hookintent.R;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -29,7 +33,7 @@ public class AppInfoHelper {
             packageName = componentName;
         }
 
-        Log.d("AppInfoHelper", "getAppInfo: " + packageName + " " + componentName);
+//        Log.d("AppInfoHelper", "getAppInfo: " + packageName + " " + componentName);
 
         // Check if the info is already cached
         if (cache.containsKey(componentName)) {
@@ -81,5 +85,18 @@ public class AppInfoHelper {
             return appIcon;
         }
     }
+
+    public static AppInfoHelper.AppInfo getAppInfo(Context context, String packageName) {
+        AppInfoHelper appInfoHelper = new AppInfoHelper(context);
+        AppInfoHelper.AppInfo appInfo = appInfoHelper.getAppInfo(packageName);
+        if (appInfo != null) {
+            return appInfo;
+        }
+        return new AppInfoHelper.AppInfo(
+                "未知应用" + ("/".equals(packageName) || "null".equals(packageName) ? "" : String.format("(%s)", packageName)),
+                ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)
+        );
+    }
+
 }
 

@@ -8,6 +8,7 @@ import android.widget.Toast;
 
 import androidx.multidex.BuildConfig;
 
+import com.fourtwo.hookintent.manager.PermissionManager;
 import com.topjohnwu.superuser.Shell;
 
 import org.lsposed.hiddenapibypass.HiddenApiBypass;
@@ -67,6 +68,12 @@ public class MainApplication extends Application {
         });
 
 
+        PermissionManager.init(this);
     }
 
+    @Override
+    public void onTerminate() {
+        super.onTerminate();
+        PermissionManager.unload(this); // 清理资源
+    }
 }

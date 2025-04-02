@@ -60,18 +60,6 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
 
     private EditCallback editCallback;
 
-    private AppInfoHelper.AppInfo getAppInfo(Context context, String packageName) {
-        AppInfoHelper appInfoHelper = new AppInfoHelper(context);
-        AppInfoHelper.AppInfo appInfo = appInfoHelper.getAppInfo(packageName);
-        if (appInfo != null) {
-            return appInfo;
-        }
-        return new AppInfoHelper.AppInfo(
-                "未知应用" + ("/".equals(packageName) || "null".equals(packageName) ? "" : String.format("(%s)", packageName)),
-                ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)
-        );
-    }
-
     @Override
     public void onBindViewHolder(@NonNull SettingsViewHolder holder, int position) {
         Map<String, Object> item = dataList.get(position);
@@ -84,7 +72,7 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
         holder.className.setText((String) item.get("className"));
         holder.category.setText((String) item.get("category"));
 
-        holder.icon.setImageDrawable(getAppInfo(context, (String) item.get("packageName")).getAppIcon());
+        holder.icon.setImageDrawable(AppInfoHelper.getAppInfo(context, (String) item.get("packageName")).getAppIcon());
 
         // 设置分类的颜色背景
         String category = (String) item.get("category");
@@ -104,7 +92,7 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
 
         // 设置开关状态
         Boolean isOpen = (Boolean) item.get("open");
-        Log.d("SettingsAdapter", "Binding position: " + position + "," + item.get("_uuid") + " isOpen: " + isOpen);
+//        Log.d("SettingsAdapter", "Binding position: " + position + "," + item.get("_uuid") + " isOpen: " + isOpen);
 
         // 移除之前的监听器
         holder.switchToggle.setOnCheckedChangeListener(null);

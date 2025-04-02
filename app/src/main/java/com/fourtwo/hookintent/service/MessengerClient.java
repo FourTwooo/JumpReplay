@@ -1,10 +1,12 @@
 package com.fourtwo.hookintent.service;
 
 import android.annotation.SuppressLint;
+import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -16,6 +18,8 @@ import android.os.RemoteException;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+
+import com.fourtwo.hookintent.base.DataConverter;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,6 +35,7 @@ public class MessengerClient {
     private final AtomicInteger requestIdGenerator = new AtomicInteger(0);
     private final Messenger clientMessenger = new Messenger(new IncomingHandler());
     private final ConcurrentHashMap<Integer, CompletableFuture<Bundle>> pendingRequests = new ConcurrentHashMap<>();
+
 
     // 回调接口
     public interface ResultCallback {
@@ -62,9 +67,7 @@ public class MessengerClient {
 
                 CompletableFuture<Bundle> future = pendingRequests.remove(requestId);
                 if (future != null) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        future.complete(bundle);
-                    }
+                    future.complete(bundle);
                 }
             } else if (msg.what == MessengerService.MSG_NOTIFY_HOOK_STATE) {
                 if (passiveCallback != null) {
@@ -101,6 +104,14 @@ public class MessengerClient {
                 try {
                     Message msg = Message.obtain(null, MessengerService.MSG_REGISTER_CLIENT);
                     msg.replyTo = clientMessenger;
+
+                    Bundle bundle = new Bundle();
+                    bundle.putString("packageName", context.getPackageName()); // 发送自己的包名
+                    bundle.putInt("uid", context.getApplicationInfo().uid);
+                    bundle.putString("className", context.getApplicationInfo().className);
+                    bundle.putString("processName", DataConverter.getCurrentProcessName(context));
+                    msg.setData(bundle);
+
                     serviceMessenger.send(msg);
                     Log.d(TAG, "Client registered with service");
                 } catch (RemoteException e) {
@@ -150,9 +161,7 @@ public class MessengerClient {
                 CompletableFuture<Bundle> future = null;
                 if (needCallback) {
                     requestId = requestIdGenerator.incrementAndGet();
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        future = new CompletableFuture<>();
-                    }
+                    future = new CompletableFuture<>();
                     pendingRequests.put(requestId, future);
                 }
 
@@ -176,7 +185,7 @@ public class MessengerClient {
                     }
                 }
 
-                if (needCallback && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                if (needCallback) {
                     future.whenComplete((result, throwable) -> {
                         if (throwable != null) {
                             if (callback != null) {

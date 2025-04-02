@@ -3,6 +3,9 @@ package com.fourtwo.hookintent.ui.settings;
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -12,9 +15,13 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -31,6 +38,7 @@ import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -336,6 +344,7 @@ public class SettingsFragment extends Fragment {
         }
     }
 
+    @SuppressLint({"ClickableViewAccessibility", "DefaultLocale"})
     private void showEditDialog(@Nullable Map<String, Object> existingData, @NonNull Context context, @NonNull Runnable onSaveCallback) {
         // 创建弹窗并设置布局
         View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_custom_hook, null);
@@ -354,6 +363,121 @@ public class SettingsFragment extends Fragment {
         Button buttonConfirm = dialogView.findViewById(R.id.button_confirm);
         Button buttonPickColor = dialogView.findViewById(R.id.button_pick_color);
 
+        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) TextInputLayout idTILQuery = dialogView.findViewById(R.id.idTILQuery);
+        idTILQuery.setEndIconOnClickListener(view -> {
+            Log.d(TAG, "showEditDialog: 图标被点击");
+
+            // 获取包管理器
+            PackageManager packageManager = requireContext().getPackageManager();
+
+            // 获取所有已安装的应用程序
+            List<ApplicationInfo> installedApplications = packageManager.getInstalledApplications(PackageManager.GET_META_DATA);
+
+            List<Map<String, Object>> appInfoHash = new ArrayList<>();
+
+            for (ApplicationInfo app : installedApplications) {
+                Map<String, Object> appInfo = new HashMap<>();
+                try {
+                    appInfo.put("isSystem", (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0);
+                    appInfo.put("appName", packageManager.getApplicationLabel(app));
+                    appInfo.put("packageName", app.packageName);
+
+                    PackageInfo packageInfo = packageManager.getPackageInfo(app.packageName, 0);
+                    appInfo.put("version", String.format("%s(%s)", packageInfo.versionName, packageInfo.versionCode));
+
+                    appInfoHash.add(appInfo);
+                    Log.d(TAG, appInfo.toString());
+                } catch (PackageManager.NameNotFoundException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+
+            // 创建弹窗
+            androidx.appcompat.app.AlertDialog.Builder builderPackages = new androidx.appcompat.app.AlertDialog.Builder(requireContext());
+
+            // 加载弹窗布局
+            @SuppressLint("InflateParams") View dialogPackagesView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_custom_packages, null);
+            @SuppressLint({"MissingInflatedId", "LocalSuppress"}) RecyclerView recyclerView = dialogPackagesView.findViewById(R.id.packages_list);
+            recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+            // 获取 Spinner 和 TextView
+            Spinner dropdownSpinner = dialogPackagesView.findViewById(R.id.dropdown_spinner);
+            TextView all_package = dialogPackagesView.findViewById(R.id.all_package);
+
+            // 创建 RecyclerView 的 Adapter
+            List<Map<String, Object>> filteredList = new ArrayList<>(appInfoHash); // 初始为所有应用
+            androidx.appcompat.app.AlertDialog dialog;
+
+            // 更新标题
+            all_package.setText(String.format("共%d个应用", filteredList.size()));
+
+            // 设置弹窗布局
+            builderPackages.setView(dialogPackagesView);
+            dialog = builderPackages.create();
+
+            PackageAdapter adapter = new PackageAdapter(filteredList, packageName -> {
+                inputPackageName.setText(packageName);
+                Log.d(TAG, "Clicked packageName: " + packageName);
+                dialog.dismiss();
+            });
+            recyclerView.setAdapter(adapter);
+
+
+            Map<String, Object> allPackage =  new HashMap<>();
+            allPackage.put("appName", "所有应用");
+            allPackage.put("packageName", "ALL");
+            allPackage.put("version", "");
+
+            // 设置 Spinner 的监听器
+            dropdownSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+                @SuppressLint("NotifyDataSetChanged")
+                @Override
+                public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                    filteredList.clear();
+
+                    switch (position) {
+                        case 0: // 所有应用
+                            filteredList.add(allPackage);
+                            filteredList.addAll(appInfoHash);
+                            break;
+                        case 1: // 用户应用
+                            filteredList.add(allPackage);
+                            for (Map<String, Object> app : appInfoHash) {
+                                if (!(Boolean) app.get("isSystem")) {
+                                    filteredList.add(app);
+                                }
+                            }
+                            break;
+                        case 2: // 系统应用
+                            filteredList.add(allPackage);
+                            for (Map<String, Object> app : appInfoHash) {
+                                if ((Boolean) app.get("isSystem")) {
+                                    filteredList.add(app);
+                                }
+                            }
+                            break;
+                    }
+                    // 更新 RecyclerView 和标题
+                    adapter.notifyDataSetChanged();
+                    all_package.setText(String.format("共%d个应用", filteredList.size() - 1));
+                }
+
+                @Override
+                public void onNothingSelected(AdapterView<?> parent) {
+                    // 默认不做任何操作
+                }
+            });
+
+            // 设置弹窗背景
+            if (dialog.getWindow() != null) {
+                dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
+            }
+
+            // 显示弹窗
+            dialog.show();
+            dialog.getWindow().setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.9), (int) (getResources().getDisplayMetrics().heightPixels * 0.9));
+
+        });
         // 默认标签颜色
         final int[][] newColor = {{Color.GRAY}};
         final boolean[] isOnOk = {false};

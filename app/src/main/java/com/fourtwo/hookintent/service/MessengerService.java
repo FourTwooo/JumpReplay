@@ -12,10 +12,12 @@ import android.util.Log;
 
 import androidx.lifecycle.MutableLiveData;
 
-import com.fourtwo.hookintent.utils.HookStatusManager;
+import com.fourtwo.hookintent.manager.HookStatusManager;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class MessengerService extends Service {
@@ -23,14 +25,14 @@ public class MessengerService extends Service {
 
     // 消息类型
     public static final int MSG_IS_HOOK = 1;  // 检查是否 Hook
-    public static final int MSG_GET_DATA = 2; // 获取数据
-
     public static final int MSG_SEND_DATA = 3;  // 发送数据
 
     public static final int MSG_REPLY = 99;  // 回复消息
     public static final int MSG_REGISTER_CLIENT = 100; // 客户端注册
     public static final int MSG_UNREGISTER_CLIENT = 101; // 客户端取消注册
     public static final int MSG_NOTIFY_HOOK_STATE = 102; // 通知 Hook 状态变化
+
+
     private static MessengerService instance;
 
     // 用于缓存接收到的每条数据
@@ -63,6 +65,8 @@ public class MessengerService extends Service {
     // 客户端列表
     private final List<Messenger> clients = new ArrayList<>();
 
+    private final Map<Messenger, Bundle> clients_info = new HashMap<>();
+
     // 服务端处理消息的 Handler
     private final Handler handler = new Handler(Looper.getMainLooper()) {
         @Override
@@ -86,25 +90,17 @@ public class MessengerService extends Service {
                     sendReply(msg.replyTo, msg.what, msg.arg1, isHooked ? 1 : 0, "Hook status checked");
                     break;
 
-                case MSG_GET_DATA:
-                    // 模拟获取数据
-                    String data1 = getData();
-                    Bundle m = msg.getData();
-                    m.getString("category");
-                    Log.d(TAG, "handleMessage: " + m);
-                    // 返回结果
-                    sendReply(msg.replyTo, msg.what, msg.arg1, 0, data1);
-                    break;
-
                 case MSG_REGISTER_CLIENT:
                     // 注册客户端
                     clients.add(msg.replyTo);
+                    clients_info.put(msg.replyTo, msg.getData());
                     Log.d(TAG, "Client registered: " + msg.replyTo);
                     break;
 
                 case MSG_UNREGISTER_CLIENT:
                     // 取消注册客户端
                     clients.remove(msg.replyTo);
+                    clients_info.remove(msg.replyTo);
                     Log.d(TAG, "Client unregistered: " + msg.replyTo);
                     break;
 
@@ -114,6 +110,11 @@ public class MessengerService extends Service {
         }
     };
 
+    public List<Bundle> getConnectedClients() {
+        // 获取客户端的标识信息（可以自定义）
+        return new ArrayList<>(clients_info.values());
+    }
+
     private final Messenger messenger = new Messenger(handler);
 
     @Override
@@ -121,10 +122,6 @@ public class MessengerService extends Service {
         return messenger.getBinder();
     }
 
-    private String getData() {
-        // 模拟返回数据
-        return "Sample Data";
-    }
 
     private void sendReply(Messenger clientMessenger, int requestType, int requestId, int resultCode, String resultData) {
         if (clientMessenger != null) {

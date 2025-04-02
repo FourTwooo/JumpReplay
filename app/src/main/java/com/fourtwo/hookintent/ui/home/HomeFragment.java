@@ -19,6 +19,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
@@ -36,7 +37,7 @@ import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.service.MessengerService;
 import com.fourtwo.hookintent.utils.DataProcessor;
-import com.fourtwo.hookintent.utils.HookStatusManager;
+import com.fourtwo.hookintent.manager.HookStatusManager;
 import com.fourtwo.hookintent.viewmodel.MainViewModel;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
@@ -114,7 +115,43 @@ public class HomeFragment extends Fragment {
                     NavController navController = Navigation.findNavController(requireActivity(), R.id.nav_host_fragment_content_main);
                     navController.navigate(R.id.nav_filter);
                     return true;
+                } else if (itemId == R.id.action_services) {
+                    List<Bundle> connectedClients = new ArrayList<>();
+                    try {
+                        connectedClients = MessengerService.getInstance().getConnectedClients();
+                    } catch (NullPointerException ignored) {
+                    }
+
+                    Log.d(TAG, "onMenuItemSelected: connectedClients size = " + connectedClients.size());
+
+                    // 创建弹窗
+                    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+//                    builder.setTitle("应用通信连接");
+
+                    // 加载弹窗布局
+                    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_custom_services, null);
+                    RecyclerView recyclerView = dialogView.findViewById(R.id.services_list);
+                    recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+
+                    // 设置 Adapter
+                    recyclerView.setAdapter(new ConnectedClientsAdapter(connectedClients)); // 传入数据
+
+                    builder.setView(dialogView);
+//                    builder.setPositiveButton("OK", (dialog, which) -> dialog.dismiss());
+
+                    // 创建弹窗
+                    AlertDialog dialog = builder.create();
+
+                    // 设置弹窗背景为圆角背景
+                    if (dialog.getWindow() != null) {
+                        dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
+                    }
+
+                    dialog.show();
+
+                    return true;
                 }
+
                 return false;
             }
 
@@ -208,8 +245,7 @@ public class HomeFragment extends Fragment {
 
 
             @Override
-            public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder,
-                                    float dX, float dY, int actionState, boolean isCurrentlyActive) {
+            public void onChildDraw(@NonNull Canvas c, @NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder, float dX, float dY, int actionState, boolean isCurrentlyActive) {
                 float alpha = 1 - Math.abs(dX) / (float) viewHolder.itemView.getWidth();
                 viewHolder.itemView.setAlpha(alpha);
                 super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive);
@@ -269,7 +305,8 @@ public class HomeFragment extends Fragment {
         if (isXposed()) {
             emptyView.setText(text);
         } else {
-            emptyView.setText("Xposed unopened!");
+
+            emptyView.setText("模块未激活! 如果使用了LSPatch 请忽略");
             emptyView.setTextColor(ContextCompat.getColor(requireContext(), R.color.red));
         }
     }

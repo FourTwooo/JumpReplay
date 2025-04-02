@@ -18,6 +18,7 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.PopupMenu;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -34,7 +35,6 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.MainActivity;
 import com.fourtwo.hookintent.MainApplication;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
@@ -42,8 +42,11 @@ import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.base.LocalDatabaseManager;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.utils.HashUtil;
+import com.fourtwo.hookintent.utils.RootServiceHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
+import com.fourtwo.hookintent.utils.ShizukuSystemServerApi;
 import com.google.android.material.tabs.TabLayout;
 
 import org.json.JSONObject;
@@ -66,8 +69,6 @@ public class DetailFragment extends Fragment {
     private RecyclerView recyclerView;
     private TextView urlTextView;
     private TabLayout tabLayout;
-    private MainActivity mainActivity;
-
     private LocalDatabaseManager dbManager;
     private JSONObject jsonObject;
     private ItemData itemData = null;
@@ -135,7 +136,7 @@ public class DetailFragment extends Fragment {
             urlTextView = view.findViewById(R.id.urlTextView);
             urlTextView.setText(itemData.getItem_from());
 
-            List<String> keys = Arrays.asList("FunctionCall", "time", "packageName", "from", "component", "scheme_raw_url");
+            List<String> keys = Arrays.asList("time", "FunctionCall", "packageName", "processName", "from", "component", "scheme_raw_url");
 
             Map<String, String> dataMap = new HashMap<>();
             Bundle bundle = itemData.getAppBundle();
@@ -164,7 +165,7 @@ public class DetailFragment extends Fragment {
 
             dataList.add(new Pair<>("separator", ""));
 
-            List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data");
+            List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data", "componentClassName");
 
             for (Map.Entry<String, String> entry : dataMap.entrySet()) {
                 if (no_print_keys.contains(entry.getKey())) {
@@ -390,8 +391,11 @@ public class DetailFragment extends Fragment {
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) TextView hintTextView = dialogView.findViewById(R.id.hint_text_view);
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button copyButton = dialogView.findViewById(R.id.copy_button);
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button suCodeButton = dialogView.findViewById(R.id.su_code_button);
-        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) CheckBox enableFeatureCheckbox = dialogView.findViewById(R.id.enable_feature_checkbox);
-
+        CheckBox enableFeatureCheckbox = dialogView.findViewById(R.id.enable_feature_checkbox);
+        Spinner dropdownSpinner = dialogView.findViewById(R.id.dropdown_spinner);
+        if (Objects.equals(optionName, "am命令")) {
+            dropdownSpinner.setEnabled(false); // 禁用 Spinner
+        }
         enableFeatureCheckbox.setChecked(SharedPreferencesUtils.getBoolean(requireContext(), "detailIsRoot"));
 
         enableFeatureCheckbox.setOnCheckedChangeListener((buttonView, isChecked1) -> {
@@ -413,12 +417,13 @@ public class DetailFragment extends Fragment {
         }
 
         suCodeButton.setOnClickListener(v -> {
-            mainActivity = (MainActivity) getActivity();
             if (!Objects.equals(optionName, "am命令")) {
                 try {
                     Intent newIntent = Intent.parseUri(String.valueOf(commandTextView.getText()), 0);
-                    mainActivity.isRootStartActivity(newIntent, enableFeatureCheckbox.isChecked());
-                } catch (URISyntaxException e) {
+
+                    String SelectedItem = dropdownSpinner.getSelectedItem().toString();
+                    PermissionManager.startActivity(requireContext(), newIntent, enableFeatureCheckbox.isChecked(), SelectedItem);
+                } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
             } else {

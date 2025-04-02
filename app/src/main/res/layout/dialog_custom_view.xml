@@ -6,20 +6,30 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <!-- 复选框 -->
-    <CheckBox
-        android:id="@+id/enable_feature_checkbox"
-        android:layout_width="wrap_content"
-        android:layout_height="28dp"
-        android:layout_gravity="start"
-        android:layout_marginEnd="4dp"
-        android:scaleX="0.7"
-        android:scaleY="0.7"
-        android:text="@string/is_root"
-        android:textSize="16sp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="RtlSymmetry" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
+
+        <CheckBox
+            android:id="@+id/enable_feature_checkbox"
+            android:layout_width="30dp"
+            android:layout_height="wrap_content"
+            android:padding="0dp"
+            android:textSize="14sp" />
+
+        <Spinner
+            android:id="@+id/dropdown_spinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginTop="0dp"
+            android:spinnerMode="dropdown"
+            android:entries="@array/items_array" />
+    </LinearLayout>
+
 
     <!-- 使用 MaterialCardView 包裹 ScrollView -->
     <com.google.android.material.card.MaterialCardView

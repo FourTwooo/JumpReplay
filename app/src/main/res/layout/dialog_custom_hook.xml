@@ -22,15 +22,19 @@
             app:strokeWidth="4dp">
 
             <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/idTILQuery"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                app:endIconMode="custom"
+                app:endIconDrawable="@drawable/ic_search"
                 android:hint="Package Name">
 
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/input_package_name"
                     android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:background="@android:color/transparent"
-                    android:layout_height="wrap_content" />
+                    android:drawablePadding="-100dp"/>
             </com.google.android.material.textfield.TextInputLayout>
         </com.google.android.material.card.MaterialCardView>
 

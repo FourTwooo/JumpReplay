@@ -104,7 +104,7 @@ public class DataProcessor {
             dataString = bundle.getString("data");
         }
 
-        AppInfoHelper.AppInfo appInfo = getAppInfo(context, packageName);
+        AppInfoHelper.AppInfo appInfo = AppInfoHelper.getAppInfo(context, packageName);
         String appName = appInfo.getAppName();
         Drawable appIcon = appInfo.getAppIcon();
 
@@ -155,18 +155,6 @@ public class DataProcessor {
     private boolean handleSchemeBase(Bundle bundle) {
 //        Log.d(TAG, "Removing duplicate Scheme bundle: " + bundle);
         return schemeDuplicateChecker.isDuplicate(bundle);
-    }
-
-    private AppInfoHelper.AppInfo getAppInfo(Context context, String packageName) {
-        AppInfoHelper appInfoHelper = new AppInfoHelper(context);
-        AppInfoHelper.AppInfo appInfo = appInfoHelper.getAppInfo(packageName);
-        if (appInfo != null) {
-            return appInfo;
-        }
-        return new AppInfoHelper.AppInfo(
-                "未知应用" + ("/".equals(packageName) || "null".equals(packageName) ? "" : String.format("(%s)", packageName)),
-                ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)
-        );
     }
 
 

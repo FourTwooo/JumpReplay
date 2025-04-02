@@ -13,6 +13,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
@@ -22,10 +23,15 @@ import androidx.navigation.ui.NavigationUI;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
 import com.fourtwo.hookintent.databinding.AppBarMainBinding;
+import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.utils.NetworkClient;
 import com.fourtwo.hookintent.utils.RootServiceHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.navigation.NavigationView;
+
+import java.util.concurrent.atomic.AtomicReference;
+
+import rikka.shizuku.Shizuku;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -96,9 +102,6 @@ public class MainActivity extends AppCompatActivity {
 
         initializeUIComponents();
 
-        // 绑定 RootService
-        RootServiceHelper.bindRootService(this);
-
         // 初始化类型颜色
         if (SharedPreferencesUtils.getStr(this, Constants.COLORS_CONFIG) == null) {
             SharedPreferencesUtils.putStr(this, Constants.COLORS_CONFIG, "{\"Intent\": \"#CE1A7EAC\", \"Scheme\": \"#47AA4B\"}");
@@ -107,36 +110,44 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "onCreate: " + SharedPreferencesUtils.getStr(this, "hooksConfig"));
     }
 
-    public void isRootStartActivity(Intent intent, Boolean isRoot) {
-        try {
-            if (isRoot) {
-                RootServiceHelper.startActivityAsRoot(this, intent);
-            } else {
-                startActivity(intent);
-            }
-            Toast.makeText(this, "调用成功", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.e(TAG, "无法启动新的 Intent: " + e.getMessage(), e);
-            Toast.makeText(this, "调用失败", Toast.LENGTH_SHORT).show();
-        }
-    }
-
+    @SuppressLint("NonConstantResourceId")
     private void initializeUIComponents() {
-        DrawerLayout drawer = binding.drawerLayout;
+        AtomicReference<DrawerLayout> drawer = new AtomicReference<>(binding.drawerLayout);
         NavigationView navigationView = binding.navView;
         mAppBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_home, R.id.nav_star, R.id.nav_me, R.id.nav_settings)
-                .setOpenableLayout(drawer)
+                .setOpenableLayout(drawer.get())
                 .build();
-        NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
-        NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
-        NavigationUI.setupWithNavController(navigationView, navController);
+        AtomicReference<NavController> navController = new AtomicReference<>(Navigation.findNavController(this, R.id.nav_host_fragment_content_main));
+        NavigationUI.setupActionBarWithNavController(this, navController.get(), mAppBarConfiguration);
+        NavigationUI.setupWithNavController(navigationView, navController.get());
+        navigationView.setNavigationItemSelectedListener(item -> {
+            // 手动处理 nav_intercept 和 nav_disabled
+            if (item.getItemId() == R.id.nav_intercept) {
+                startActivity(new Intent(this, IntentIntercept.class));
+                return true; // 返回 true 表示事件已处理
+            } else if (item.getItemId() == R.id.nav_disabled) {
+                startActivity(new Intent(this, DisabledActivity.class));
+                return true; // 返回 true 表示事件已处理
+            } else {
+                // 其他菜单项交由 NavigationUI 自动处理
+                navController.set(Navigation.findNavController(this, R.id.nav_host_fragment_content_main));
+                boolean handled = NavigationUI.onNavDestinationSelected(item, navController.get());
+                if (handled) {
+                    drawer.set(binding.drawerLayout);
+                    drawer.get().closeDrawer(GravityCompat.START); // 关闭侧边栏
+                }
+                return handled; // 返回 NavigationUI 是否处理了事件
+            }
+        });
+
+
+
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        RootServiceHelper.unbindRootService(this);
     }
 
     @Override

@@ -1,4 +1,4 @@
-package com.fourtwo.hookintent.utils;
+package com.fourtwo.hookintent.manager;
 
 public class HookStatusManager {
     private static boolean isHook = false; // 默认状态

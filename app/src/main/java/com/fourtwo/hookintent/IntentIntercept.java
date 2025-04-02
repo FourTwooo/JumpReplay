@@ -1,11 +1,14 @@
 package com.fourtwo.hookintent;
 
-import static android.content.pm.PackageManager.PERMISSION_GRANTED;
-
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.Editable;
@@ -15,29 +18,44 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Toast;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.GridView;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.Spinner;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.fourtwo.hookintent.adapter.IntentInterceptAdapter;
 import com.fourtwo.hookintent.data.IntentMatchItem;
 import com.fourtwo.hookintent.databinding.ActivityIntentInterceptBinding;
 import com.fourtwo.hookintent.databinding.ContentInterceptMainBinding;
-import com.fourtwo.hookintent.utils.RootServiceHelper;
+import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
-import com.fourtwo.hookintent.utils.ShizukuSystemServerApi;
+import com.fourtwo.hookintent.utils.ShortcutHelper;
+import com.google.android.material.textfield.TextInputEditText;
 
+import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-
-import rikka.shizuku.Shizuku;
+import java.util.Set;
 
 public class IntentIntercept extends AppCompatActivity implements IntentInterceptAdapter.OnIntentMatchClickListener {
     private static final String TAG = "IntentIntercept";
@@ -48,34 +66,12 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
     private IntentInterceptAdapter adapter;
 
+    private ActivityResultLauncher<String> filePickerLauncher; // 文件选择器
+    private AlertDialog iconSelectionDialog;                  // 图标选择对话框
+    private ImageView currentIconPreview;                     // 当前图标预览
+
     private static boolean isSystemXposed() {
         return false;
-    }
-
-    private static final int REQUEST_CODE_BUTTON1 = 1;
-
-    private final Shizuku.OnBinderReceivedListener BINDER_RECEIVED_LISTENER = () -> {
-        if (Shizuku.isPreV11()) {
-            Log.d(TAG, "Shizuku pre-v11 is not supported");
-        } else {
-            Log.d(TAG, "Binder received");
-        }
-    };
-
-    private final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> Log.d(TAG, "Binder dead");
-
-    private final Shizuku.OnRequestPermissionResultListener REQUEST_PERMISSION_RESULT_LISTENER = this::onRequestPermissionsResult;
-
-    private void onRequestPermissionsResult(int requestCode, int grantResult) {
-        if (grantResult == PERMISSION_GRANTED) {
-            switch (requestCode) {
-                case REQUEST_CODE_BUTTON1: {
-                    break;
-                }
-            }
-        } else {
-            Log.d(TAG, "User denied permission");
-        }
     }
 
     @Override
@@ -90,8 +86,6 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // 绑定 RootService
-        RootServiceHelper.bindRootService(this);
         // 初始化布局绑定
         binding = ActivityIntentInterceptBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -116,7 +110,6 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         originalUrlText = extractUrlFromIntent(originalIntent);
         contentBinding.urlTextView.setText(originalUrlText);
 
-        // 设置 UI 和事件监听
         // 设置重置按钮初始状态为隐藏
         binding.resetButton.setVisibility(View.GONE);
 
@@ -158,10 +151,24 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
         binding.btnReloadIntent.setOnClickListener(view -> handleReloadIntentClick());
 
-        Shizuku.addBinderReceivedListenerSticky(BINDER_RECEIVED_LISTENER);
-        Shizuku.addBinderDeadListener(BINDER_DEAD_LISTENER);
-        Shizuku.addRequestPermissionResultListener(REQUEST_PERMISSION_RESULT_LISTENER);
-
+        // 注册文件选择器
+        filePickerLauncher = registerForActivityResult(
+                new ActivityResultContracts.GetContent(),
+                uri -> {
+                    if (uri != null) {
+                        try {
+                            InputStream inputStream = getContentResolver().openInputStream(uri);
+                            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
+                            currentIconPreview.setImageBitmap(bitmap); // 更新图标预览
+                            if (iconSelectionDialog != null) {
+                                iconSelectionDialog.dismiss(); // 关闭图标选择对话框
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+        );
     }
 
     @Override
@@ -196,6 +203,199 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         return true; // 返回 true 以显示菜单
     }
 
+    private void showAppIcons(GridView iconsGrid, ImageView iconPreview) {
+        PackageManager packageManager = getPackageManager();
+
+        List<ApplicationInfo> apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA);
+
+        // 使用 Set 去重
+        Set<Drawable> appIcons = new HashSet<>();
+        for (ApplicationInfo app : apps) {
+            if ((app.flags & ApplicationInfo.FLAG_SYSTEM) != 0){continue;}
+            appIcons.add(app.loadIcon(packageManager));
+        }
+
+        List<Drawable> uniqueAppIcons = new ArrayList<>(appIcons); // 转为 List 以适配 Adapter
+
+        BaseAdapter adapter = new BaseAdapter() {
+            @Override
+            public int getCount() {
+                return uniqueAppIcons.size();
+            }
+
+            @Override
+            public Object getItem(int position) {
+                return uniqueAppIcons.get(position);
+            }
+
+            @Override
+            public long getItemId(int position) {
+                return position;
+            }
+
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                ImageView imageView;
+                if (convertView == null) {
+                    imageView = new ImageView(parent.getContext());
+                    imageView.setLayoutParams(new GridView.LayoutParams(100, 100));
+                    imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                } else {
+                    imageView = (ImageView) convertView;
+                }
+                imageView.setImageDrawable(uniqueAppIcons.get(position));
+                return imageView;
+            }
+        };
+
+        iconsGrid.setAdapter(adapter);
+
+        // 点击图标后更新预览并关闭对话框
+        iconsGrid.setOnItemClickListener((parent, view, position, id) -> {
+            iconPreview.setImageDrawable(uniqueAppIcons.get(position));
+            if (iconSelectionDialog != null) {
+                iconSelectionDialog.dismiss(); // 关闭对话框
+            }
+        });
+    }
+
+    private static final int REQUEST_CODE_PICK_IMAGE = 1;
+
+    private void showIconSelectionDialog(ImageView iconPreview) {
+        // 保存当前预览图标视图引用
+        currentIconPreview = iconPreview;
+
+        // 创建图标选择对话框
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = getLayoutInflater().inflate(R.layout.icon_selection_dialog, null);
+        builder.setView(view);
+
+        iconSelectionDialog = builder.create(); // 保存对话框实例
+
+        // 设置弹窗背景为圆角背景
+        if (iconSelectionDialog.getWindow() != null) {
+            iconSelectionDialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
+        }
+
+        GridView iconsGrid = view.findViewById(R.id.icons_grid);
+        ImageView customIconButton = view.findViewById(R.id.custom_icon_button);
+
+        // 展示应用图标
+        showAppIcons(iconsGrid, iconPreview);
+
+        // 自定义图标按钮点击事件
+        customIconButton.setOnClickListener(v -> filePickerLauncher.launch("image/*"));
+
+        iconSelectionDialog.show(); // 显示对话框
+    }
+
+    private Bitmap getBitmapFromImageView(ImageView imageView) {
+        Drawable drawable = imageView.getDrawable();
+        if (drawable instanceof BitmapDrawable) {
+            return ((BitmapDrawable) drawable).getBitmap();
+        }
+
+        // 如果是其他类型的 Drawable（例如 VectorDrawable），将其转换为 Bitmap
+        Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
+        drawable.draw(canvas);
+        return bitmap;
+    }
+
+    public void SetShortcut() {
+        // 在 Activity 或 Fragment 中使用 Dialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        View view = getLayoutInflater().inflate(R.layout.shortcut_config_dialog, null);
+        builder.setView(view);
+
+        AlertDialog dialog = builder.create();
+        // 设置弹窗背景为圆角背景
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
+        }
+
+        // 获取控件
+        TextInputEditText shortcutName = view.findViewById(R.id.shortcut_name);
+        ImageView iconPreview = view.findViewById(R.id.icon_preview);
+        TextInputEditText intentString = view.findViewById(R.id.intent_string);
+        LinearLayout dynamicParamsContainer = view.findViewById(R.id.dynamic_params_container);
+        ImageView addParamButton = view.findViewById(R.id.add_param_button);
+        Button submitButton = view.findViewById(R.id.submit_button);
+        Button cancelButton = view.findViewById(R.id.cancel_button);
+        CheckBox enableFeatureCheckbox = view.findViewById(R.id.enable_feature_checkbox);
+        Spinner dropdownSpinner = view.findViewById(R.id.dropdown_spinner);
+
+        intentString.setText(Objects.requireNonNull(contentBinding.urlTextView.getText()).toString());
+
+        // 选择图标
+        iconPreview.setOnClickListener(v -> showIconSelectionDialog(iconPreview));
+
+        // 动态添加参数
+        addParamButton.setOnClickListener(v -> {
+            // 创建一个水平布局，用来包含 EditText 和删除按钮
+            LinearLayout paramContainer = new LinearLayout(this);
+            paramContainer.setOrientation(LinearLayout.HORIZONTAL);
+
+            // 创建 EditText 参数输入框
+            EditText paramInput = new EditText(this);
+            paramInput.setHint("请输入参数");
+            paramInput.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+            // 创建删除按钮
+            ImageButton deleteButton = new ImageButton(this);
+            deleteButton.setBackground(null); // 移除默认背景
+            deleteButton.setImageResource(R.drawable.baseline_delete_outline_24);
+            deleteButton.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            deleteButton.setOnClickListener(deleteView -> dynamicParamsContainer.removeView(paramContainer));
+
+            // 将 EditText 和删除按钮添加到该容器
+            paramContainer.addView(paramInput);
+            paramContainer.addView(deleteButton);
+
+            // 将容器添加到动态参数布局中
+            dynamicParamsContainer.addView(paramContainer);
+        });
+
+        // 提交按钮
+        submitButton.setOnClickListener(v -> {
+            String name = Objects.requireNonNull(shortcutName.getText()).toString();
+            String intent = Objects.requireNonNull(intentString.getText()).toString();
+
+            ArrayList<String> dynamicParams = new ArrayList<>();
+            for (int i = 0; i < dynamicParamsContainer.getChildCount(); i++) {
+                // 获取子 View（LinearLayout）
+                LinearLayout paramContainer = (LinearLayout) dynamicParamsContainer.getChildAt(i);
+
+                // 从 LinearLayout 中获取 EditText
+                EditText paramInput = (EditText) paramContainer.getChildAt(0); // 第一个子 View 是 EditText
+                dynamicParams.add(paramInput.getText().toString());
+            }
+
+            // 获取 iconPreview 的图标
+            Bitmap shortcutIcon = getBitmapFromImageView(iconPreview);
+
+            Log.d(TAG, "onOptionsItemSelected: " + dynamicParams);
+            dialog.dismiss();
+
+            // 调用 createShortcut 方法
+            ShortcutHelper.createShortcut(
+                    this,
+                    name,
+                    shortcutIcon, // 动态传递图标
+                    intent,
+                    dynamicParams,
+                    enableFeatureCheckbox.isChecked(),
+                    dropdownSpinner.getSelectedItem().toString()
+            );
+        });
+
+        // 取消按钮
+        cancelButton.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+    }
+
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem menuItem) {
         int itemId = menuItem.getItemId();
@@ -203,7 +403,9 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
             Intent intent = new Intent(this, DisabledActivity.class);
             intent.putExtra("com.fourtwo.hookintent", "com.fourtwo.hookintent.DisabledActivity");
             startActivity(intent);
-
+            return true;
+        } else if (itemId == R.id.add_link) {
+            SetShortcut();
             return true;
         }
         return super.onOptionsItemSelected(menuItem);
@@ -225,36 +427,13 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     }
 
 
-    private void isRootStartActivity(Intent intent) {
-
-        try {
-            if (contentBinding.enableFeatureCheckbox.isChecked()) {
-                String SelectedItem = contentBinding.dropdownSpinner.getSelectedItem().toString();
-                String[] itemsArray = getResources().getStringArray(R.array.items_array);
-                if (SelectedItem.equals(itemsArray[0])) {
-                    // 使用root
-                    RootServiceHelper.startActivityAsRoot(this, intent);
-                } else if (SelectedItem.equals(itemsArray[1])) {
-                    // 使用Shizuku - 系统助手
-                    ShizukuSystemServerApi.launchAssistantWithTemporaryReplacement(this, intent);
-                }
-            } else {
-                startActivity(intent);
-            }
-            Toast.makeText(this, "调用成功", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.e(TAG, "无法启动新的 Intent: " + e.getMessage(), e);
-            Toast.makeText(this, "调用失败", Toast.LENGTH_SHORT).show();
-        }
-    }
-
     /**
      * 处理发送按钮的点击事件
      */
     private void handleReloadIntentClick() {
         try {
             Intent newIntent = Intent.parseUri(Objects.requireNonNull(contentBinding.urlTextView.getText()).toString(), 0);
-            isRootStartActivity(newIntent);
+            PermissionManager.startActivity(this, newIntent, contentBinding.enableFeatureCheckbox.isChecked(), contentBinding.dropdownSpinner.getSelectedItem().toString());
         } catch (Exception ignored) {
         }
 
@@ -267,7 +446,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     @Override
     public void onIntentMatchClick(Intent intent) {
         if (intent != null) {
-            isRootStartActivity(intent);
+            PermissionManager.startActivity(this, intent, contentBinding.enableFeatureCheckbox.isChecked(), contentBinding.dropdownSpinner.getSelectedItem().toString());
         }
     }
 
@@ -339,11 +518,5 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        RootServiceHelper.unbindRootService(this);
-
-        Shizuku.removeBinderReceivedListener(BINDER_RECEIVED_LISTENER);
-        Shizuku.removeBinderDeadListener(BINDER_DEAD_LISTENER);
-        Shizuku.removeRequestPermissionResultListener(REQUEST_PERMISSION_RESULT_LISTENER);
-
     }
 }

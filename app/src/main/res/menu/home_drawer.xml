@@ -12,18 +12,17 @@
         android:title="@string/action_delete"
         app:showAsAction="ifRoom" />
 
-    <!-- 新增的菜单选项 -->
     <item
         android:id="@+id/action_filter"
         android:icon="@drawable/filter_list_off"
         android:title="过滤"
         app:showAsAction="never" />
 
-    <!--    <item-->
-    <!--        android:id="@+id/action_sort"-->
-    <!--        android:icon="@drawable/ic_sort"-->
-    <!--        android:title="排序"-->
-    <!--        app:showAsAction="never"/>-->
+    <item
+        android:id="@+id/action_services"
+        android:icon="@drawable/services"
+        android:title="连接"
+        app:showAsAction="never" />
 
 
 </menu>
