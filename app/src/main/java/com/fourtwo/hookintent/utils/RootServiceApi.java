@@ -12,12 +12,12 @@ import com.fourtwo.hookintent.IRootActivityService;
 import com.fourtwo.hookintent.service.RootActivityService;
 import com.topjohnwu.superuser.ipc.RootService;
 
-public class RootServiceHelper {
+public class RootServiceApi {
 
     private static IRootActivityService rootService;
     private static boolean isServiceBound = false;
 
-    private RootServiceHelper() {
+    private RootServiceApi() {
         // 工具类不允许实例化
     }
 

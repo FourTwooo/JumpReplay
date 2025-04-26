@@ -9,9 +9,8 @@ android {
     defaultConfig {
         applicationId "com.fourtwo.hookintent"
         minSdk 24
-        targetSdk 34
         versionCode
-        versionName "1.4.9"
+        versionName "1.5.0"
 
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -24,8 +23,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
 
     buildFeatures {

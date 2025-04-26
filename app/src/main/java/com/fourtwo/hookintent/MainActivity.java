@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -21,17 +20,14 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.data.ImagesBase64;
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
 import com.fourtwo.hookintent.databinding.AppBarMainBinding;
-import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.utils.NetworkClient;
-import com.fourtwo.hookintent.utils.RootServiceHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.navigation.NavigationView;
 
 import java.util.concurrent.atomic.AtomicReference;
-
-import rikka.shizuku.Shizuku;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -108,6 +104,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Log.d(TAG, "onCreate: " + SharedPreferencesUtils.getStr(this, "hooksConfig"));
+
+//        Log.d("drawableToBase64", ImagesBase64.drawableToBase64(this, R.drawable.delete));
     }
 
     @SuppressLint("NonConstantResourceId")

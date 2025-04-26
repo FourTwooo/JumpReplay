@@ -1,6 +1,7 @@
 package com.fourtwo.hookintent;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.app.ActivityThread;
 import android.app.Application;
 import android.content.ComponentName;
@@ -17,6 +18,10 @@ import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.JsonHandler;
@@ -25,6 +30,8 @@ import com.fourtwo.hookintent.service.MessengerClient;
 import com.fourtwo.hookintent.service.MessengerService;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.fourtwo.hookintent.xposed.RecordXposedBridge;
+import com.fourtwo.hookintent.xposed.ui.FloatWindow;
+import com.fourtwo.hookintent.xposed.ui.FloatWindowView;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -62,7 +69,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private Boolean isService = false;
 
     private Boolean isHostApp = false;
-    private final String myAppPackage = "com.fourtwo.hookintent";
+    public static final String myAppPackage = "com.fourtwo.hookintent";
     private final String myAppClass = "com.fourtwo.hookintent.IntentIntercept";
 
     public static final String AUTHORITY = "com.fourtwo.hookintent.configprovider";
@@ -167,181 +174,209 @@ public class IntentCapture implements IXposedHookLoadPackage {
         Class<?> hookClass;
         try {
             hookClass = XposedHelpers.findClass(ClassName, classLoader);
-        } catch (XposedHelpers.ClassNotFoundError error) {
-            return;
-        }
+            XposedBridge.log("android.server加载成功! => " + ClassName);
+            HookClass(classLoader, ClassName);
+            XposedBridge.hookAllMethods(hookClass, "queryIntentActivitiesInternal", new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    Intent intent = (Intent) param.args[0];
 
-        XposedBridge.hookAllMethods(hookClass, "queryIntentActivitiesInternal", new XC_MethodHook() {
-            @Override
-            protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                Intent intent = (Intent) param.args[0];
-
-                if (myAppPackage.equals(intent.getPackage())) {
+                    XposedBridge.log("queryIntentActivitiesInternal Scheme: " + intent.getDataString());
                     // 如果是自己的 Intent，不再处理，直接返回
-                    return;
-                }
-
-                if (intent.getComponent() != null || intent.getScheme() == null) {
-                    return;
-                }
-
-//                XposedBridge.log("queryIntentActivitiesInternal Scheme: " + intent.getDataString());
-//                filterScheme(intent.getDataString(), "queryIntentActivitiesInternal");
-
-                // 获取原始返回值
-                @SuppressWarnings("unchecked") List<ResolveInfo> originalResult = (List<ResolveInfo>) param.getResult();
-//                XposedBridge.log("originalResult: " + originalResult);
-                boolean hasHookIntent = false; // 用于标记是否存在目标 ResolveInfo
-
-                // 遍历 originalResult
-                for (ResolveInfo resolveInfo : originalResult) {
-                    if (resolveInfo.activityInfo != null && myAppPackage.equals(resolveInfo.activityInfo.packageName)) {
-                        hasHookIntent = true; // 找到目标 ResolveInfo
-                        break; // 提前结束循环
+                    if (myAppPackage.equals(intent.getPackage())) {
+                        return;
                     }
-                }
 
-                if (hasHookIntent || originalResult.isEmpty()) {
-                    return;
-                }
+                    if (intent.getComponent() != null || intent.getScheme() == null) {
+                        return;
+                    }
 
-                String disabledScheme = null;
-                long token = Binder.clearCallingIdentity();
-                try {
-                    Map<String, String> HooksConfig = getConfig(SCHEME_URI);
-                    disabledScheme = HooksConfig.get("disabledScheme");
-                } catch (Exception ignored) {
-                } finally {
-                    Binder.restoreCallingIdentity(token);
-                }
+                    // 获取原始返回值
+                    @SuppressWarnings("unchecked") List<ResolveInfo> originalResult = (List<ResolveInfo>) param.getResult();
+                    boolean hasHookIntent = false; // 用于标记是否存在目标 ResolveInfo
 
-                XposedBridge.log("Scheme:" + intent.getScheme() + " disabledScheme:" + disabledScheme);
-                if (disabledScheme != null) {
-                    List<Map<String, Object>> disabledSchemeList = JsonHandler.deserializeHookedRecords(disabledScheme);
-
-                    for (Map<String, Object> disabledSchemeObj : disabledSchemeList) {
-                        Boolean re = (Boolean) disabledSchemeObj.get("re");
-                        Boolean open = (Boolean) disabledSchemeObj.get("open");
-                        String text = (String) disabledSchemeObj.get("text");
-
-                        // 如果不开启，则跳过
-                        if (!Boolean.TRUE.equals(open)) {
-                            continue;
+                    // 遍历 originalResult
+                    for (ResolveInfo resolveInfo : originalResult) {
+                        if (resolveInfo.activityInfo != null && myAppPackage.equals(resolveInfo.activityInfo.packageName)) {
+                            hasHookIntent = true; // 找到目标 ResolveInfo
+                            break; // 提前结束循环
                         }
+                    }
 
-                        // 正则匹配逻辑
-                        if (Boolean.TRUE.equals(re)) {
-                            if (text == null) {
+                    if (hasHookIntent || originalResult.isEmpty()) {
+                        return;
+                    }
+
+                    String disabledScheme = null;
+                    long token = Binder.clearCallingIdentity();
+                    try {
+                        Map<String, String> HooksConfig = getConfig(SCHEME_URI);
+                        disabledScheme = HooksConfig.get("disabledScheme");
+                    } catch (Exception ignored) {
+                    } finally {
+                        Binder.restoreCallingIdentity(token);
+                    }
+
+
+                    if (disabledScheme != null) {
+                        List<Map<String, Object>> disabledSchemeList = JsonHandler.deserializeHookedRecords(disabledScheme);
+
+                        for (Map<String, Object> disabledSchemeObj : disabledSchemeList) {
+                            Boolean re = (Boolean) disabledSchemeObj.get("re");
+                            Boolean open = (Boolean) disabledSchemeObj.get("open");
+                            String text = (String) disabledSchemeObj.get("text");
+
+                            // 如果不开启，则跳过
+                            if (!Boolean.TRUE.equals(open)) {
                                 continue;
                             }
 
-                            Pattern pattern;
-                            try {
-                                pattern = Pattern.compile(text);
-                            } catch (PatternSyntaxException e) {
-                                System.out.println("正则表达式语法错误：" + e.getMessage());
-                                continue;
-                            }
+                            // 正则匹配逻辑
+                            if (Boolean.TRUE.equals(re)) {
+                                if (text == null) {
+                                    continue;
+                                }
 
-                            Matcher matcher = pattern.matcher(intent.getDataString());
-                            if (matcher.find()) {
-                                param.setResult(new ArrayList<>());
-                                return;
-                            }
-                        } else {
-                            // 非正则匹配逻辑
-                            if (Objects.equals(text, intent.getScheme())) {
-                                param.setResult(new ArrayList<>());
-                                return;
+                                Pattern pattern;
+                                try {
+                                    pattern = Pattern.compile(text);
+                                } catch (PatternSyntaxException e) {
+                                    System.out.println("正则表达式语法错误：" + e.getMessage());
+                                    continue;
+                                }
+
+                                Matcher matcher = pattern.matcher(intent.getDataString());
+                                if (matcher.find()) {
+                                    param.setResult(new ArrayList<>());
+                                    return;
+                                }
+                            } else {
+                                // 非正则匹配逻辑
+                                if (Objects.equals(text, intent.getScheme())) {
+                                    param.setResult(new ArrayList<>());
+                                    return;
+                                }
                             }
                         }
                     }
-                }
 
 //                 构造特殊 Intent，用于主动调用
-                Intent specialIntent = new Intent(Intent.ACTION_VIEW); // 自定义的特殊 Intent
-                specialIntent.setPackage(myAppPackage); // 只匹配自己 APP 的包名
-                specialIntent.setComponent(new ComponentName(myAppPackage, myAppClass)); // 设置组件
-                specialIntent.addCategory(Intent.CATEGORY_DEFAULT); // 添加默认分类
-                specialIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // 设置 Intent 标志
+                    Intent specialIntent = new Intent(Intent.ACTION_VIEW); // 自定义的特殊 Intent
+                    specialIntent.setPackage(myAppPackage); // 只匹配自己 APP 的包名
+                    specialIntent.setComponent(new ComponentName(myAppPackage, myAppClass)); // 设置组件
+                    specialIntent.addCategory(Intent.CATEGORY_DEFAULT); // 添加默认分类
+                    specialIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK); // 设置 Intent 标志
 
-                // 动态获取参数
-                Object[] dynamicArgs = param.args.clone(); // 克隆原始参数
-                dynamicArgs[0] = specialIntent; // 替换 Intent 为特殊 Intent
-                dynamicArgs[1] = null;                      // 清空 resolvedType
-                dynamicArgs[2] = PackageManager.MATCH_DEFAULT_ONLY; // 设置 flags，仅匹配默认组件
+                    // 动态获取参数
+                    Object[] dynamicArgs = param.args.clone(); // 克隆原始参数
+                    dynamicArgs[0] = specialIntent; // 替换 Intent 为特殊 Intent
+                    dynamicArgs[1] = null;                      // 清空 resolvedType
+                    dynamicArgs[2] = PackageManager.MATCH_DEFAULT_ONLY; // 设置 flags，仅匹配默认组件
 
-                // 调用 queryIntentActivitiesInternal
-                @SuppressWarnings("unchecked") List<ResolveInfo> myAppResolveInfos = (List<ResolveInfo>) XposedHelpers.callMethod(param.thisObject, // 当前 Hook 的类实例
-                        "queryIntentActivitiesInternal", dynamicArgs // 动态参数数组
-                );
+                    // 调用 queryIntentActivitiesInternal
+                    @SuppressWarnings("unchecked") List<ResolveInfo> myAppResolveInfos = (List<ResolveInfo>) XposedHelpers.callMethod(param.thisObject, // 当前 Hook 的类实例
+                            "queryIntentActivitiesInternal", dynamicArgs // 动态参数数组
+                    );
 
-                // 如果成功获取到自己的 ResolveInfo，则合并到原始结果中
-                if (myAppResolveInfos != null && !myAppResolveInfos.isEmpty()) {
-                    ResolveInfo myAppResolveInfo = myAppResolveInfos.get(0);
-                    ResolveInfo clAppResolveInfo = originalResult.get(0);
+                    // 如果成功获取到自己的 ResolveInfo，则合并到原始结果中
+                    if (myAppResolveInfos != null && !myAppResolveInfos.isEmpty()) {
+                        ResolveInfo myAppResolveInfo = myAppResolveInfos.get(0);
+                        ResolveInfo clAppResolveInfo = originalResult.get(0);
 
-                    // 修改 match 值
-                    Field matchField = ResolveInfo.class.getDeclaredField("match");
-                    matchField.setAccessible(true);
-                    matchField.set(myAppResolveInfo, clAppResolveInfo.match); // 与目标应用一致
+                        // 修改 match 值
+                        Field matchField = ResolveInfo.class.getDeclaredField("match");
+                        matchField.setAccessible(true);
+                        matchField.set(myAppResolveInfo, clAppResolveInfo.match); // 与目标应用一致
 
-                    // myAppResolveInfo.activityInfo.exported = true;
-                    // myAppResolveInfo.activityInfo.permission = null;
-                    // myAppResolveInfo.activityInfo.launchMode = ActivityInfo.LAUNCH_SINGLE_TASK;
-                    // myAppResolveInfo.priority = 1000; // 优先级
-                    myAppResolveInfo.isDefault = true; // 标记为默认候选项
+                        // myAppResolveInfo.activityInfo.exported = true;
+                        // myAppResolveInfo.activityInfo.permission = null;
+                        // myAppResolveInfo.activityInfo.launchMode = ActivityInfo.LAUNCH_SINGLE_TASK;
+                        // myAppResolveInfo.priority = 1000; // 优先级
+                        myAppResolveInfo.isDefault = true; // 标记为默认候选项
 
-                    IntentFilter intentFilter = new IntentFilter();
-                    intentFilter.addAction(Intent.ACTION_VIEW); // 添加 ACTION_VIEW
-                    intentFilter.addCategory(Intent.CATEGORY_DEFAULT); // 添加 CATEGORY_DEFAULT
-                    intentFilter.addCategory(Intent.CATEGORY_BROWSABLE); // 添加 CATEGORY_BROWSABLE
-                    intentFilter.addDataScheme(intent.getScheme()); // 添加 scheme
+                        IntentFilter intentFilter = new IntentFilter();
+                        intentFilter.addAction(Intent.ACTION_VIEW); // 添加 ACTION_VIEW
+                        intentFilter.addCategory(Intent.CATEGORY_DEFAULT); // 添加 CATEGORY_DEFAULT
+                        intentFilter.addCategory(Intent.CATEGORY_BROWSABLE); // 添加 CATEGORY_BROWSABLE
+                        intentFilter.addDataScheme(intent.getScheme()); // 添加 scheme
 
-                    // 设置到 ResolveInfo
-                    myAppResolveInfo.filter = intentFilter;
+                        // 设置到 ResolveInfo
+                        myAppResolveInfo.filter = intentFilter;
 
-                    originalResult.add(myAppResolveInfo);
-                    // originalResult.set(0, myAppResolveInfo);
-                    XposedBridge.log("originalResult.addAll: " + originalResult);
+                        originalResult.add(myAppResolveInfo);
+                        // originalResult.set(0, myAppResolveInfo);
+                        XposedBridge.log("originalResult.addAll: " + originalResult);
+                    }
+
+                    // 将修改后的结果设置回返回值
+                    param.setResult(originalResult);
                 }
+            });
+        } catch (XposedHelpers.ClassNotFoundError ignored) {
+        }
 
-                // 将修改后的结果设置回返回值
-                param.setResult(originalResult);
-            }
-        });
-        //        /* PendingIntent.getActivity */
-//        XposedBridge.hookAllMethods(XposedHelpers.findClass("android.app.PendingIntent", classLoader), "getActivity", new XC_MethodHook() {
-//            @Override
-//            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-//                super.beforeHookedMethod(methodHookParam);
-//                if (!getIsHook()) return;
-//                Context context = (Context) methodHookParam.args[0];
-//                Intent intent = (Intent) methodHookParam.args[2];
-//                XposedBridge.log("PendingIntent.getActivity" + intent);
-//                filterIntent(intent, "PendingIntent.getActivity", context.getClass().getName());
-//            }
-//        });
-//
-//
-////         Intent()
-//        XposedBridge.hookAllConstructors(XposedHelpers.findClass("android.content.Intent", classLoader),
-//                new XC_MethodHook() {
-//                    @Override
-//                    protected void afterHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-//                        super.afterHookedMethod(methodHookParam);
-//                        if (!getIsHook()) return;
-//                        // 使用 thisObject 获取当前构造的 Intent 实例
-//                        Intent intent = (Intent) methodHookParam.thisObject;
-//                        if ("GET_JUMP_REPLAY_HOOK".equals(intent.getAction())) {
-//                            return;
+
+        Class<?> PackageParserClass = XposedHelpers.findClass("android.content.pm.PackageParser", classLoader);
+        XposedBridge.hookAllMethods(PackageParserClass, "parseUsesPermission",
+                new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        super.beforeHookedMethod(param);
+                    }
+
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                        super.afterHookedMethod(param);
+                        Object pp_Package = param.args[0];
+                        XposedBridge.log("pp_Package " + pp_Package);
+//                        ArrayList<String> requestedPermissions = (ArrayList<String>) getObjectField(pp_Package, "requestedPermissions");
+//                        if (-1 == requestedPermissions.indexOf(permission)) {
+//                            requestedPermissions.add(permission);
 //                        }
-//                        XposedBridge.log("new intent: " + intent);
-//                        filterIntent(intent, "Intent()", null);
-//                    }
-//                }
-//        );
+                        //setObjectField(pp_Package,"requestedPermissions",requestedPermissions);
+                    }
+                }
+        );
 
+    }
+
+    public void SetFloatWindowUi(Context applicationContext) {
+        try {
+            Class<?> declared = XposedHelpers.findClass(Activity.class.getName(), applicationContext.getClassLoader());
+            final FloatWindow[] floatWindow = new FloatWindow[1];
+            XposedBridge.hookMethod(declared.getDeclaredMethod("onResume"), new XC_MethodHook() {
+
+                @Override
+                protected void afterHookedMethod(MethodHookParam methodHookParam) {
+                    XposedBridge.log("SetFloatWindowUi onResume");
+                    Activity activity = (Activity) methodHookParam.thisObject;
+                    floatWindow[0] = new FloatWindow(applicationContext, activity);
+                    FloatWindowView floatWindowView = (FloatWindowView) new FloatWindowView(applicationContext);
+                    // 设置回调监听器
+                    floatWindowView.setOnOpenViewClickListener(onIsHook -> {
+                        isHook = onIsHook;
+                        // 打印日志
+                        XposedBridge.log("isHook 已更新: " + isHook);
+                    });
+
+                    floatWindow[0].setFloatWindowView((LinearLayout) floatWindowView.createView());
+                    floatWindow[0].initialize();
+                }
+            });
+
+            XposedBridge.hookMethod(declared.getDeclaredMethod("onPause"), new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam methodHookParam) {
+                    XposedBridge.log("SetFloatWindowUi onPause");
+                    floatWindow[0].setIsOnPause(true);
+                    floatWindow[0].removeView();
+                }
+            });
+
+        } catch (NoSuchMethodException ignored) {
+        } catch (java.lang.AssertionError e) {
+            XposedBridge.log("悬浮窗加载失败 =>" + e);
+        }
     }
 
 
@@ -351,6 +386,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
             hookSystemMethods(applicationContext);
             return;
         }
+
 
         if (!isHostApp) {
             if (client == null) {
@@ -363,7 +399,14 @@ public class IntentCapture implements IXposedHookLoadPackage {
             // 启动定时分流检测
             startBatchSender();
         }
-        hookMethods(applicationContext);
+
+        try {
+            hookMethods(applicationContext);
+        } catch (java.lang.IllegalArgumentException e) {
+            XposedBridge.log("写入失败, 服务端未连接 APP未持有权限 => " + e);
+        }
+
+        SetFloatWindowUi(applicationContext);
     }
 
     @Override
@@ -378,17 +421,17 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
         // 偶然发现有些机型(LGE Nexus 5X[Android 8.1.0])居然Application attach不会触发
         XposedHelpers.findAndHookMethod(ContextWrapper.class, "attachBaseContext", Context.class, new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
-                        super.afterHookedMethod(param);
-                        if (applicationContext == null) {
-                            XposedBridge.log(packageName + ": xposed挂载成功 attachBaseContext");
-                            applicationContext = (Context) param.args[0];
-                            Hook(loadPackageParam);
-                        }
-                    }
+            @SuppressLint("WrongConstant")
+            @Override
+            protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
+                super.afterHookedMethod(param);
+                if (applicationContext == null) {
+                    XposedBridge.log(packageName + ": xposed挂载成功 attachBaseContext");
+                    applicationContext = (Context) param.args[0];
+                    Hook(loadPackageParam);
                 }
-        );
+            }
+        });
 
         XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
             @Override
@@ -513,6 +556,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
                         CONFIG_URI,
                         values
                 );
+
             }
         }
 
@@ -579,10 +623,10 @@ public class IntentCapture implements IXposedHookLoadPackage {
     /**
      * 调试测试代码
      */
-    private void HookClass(XC_LoadPackage.LoadPackageParam loadPackageParam, String classNameToHook) {
+    private void HookClass(ClassLoader classLoader, String classNameToHook) {
         try {
             // 获取目标类的 Class 对象
-            Class<?> clazz = XposedHelpers.findClass(classNameToHook, loadPackageParam.classLoader);
+            Class<?> clazz = XposedHelpers.findClass(classNameToHook, classLoader);
 
             // 获取类中的所有方法
             Method[] methods = clazz.getDeclaredMethods();

@@ -12,17 +12,10 @@
 <img src="https://github.com/user-attachments/assets/73603153-6f74-468c-aff4-a3a921a6c1bc" width="200"/><img src="https://github.com/user-attachments/assets/1f3e256c-ff1d-402b-9d1d-52a353d68bb3" width="200"/><img src="https://github.com/user-attachments/assets/cc1c2e44-f5b4-4826-a957-72e727990bc4" width="200"/><img src="https://github.com/user-attachments/assets/b73e8411-abb1-4a06-9dcd-938b148f502e" width="200"/><img src="https://github.com/user-attachments/assets/7d1a4ede-337d-4c44-add8-0d739964bc33" width="200"/>
 
 
-
-
-## 开发环境
-
-| 手机型号     | 系统         | HOOK框架         | 是否正常 |
-|----------|------------|----------------|------|
-| OnePlus6 | Android 10 | LSPosed 1.9.1  | ✅    |
-| OnePlus6 | Android 11 | EdXposed 4.6.2 | ✅    |
-| 小米6      | MIUI 10.3  | EdXposed 4.6.2 | ✅    |
-
 ---
+## 使用环境
+**Android < 11**
+- 超过版本应用 **未设置targetSdk** 或 **持有QUERY_ALL_PACKAGES权限** 可以使用
 ## 演示视频
 
 **抓包(作用域勾选对应应用)**
@@ -36,4 +29,4 @@ https://github.com/user-attachments/assets/634184d4-1bf4-4a4f-9502-01e064bdee9b
 ---
 
 ### 有bug和改进意见请直接提交Issues或QQ群(1021904342)联系我
-### 项目免费开源..请遵守GPL3.0.如果你喜欢项目请点个Star支持一下.
+### 如二改请完全遵守GPL3.0.如果你喜欢项目请点个Star支持一下.

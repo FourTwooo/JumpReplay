@@ -44,15 +44,12 @@ import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.utils.HashUtil;
-import com.fourtwo.hookintent.utils.RootServiceHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
-import com.fourtwo.hookintent.utils.ShizukuSystemServerApi;
 import com.google.android.material.tabs.TabLayout;
 
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
-import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;

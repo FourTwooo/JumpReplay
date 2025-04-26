@@ -141,7 +141,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 //        binding.btnReloadIntent.setOnClickListener((v) -> {
 //            String res;
 //            try {
-//                res = ShizukuSystemServerApi.UserManager_getUsers(true, true, true).toString();
+//                res = ShizukuServerApi.UserManager_getUsers(true, true, true).toString();
 //            } catch (Throwable tr) {
 //                tr.printStackTrace();
 //                res = tr.getMessage();

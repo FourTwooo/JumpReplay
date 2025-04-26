@@ -1,13 +1,10 @@
 package com.fourtwo.hookintent.service;
 
 import android.annotation.SuppressLint;
-import android.app.ActivityManager;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -202,7 +199,7 @@ public class MessengerClient {
                 try {
                     context.unbindService(this);
                 } catch (java.lang.IllegalArgumentException e) {
-                    Log.e(TAG, "onServiceConnected: 服务端app未开启", e);
+                    Log.d(TAG, "onServiceConnected: 服务端app未开启");
                 }
             }
 

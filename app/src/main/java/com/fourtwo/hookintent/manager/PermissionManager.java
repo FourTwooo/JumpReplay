@@ -2,12 +2,13 @@ package com.fourtwo.hookintent.manager;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.util.Log;
 import android.widget.Toast;
 
 import com.fourtwo.hookintent.R;
-import com.fourtwo.hookintent.utils.RootServiceHelper;
-import com.fourtwo.hookintent.utils.ShizukuSystemServerApi;
+import com.fourtwo.hookintent.utils.RootServiceApi;
+import com.fourtwo.hookintent.utils.ShizukuServerApi;
 
 import rikka.shizuku.Shizuku;
 
@@ -21,9 +22,11 @@ public class PermissionManager {
         } else {
             Log.d(TAG, "Binder received");
         }
+        isPermissionGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
     };
 
-    private static final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> Log.d("PermissionManager", "Binder dead");
+    public static boolean isPermissionGranted;
+    private static final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> isPermissionGranted = false;
 
     public static void ShizukuInit() {
         // 注册监听器
@@ -38,11 +41,11 @@ public class PermissionManager {
     }
 
     public static void bindRootService(Context context) {
-        RootServiceHelper.bindRootService(context);
+        RootServiceApi.bindRootService(context);
     }
 
     public static void unbindRootService(Context context) {
-        RootServiceHelper.unbindRootService(context);
+        RootServiceApi.unbindRootService(context);
     }
 
     public static void init(Context context){
@@ -60,11 +63,14 @@ public class PermissionManager {
             if (isRoot) {
                 String[] itemsArray = context.getResources().getStringArray(R.array.items_array);
                 if (SelectedItem.equals(itemsArray[0])) {
-                    // 使用root
-                    RootServiceHelper.startActivityAsRoot(context, intent);
+                    // root
+                    RootServiceApi.startActivityAsRoot(context, intent);
                 } else if (SelectedItem.equals(itemsArray[1])) {
-                    // 使用Shizuku - 系统助手
-                    ShizukuSystemServerApi.launchAssistantWithTemporaryReplacement(context, intent);
+                    // Shizuku - 系统助手
+                    ShizukuServerApi.launchAssistantWithTemporaryReplacement(context, intent);
+                } else if(SelectedItem.equals(itemsArray[2])){
+                    // Shizuku
+                    ShizukuServerApi.startActivityAsShizuku(context, intent, 0);
                 }
             } else {
                 context.startActivity(intent);

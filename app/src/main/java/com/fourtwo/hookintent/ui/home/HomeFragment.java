@@ -35,9 +35,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.manager.HookStatusManager;
 import com.fourtwo.hookintent.service.MessengerService;
 import com.fourtwo.hookintent.utils.DataProcessor;
-import com.fourtwo.hookintent.manager.HookStatusManager;
 import com.fourtwo.hookintent.viewmodel.MainViewModel;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 

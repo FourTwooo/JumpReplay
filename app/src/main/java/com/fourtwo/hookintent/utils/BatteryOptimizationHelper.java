@@ -3,13 +3,10 @@ package com.fourtwo.hookintent.utils;
 import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.net.Uri;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
-import android.util.Log;
 
 import androidx.appcompat.app.AlertDialog;
 

@@ -10,6 +10,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.fourtwo.hookintent.manager.PermissionManager;
+
 import java.net.URISyntaxException;
 
 public class ShortcutActivity extends AppCompatActivity {
@@ -20,6 +21,9 @@ public class ShortcutActivity extends AppCompatActivity {
 
         // 设置透明背景
         getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+
+
+        Log.d("showReplaceParamsDialog", "showReplaceParamsDialog: " + getIntent().toUri(Intent.URI_INTENT_SCHEME));
 
         // 接收传递的参数
         Bundle bundle = getIntent().getExtras();

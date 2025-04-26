@@ -6,9 +6,6 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 
-import androidx.core.content.ContextCompat;
-
-import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;

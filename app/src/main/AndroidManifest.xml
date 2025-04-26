@@ -47,19 +47,19 @@
             android:authorities="com.fourtwo.hookintent.configprovider"
             android:exported="true"
             android:grantUriPermissions="true"
-            android:readPermission="android.permission.INTERNET"
             tools:ignore="ExportedContentProvider" />
-
-        <service
-            android:name=".service.RootActivityService"
-            android:permission="com.topjohnwu.libsu.SERVICE_PERMISSION"
-            tools:ignore="Instantiatable" />
 
         <service
             android:name=".service.MessengerService"
             android:enabled="true"
             android:exported="true"
             tools:ignore="ExportedService" />
+
+        <service
+            android:name=".service.RootActivityService"
+            android:permission="com.topjohnwu.libsu.SERVICE_PERMISSION"
+            tools:ignore="Instantiatable" />
+
 
         <activity
             android:name=".MainActivity"
