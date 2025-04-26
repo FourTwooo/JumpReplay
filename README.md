@@ -15,7 +15,7 @@
 ---
 ## 使用环境
 **Android < 11**
-- 超过版本应用 **未设置targetSdk** 或 **持有QUERY_ALL_PACKAGES权限** 可以使用
+- 超过版本应用 **未设置targetSdk>=30** 或 **持有QUERY_ALL_PACKAGES权限** 可以使用
 ## 演示视频
 
 **抓包(作用域勾选对应应用)**
