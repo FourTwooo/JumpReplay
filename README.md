@@ -1,3 +1,5 @@
+##  tg号 @Party9999999 拿开源项目圈钱
+
 # JumpReplay
 
 [![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/FourTwooo/JumpReplay?label=version&logo=github)](https://github.com/FourTwooo/JumpReplay/releases) 
