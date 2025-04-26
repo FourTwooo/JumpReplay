@@ -20,7 +20,7 @@
 
 **抓包(作用域勾选对应应用)**
 
-https://github.com/user-attachments/assets/ff862eca-fd00-43a0-aaa9-112ba3c71661
+https://github.com/user-attachments/assets/b7c47a00-f47d-43e9-848e-a00eda47c6db
 
 **拦截(作用域勾选系统框架)**
 
