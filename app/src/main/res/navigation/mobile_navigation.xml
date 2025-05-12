@@ -1,5 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- navigation/mobile_navigation.xml-->
+<?xml version="1.0" encoding="utf-8"?><!-- navigation/mobile_navigation.xml-->
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
@@ -37,8 +36,7 @@
         android:id="@+id/nav_settings"
         android:name="com.fourtwo.hookintent.ui.settings.SettingsFragment"
         android:label="配置"
-        tools:layout="@layout/fragment_settings">
-    </fragment>
+        tools:layout="@layout/fragment_settings" />
 
     <fragment
         android:id="@+id/nav_me"
@@ -51,6 +49,12 @@
         android:name="com.fourtwo.hookintent.ui.filter.FilterFragment"
         android:label="过滤"
         tools:layout="@layout/fragment_filter" />
+
+    <fragment
+        android:id="@+id/nav_setup"
+        android:name="com.fourtwo.hookintent.ui.setup.SetupFragment"
+        android:label="设置"
+        tools:layout="@layout/fragment_select" />
 
     <fragment
         android:id="@+id/nav_select"
@@ -66,7 +70,6 @@
         android:id="@+id/nav_disabled"
         android:name="com.fourtwo.hookintent.DisabledActivity"
         tools:layout="@layout/activity_disabled" />
-
 
 
 </navigation>

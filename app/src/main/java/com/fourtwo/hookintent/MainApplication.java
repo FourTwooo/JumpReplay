@@ -1,10 +1,7 @@
 package com.fourtwo.hookintent;
 
 import android.app.Application;
-import android.content.Context;
 import android.os.Build;
-import android.util.Log;
-import android.widget.Toast;
 
 import androidx.multidex.BuildConfig;
 
@@ -15,40 +12,12 @@ import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
 public class MainApplication extends Application {
 
-    final String TAG = "MainApplication";
-
-    static Boolean isRoot = false;
-
     static {
         Shell.enableVerboseLogging = BuildConfig.DEBUG;
         Shell.setDefaultBuilder(Shell.Builder.create()
                 .setFlags(Shell.FLAG_MOUNT_MASTER)
                 .setTimeout(10));
     }
-
-    public static void executeCommand(String command, Boolean Root, Context context) {
-        if (isRoot) {
-            if (Root) {
-                Shell.cmd("su root", command).submit(result -> {
-                    if (result.isSuccess()) {
-                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            } else {
-                Shell.cmd("su shell", command).submit(result -> {
-                    if (result.isSuccess()) {
-                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        }
-
-    }
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -60,15 +29,9 @@ public class MainApplication extends Application {
 
         // ROOT提权
         Shell.getShell(shell -> {
-            if (isRoot = shell.isRoot()) {
-                Log.d(TAG, "onCreate: 手机已root");
-            } else {
-                Log.d(TAG, "onCreate: 手机未root");
-            }
+            PermissionManager.isRootPermissionGranted = shell.isRoot();
+            PermissionManager.init(this);
         });
-
-
-        PermissionManager.init(this);
     }
 
     @Override
@@ -76,4 +39,5 @@ public class MainApplication extends Application {
         super.onTerminate();
         PermissionManager.unload(this); // 清理资源
     }
+
 }

@@ -4,7 +4,6 @@ import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
@@ -13,12 +12,9 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
-import com.fourtwo.hookintent.IntentCapture;
-import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.data.ImagesBase64;
 
 import java.lang.reflect.Field;
-import java.util.Objects;
 
 import de.robv.android.xposed.XposedBridge;
 
@@ -90,10 +86,10 @@ public class FloatWindow extends LinearLayout {
         });
     }
 
-    private LinearLayout floatWindowView;
+    public FloatWindowView floatWindowView;
     private boolean isTextViewVisible = false;            // 弹出 View 是否可见
 
-    public void setFloatWindowView(LinearLayout floatWindowView){
+    public void setFloatWindowView(FloatWindowView floatWindowView){
         this.floatWindowView = floatWindowView;
     }
 

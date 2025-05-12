@@ -74,7 +74,7 @@ public class ShizukuServerApi {
     }
 
     private static boolean requestShizukuPermission() {
-        if (!PermissionManager.isPermissionGranted){
+        if (!PermissionManager.isShizukuPermissionGranted){
             Shizuku.requestPermission(1);
             Log.d(TAG, "requestShizukuPermission: Shizuku未授权");
             return false;

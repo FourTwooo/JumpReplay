@@ -10,7 +10,10 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -27,7 +30,9 @@ import android.widget.GridView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.Spinner;
+import android.widget.TextView;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -41,12 +46,12 @@ import com.fourtwo.hookintent.data.IntentMatchItem;
 import com.fourtwo.hookintent.databinding.ActivityIntentInterceptBinding;
 import com.fourtwo.hookintent.databinding.ContentInterceptMainBinding;
 import com.fourtwo.hookintent.manager.PermissionManager;
+import com.fourtwo.hookintent.utils.LoadingOverlay;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.fourtwo.hookintent.utils.ShortcutHelper;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
@@ -56,6 +61,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class IntentIntercept extends AppCompatActivity implements IntentInterceptAdapter.OnIntentMatchClickListener {
     private static final String TAG = "IntentIntercept";
@@ -136,18 +143,6 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
         // 设置重置按钮点击事件
         binding.resetButton.setOnClickListener(view -> contentBinding.urlTextView.setText(originalUrlText));
-
-        // 设置发送按钮点击事件
-//        binding.btnReloadIntent.setOnClickListener((v) -> {
-//            String res;
-//            try {
-//                res = ShizukuServerApi.UserManager_getUsers(true, true, true).toString();
-//            } catch (Throwable tr) {
-//                tr.printStackTrace();
-//                res = tr.getMessage();
-//            }
-//            Log.d(TAG, "getUsers: " + res);
-//        });
 
         binding.btnReloadIntent.setOnClickListener(view -> handleReloadIntentClick());
 
@@ -259,9 +254,12 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         });
     }
 
-    private static final int REQUEST_CODE_PICK_IMAGE = 1;
-
     private void showIconSelectionDialog(ImageView iconPreview) {
+        // 创建加载进度
+        LoadingOverlay loadingOverlay = new LoadingOverlay(this);
+        loadingOverlay.setLoadingText("正在加载应用列表...");
+        loadingOverlay.show();
+
         // 保存当前预览图标视图引用
         currentIconPreview = iconPreview;
 
@@ -280,14 +278,24 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         GridView iconsGrid = view.findViewById(R.id.icons_grid);
         ImageView customIconButton = view.findViewById(R.id.custom_icon_button);
 
-        // 展示应用图标
-        showAppIcons(iconsGrid, iconPreview);
+        // 使用 Executor 执行耗时任务
+        Executor executor = Executors.newSingleThreadExecutor();
+        executor.execute(() -> {
+            // 耗时操作：加载应用图标（这里会阻塞主线程）
+            showAppIcons(iconsGrid, iconPreview);
+
+            // 回到主线程更新 UI
+            new Handler(Looper.getMainLooper()).post(() -> {
+                // 隐藏加载层并显示对话框
+                loadingOverlay.hide();
+                iconSelectionDialog.show(); // 显示对话框
+            });
+        });
 
         // 自定义图标按钮点击事件
         customIconButton.setOnClickListener(v -> filePickerLauncher.launch("image/*"));
-
-        iconSelectionDialog.show(); // 显示对话框
     }
+
 
     private Bitmap getBitmapFromImageView(ImageView imageView) {
         Drawable drawable = imageView.getDrawable();
@@ -454,15 +462,17 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
      * 从 Intent 中提取 URL 并解码
      */
     private String extractUrlFromIntent(Intent intent) {
+        if (intent.getStringExtra("DetailData") != null){
+            return intent.getStringExtra("DetailData");
+        }
         String urlText = intent.getDataString();
         if (urlText == null) {
             urlText = intent.toUri(Intent.URI_INTENT_SCHEME);
         }
-        try {
-            return URLDecoder.decode(urlText, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            return urlText;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            return URLDecoder.decode(urlText, StandardCharsets.UTF_8);
         }
+        return urlText;
     }
 
     /**

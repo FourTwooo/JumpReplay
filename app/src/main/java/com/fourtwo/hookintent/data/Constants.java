@@ -1,5 +1,7 @@
 package com.fourtwo.hookintent.data;
 
+import android.net.Uri;
+
 public final class Constants {
 
     // 防止实例化这个类
@@ -8,6 +10,12 @@ public final class Constants {
     }
 
     // Provider Config
+    public static final String AUTHORITY = "com.fourtwo.hookintent.configprovider";
+
+    public static final Uri CONFIG_URI = Uri.parse("content://" + AUTHORITY + "/config");
+
+    public static final Uri SCHEME_URI = Uri.parse("content://" + AUTHORITY + "/scheme");
+
     public static final String INTERNAL_HOOKS_CONFIG = "internalHooksConfig";
 
     public static final String EXTERNAL_HOOKS_CONFIG = "externalHooksConfig";
@@ -15,6 +23,8 @@ public final class Constants {
     public static final String DISABLED_SCHEME = "disabledScheme";
 
     public static final String COLORS_CONFIG = "Colors";
+
+    public static final String FLOAT_WINDOW_CONFIG = "FloatWindow";
 
     //  数据库字段名
     public static final String PACKAGE = "包名";

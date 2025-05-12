@@ -1,6 +1,5 @@
 package com.fourtwo.hookintent.ui.me;
 
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -105,9 +104,7 @@ public class MeFragment extends Fragment {
             public void onFailure(String errorMessage) {
                 if (isAdded()) {
                     requireActivity().runOnUiThread(() -> {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                            textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
-                        }
+                        textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
                         textView.setText(errorMessage);
                         binding.progressBar.setVisibility(View.GONE);
                         binding.loadingText.setVisibility(View.GONE);

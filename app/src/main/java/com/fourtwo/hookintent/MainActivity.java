@@ -20,7 +20,6 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
 import com.fourtwo.hookintent.data.Constants;
-import com.fourtwo.hookintent.data.ImagesBase64;
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
 import com.fourtwo.hookintent.databinding.AppBarMainBinding;
 import com.fourtwo.hookintent.utils.NetworkClient;
@@ -35,6 +34,9 @@ public class MainActivity extends AppCompatActivity {
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
 
+    public static boolean isXposed() {
+        return false;
+    }
     @Override
     protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
@@ -103,6 +105,11 @@ public class MainActivity extends AppCompatActivity {
             SharedPreferencesUtils.putStr(this, Constants.COLORS_CONFIG, "{\"Intent\": \"#CE1A7EAC\", \"Scheme\": \"#47AA4B\"}");
         }
 
+        // 初始化悬浮窗设置
+        if (SharedPreferencesUtils.getStr(this, Constants.FLOAT_WINDOW_CONFIG) == null) {
+            SharedPreferencesUtils.putStr(this, Constants.FLOAT_WINDOW_CONFIG, "{\"float_window\": true, \"my_float_window\": false}");
+        }
+
         Log.d(TAG, "onCreate: " + SharedPreferencesUtils.getStr(this, "hooksConfig"));
 
 //        Log.d("drawableToBase64", ImagesBase64.drawableToBase64(this, R.drawable.delete));
@@ -113,7 +120,7 @@ public class MainActivity extends AppCompatActivity {
         AtomicReference<DrawerLayout> drawer = new AtomicReference<>(binding.drawerLayout);
         NavigationView navigationView = binding.navView;
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.nav_star, R.id.nav_me, R.id.nav_settings)
+                R.id.nav_home, R.id.nav_star, R.id.nav_me, R.id.nav_settings, R.id.nav_setup)
                 .setOpenableLayout(drawer.get())
                 .build();
         AtomicReference<NavController> navController = new AtomicReference<>(Navigation.findNavController(this, R.id.nav_host_fragment_content_main));

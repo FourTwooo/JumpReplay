@@ -16,10 +16,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ConfigProvider extends ContentProvider {
-    public static final String AUTHORITY = "com.fourtwo.hookintent.configprovider";
-    public static final Uri CONFIG_URI = Uri.parse("content://" + AUTHORITY + "/config");
-    public static final Uri SCHEME_URI = Uri.parse("content://" + AUTHORITY + "/scheme");
-
     @Override
     public boolean onCreate() {
         return true;
@@ -30,13 +26,15 @@ public class ConfigProvider extends ContentProvider {
     public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
         Map<String, String> configData = new HashMap<>();
 
-        if (CONFIG_URI.equals(uri)) {
+        if (Constants.CONFIG_URI.equals(uri)) {
             // 如果传递的是 CONFIG_URI，返回外部和内部配置
             String EXTERNAL_HOOKS_CONFIG = SharedPreferencesUtils.getStr(getContext(), Constants.EXTERNAL_HOOKS_CONFIG);
             String INTERNAL_HOOKS_CONFIG = SharedPreferencesUtils.getStr(getContext(), Constants.INTERNAL_HOOKS_CONFIG);
+            String FLOAT_WINDOW_CONFIG = SharedPreferencesUtils.getStr(getContext(), Constants.FLOAT_WINDOW_CONFIG);
             configData.put(Constants.EXTERNAL_HOOKS_CONFIG, EXTERNAL_HOOKS_CONFIG);
             configData.put(Constants.INTERNAL_HOOKS_CONFIG, INTERNAL_HOOKS_CONFIG);
-        } else if (SCHEME_URI.equals(uri)) {
+            configData.put(Constants.FLOAT_WINDOW_CONFIG, FLOAT_WINDOW_CONFIG);
+        } else if (Constants.SCHEME_URI.equals(uri)) {
             // 如果传递的是 SCHEME_URI，返回禁用的 Scheme 配置
             String DISABLED_SCHEME = SharedPreferencesUtils.getStr(getContext(), Constants.DISABLED_SCHEME);
             configData.put(Constants.DISABLED_SCHEME, DISABLED_SCHEME);
@@ -64,7 +62,7 @@ public class ConfigProvider extends ContentProvider {
             SharedPreferencesUtils.putStr(getContext(), Constants.INTERNAL_HOOKS_CONFIG, value);
 
             // 返回新的数据 URI
-            return Uri.withAppendedPath(CONFIG_URI, Constants.INTERNAL_HOOKS_CONFIG);
+            return Uri.withAppendedPath(Constants.CONFIG_URI, Constants.INTERNAL_HOOKS_CONFIG);
         }
         return null;
     }

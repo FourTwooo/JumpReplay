@@ -33,11 +33,13 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="disabled">禁用</string>
     <string name="add_link">创建快捷方式</string>
+    <string name="setup">设置</string>
+    <string name="float_window">悬浮窗(重启进程生效)</string>
 
     <string-array name="items_array">
         <item>root</item>
-        <item>Shizuku - 系统助手</item>
         <item>Shizuku</item>
+        <item>Shizuku - 系统助手</item>
     </string-array>
 
 

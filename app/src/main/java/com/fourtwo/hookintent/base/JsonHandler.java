@@ -343,5 +343,25 @@ public class JsonHandler {
         return jsonObject.toString();
     }
 
+    public static Map<String, Boolean>strToBoolean(Map<String, String> map){
+        // 转换为 Map<String, Boolean>
+        Map<String, Boolean> booleanMap = new HashMap<>();
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            // 将 String 类型的值解析为 Boolean 类型
+            booleanMap.put(entry.getKey(), Boolean.parseBoolean(entry.getValue()));
+        }
+        return booleanMap;
+    }
+
+    public static Map<String, String> booleanToStr(Map<String, Boolean> map) {
+        // 创建一个新的 Map<String, String>
+        Map<String, String> stringMap = new HashMap<>();
+        for (Map.Entry<String, Boolean> entry : map.entrySet()) {
+            // 将 Boolean 类型的值转换为 String 类型
+            stringMap.put(entry.getKey(), entry.getValue().toString());
+        }
+        return stringMap;
+    }
+
 }
 

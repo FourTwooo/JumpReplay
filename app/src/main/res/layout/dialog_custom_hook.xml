@@ -195,5 +195,29 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="确认" />
+
+        <RelativeLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+
+            <ProgressBar
+                android:id="@+id/setting_progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/setting_loadingText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/setting_progressBar"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="16dp"
+                android:text="正在加载所有应用"
+                android:visibility="gone" />
+
+        </RelativeLayout>
     </LinearLayout>
+
 </ScrollView>

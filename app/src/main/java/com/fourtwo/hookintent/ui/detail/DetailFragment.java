@@ -5,6 +5,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
@@ -35,7 +36,7 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.fourtwo.hookintent.MainApplication;
+import com.fourtwo.hookintent.IntentIntercept;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
 import com.fourtwo.hookintent.base.JsonHandler;
@@ -49,7 +50,6 @@ import com.google.android.material.tabs.TabLayout;
 
 import org.json.JSONObject;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -347,12 +347,27 @@ public class DetailFragment extends Fragment {
 
             options.add("intentUri");
             actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri"));
+
+            options.add("转到 意图拦截器");
+            actions.add(() -> {
+                Intent intent = new Intent(requireContext(), IntentIntercept.class);
+                intent.putExtra("DetailData", uriCommand);
+                requireContext().startActivity(intent);
+            });
+
         } else if (Category.equals("Scheme")) {
             String uriCommand = itemData.getAppBundle().getString("scheme_raw_url");
 
             Log.d(TAG, "schemeCommand: " + uriCommand);
             options.add("schemeUri");
             actions.add(() -> showAmCommandDialog(uriCommand, false, "schemeUri"));
+
+            options.add("转到 意图拦截器");
+            actions.add(() -> {
+                Intent intent = new Intent(requireContext(), IntentIntercept.class);
+                intent.putExtra("DetailData", uriCommand);
+                requireContext().startActivity(intent);
+            });
         }
 
         // 改用 PopupMenu
@@ -390,7 +405,7 @@ public class DetailFragment extends Fragment {
         @SuppressLint({"MissingInflatedId", "LocalSuppress"}) Button suCodeButton = dialogView.findViewById(R.id.su_code_button);
         CheckBox enableFeatureCheckbox = dialogView.findViewById(R.id.enable_feature_checkbox);
         Spinner dropdownSpinner = dialogView.findViewById(R.id.dropdown_spinner);
-        if (Objects.equals(optionName, "am命令")) {
+        if (Objects.equals(optionName, "am命令") || Objects.equals(optionName, "schemeUri")) {
             dropdownSpinner.setEnabled(false); // 禁用 Spinner
         }
         enableFeatureCheckbox.setChecked(SharedPreferencesUtils.getBoolean(requireContext(), "detailIsRoot"));
@@ -400,9 +415,8 @@ public class DetailFragment extends Fragment {
             SharedPreferencesUtils.putBoolean(requireContext(), "detailIsRoot", isChecked1);
         });
 
-        try {
-            amCommand = URLDecoder.decode(amCommand, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException ignored) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            amCommand = URLDecoder.decode(amCommand, StandardCharsets.UTF_8);
         }
 
         commandTextView.setText(amCommand); // 确保文本足够长以测试滚动
@@ -424,7 +438,7 @@ public class DetailFragment extends Fragment {
                     throw new RuntimeException(e);
                 }
             } else {
-                MainApplication.executeCommand(String.valueOf(commandTextView.getText()), enableFeatureCheckbox.isChecked(), requireContext());
+                PermissionManager.executeCommand(String.valueOf(commandTextView.getText()), enableFeatureCheckbox.isChecked(), requireContext());
             }
         });
 

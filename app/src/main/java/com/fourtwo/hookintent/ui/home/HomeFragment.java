@@ -32,6 +32,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.MainActivity;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.ItemData;
@@ -73,11 +74,6 @@ public class HomeFragment extends Fragment {
 
         return isHook;
     }
-
-    private static boolean isXposed() {
-        return false;
-    }
-
 
     @SuppressLint("UseCompatLoadingForDrawables")
     @Override
@@ -302,10 +298,9 @@ public class HomeFragment extends Fragment {
 
     @SuppressLint("SetTextI18n")
     private void setEmptyView(String text) {
-        if (isXposed()) {
+        if (MainActivity.isXposed()) {
             emptyView.setText(text);
         } else {
-
             emptyView.setText("模块未激活! 如果使用了LSPatch 请忽略");
             emptyView.setTextColor(ContextCompat.getColor(requireContext(), R.color.red));
         }

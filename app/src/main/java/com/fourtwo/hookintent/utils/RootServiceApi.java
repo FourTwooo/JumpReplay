@@ -15,7 +15,7 @@ import com.topjohnwu.superuser.ipc.RootService;
 public class RootServiceApi {
 
     private static IRootActivityService rootService;
-    private static boolean isServiceBound = false;
+    public static boolean isServiceBound = false;
 
     private RootServiceApi() {
         // 工具类不允许实例化
@@ -47,16 +47,18 @@ public class RootServiceApi {
     public static void startActivityAsRoot(Context context, Intent intent) {
         if (rootService == null) {
             Toast.makeText(context, "Root service not connected", Toast.LENGTH_SHORT).show();
-            return;
+            throw new IllegalArgumentException();
         }
 
         try {
             int result = rootService.startActivityAsRoot(intent, 0);
             if (result != 0) {
                 Toast.makeText(context, "Failed to start activity as root. Code: " + result, Toast.LENGTH_SHORT).show();
+                throw new IllegalArgumentException();
             }
         } catch (RemoteException e) {
             Toast.makeText(context, "IPC Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            throw new IllegalArgumentException();
         }
     }
 

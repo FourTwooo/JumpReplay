@@ -79,14 +79,20 @@ public class StarFragment extends Fragment {
 //        starViewModel.getText().observe(getViewLifecycleOwner(), textView::setText);
         List<JSONObject> allStarData = dbManager.getAllData(Constants.STAR_TABLE_NAME);
         Log.d(TAG, "onCreateView: " + allStarData.size());
-        for (JSONObject jsonObject : allStarData) {
-            try {
-                String jsonString = jsonObject.getString(Constants.SQL_DATA);
-                JSONObject jsonObjectFromSQL = new JSONObject(jsonString);
-                Bundle data = JsonHandler.toBundle(jsonObjectFromSQL);
-                dataProcessor.processBundle(data, itemData -> viewModel.addIntentData(itemData));
-            } catch (JSONException e) {
-                throw new RuntimeException(e);
+
+        if (allStarData.size() == 0) {
+            binding.starEmptyView.setVisibility(View.VISIBLE);
+        } else {
+            binding.starEmptyView.setVisibility(View.GONE);
+            for (JSONObject jsonObject : allStarData) {
+                try {
+                    String jsonString = jsonObject.getString(Constants.SQL_DATA);
+                    JSONObject jsonObjectFromSQL = new JSONObject(jsonString);
+                    Bundle data = JsonHandler.toBundle(jsonObjectFromSQL);
+                    dataProcessor.processBundle(data, itemData -> viewModel.addIntentData(itemData));
+                } catch (JSONException e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
         return root;

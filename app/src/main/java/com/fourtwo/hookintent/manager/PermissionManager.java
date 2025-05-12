@@ -9,24 +9,33 @@ import android.widget.Toast;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.utils.RootServiceApi;
 import com.fourtwo.hookintent.utils.ShizukuServerApi;
+import com.topjohnwu.superuser.Shell;
 
 import rikka.shizuku.Shizuku;
 
 public class PermissionManager {
 
-    private static String TAG = "PermissionManager";
+    private static final String TAG = "PermissionManager";
 
     private static final Shizuku.OnBinderReceivedListener BINDER_RECEIVED_LISTENER = () -> {
         if (Shizuku.isPreV11()) {
             Log.d(TAG, "Shizuku pre-v11 is not supported");
         } else {
-            Log.d(TAG, "Binder received");
+            Log.d(TAG, "Binder received ");
         }
-        isPermissionGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
+        isBinderAvailable = true;
+        isShizukuPermissionGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
     };
 
-    public static boolean isPermissionGranted;
-    private static final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> isPermissionGranted = false;
+    private static final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> {
+        isBinderAvailable = false;
+        isShizukuPermissionGranted = false;
+    };
+
+    public static boolean isShizukuPermissionGranted;
+    public static boolean isRootPermissionGranted;
+    public static boolean isBinderAvailable;
+
 
     public static void ShizukuInit() {
         // 注册监听器
@@ -62,13 +71,13 @@ public class PermissionManager {
         try {
             if (isRoot) {
                 String[] itemsArray = context.getResources().getStringArray(R.array.items_array);
-                if (SelectedItem.equals(itemsArray[0])) {
+                if (SelectedItem.equals("root")) {
                     // root
                     RootServiceApi.startActivityAsRoot(context, intent);
-                } else if (SelectedItem.equals(itemsArray[1])) {
+                } else if (SelectedItem.equals("Shizuku - 系统助手")) {
                     // Shizuku - 系统助手
                     ShizukuServerApi.launchAssistantWithTemporaryReplacement(context, intent);
-                } else if(SelectedItem.equals(itemsArray[2])){
+                } else if(SelectedItem.equals("Shizuku")){
                     // Shizuku
                     ShizukuServerApi.startActivityAsShizuku(context, intent, 0);
                 }
@@ -82,4 +91,26 @@ public class PermissionManager {
         }
     }
 
+    public static void executeCommand(String command, Boolean Root, Context context) {
+        if (isRootPermissionGranted) {
+            if (Root) {
+                Shell.cmd("su root", command).submit(result -> {
+                    if (result.isSuccess()) {
+                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            } else {
+                Shell.cmd("su shell", command).submit(result -> {
+                    if (result.isSuccess()) {
+                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }
+
+    }
 }

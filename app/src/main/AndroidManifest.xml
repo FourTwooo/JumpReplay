@@ -115,6 +115,7 @@
 
         <activity
             android:name=".ShortcutActivity"
+            android:label="快捷方式"
             android:theme="@style/TransparentActivity"
             android:exported="true"
             android:launchMode="singleTask"

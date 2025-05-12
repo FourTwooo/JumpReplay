@@ -12,7 +12,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
-import android.widget.Switch;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -24,6 +23,7 @@ import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.utils.AppInfoHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
+import com.suke.widget.SwitchButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -159,7 +159,7 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
         ImageView icon, operate;
         TextView category, packageName, methodName, className;
         @SuppressLint("UseSwitchCompatOrMaterialCode")
-        Switch switchToggle;
+        SwitchButton switchToggle;
 
         public SettingsViewHolder(@NonNull View itemView) {
             super(itemView);
