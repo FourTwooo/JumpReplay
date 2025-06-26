@@ -30,8 +30,13 @@ import com.fourtwo.hookintent.xposed.RecordXposedBridge;
 import com.fourtwo.hookintent.xposed.ui.FloatWindow;
 import com.fourtwo.hookintent.xposed.ui.FloatWindowView;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -55,6 +60,7 @@ import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import okhttp3.Request;
 
 
 public class IntentCapture implements IXposedHookLoadPackage {
@@ -73,7 +79,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private final List<Intent> intentList = new ArrayList<>();
 
     private Boolean getIsHook() {
-//        XposedBridge.log("isHook: " + isHook);
+//        XposedBridge.log("isHook: " + isHook)
         if (client != null && !isService) {
             client.sendMessageAsync(MessengerService.MSG_IS_HOOK, null, true, new MessengerClient.ResultCallback() {
                 @Override
@@ -107,6 +113,10 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     @SuppressLint("SimpleDateFormat")
     private void sendBroadcastSafely(Bundle bundle) {
+        if (!isService) {
+            return;
+        }
+
         Context appContext = getAppContext();
         if (appContext == null) return;
         if (!bundle.containsKey("from")) {
@@ -186,15 +196,12 @@ public class IntentCapture implements IXposedHookLoadPackage {
                     if (myAppPackage.equals(intent.getPackage())) {
                         return;
                     }
-
-                    if (intent.getComponent() != null || intent.getScheme() == null) {
+                    if (intent.getComponent() != null || intent.getScheme() == null || intent.getPackage() != null || intent.getDataString() == null) {
                         return;
                     }
 
-                    if (intent.getDataString() != null && intent.getExtras() != null){
-                        return;
-                    }
                     XposedBridge.log("queryIntentActivitiesInternal Scheme: " + intent.getDataString());
+
                     // 获取原始返回值
                     @SuppressWarnings("unchecked") List<ResolveInfo> originalResult = (List<ResolveInfo>) param.getResult();
                     boolean hasHookIntent = false; // 用于标记是否存在目标 ResolveInfo
@@ -351,7 +358,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
                 @Override
                 protected void afterHookedMethod(MethodHookParam methodHookParam) {
-                    XposedBridge.log("SetFloatWindowUi onResume");
                     Activity activity = (Activity) methodHookParam.thisObject;
                     floatWindow = new FloatWindow(applicationContext, activity);
                     FloatWindowView floatWindowView = new FloatWindowView(applicationContext);
@@ -377,7 +383,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 @Override
                 protected void afterHookedMethod(MethodHookParam methodHookParam) {
                     if (floatWindow != null) {
-                        XposedBridge.log("SetFloatWindowUi onPause");
                         floatWindow.setIsOnPause(true);
                         floatWindow.removeView();
                     }
@@ -641,6 +646,69 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 }
             }
         }
+
+//        try {
+//            Class<?> okhttpClass = Class.forName("okhttp3.OkHttpClient", false, classLoader);
+//            XposedBridge.hookAllMethods(okhttpClass, "newCall", new XC_MethodHook() {
+//                @Override
+//                protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
+//                    super.beforeHookedMethod(methodHookParam);
+//
+//                    // 获取 Request 对象
+//                    Object request = methodHookParam.args[0];
+//                    if (request != null) {
+//                        StringBuilder logBuilder = new StringBuilder();
+//                        logBuilder.append("OkHttp Request intercepted:\n");
+//
+//                        // 获取请求 URL
+//                        Method urlMethod = request.getClass().getDeclaredMethod("url");
+//                        Object url = urlMethod.invoke(request);
+//                        logBuilder.append("URL: ").append(url).append("\n");
+//
+//                        // 获取请求方法 (GET/POST 等)
+//                        Method methodMethod = request.getClass().getDeclaredMethod("method");
+//                        Object method = methodMethod.invoke(request);
+//                        logBuilder.append("Method: ").append(method).append("\n");
+//
+//                        // 获取请求头
+//                        Method headersMethod = request.getClass().getDeclaredMethod("headers");
+//                        Object headers = headersMethod.invoke(request);
+//                        logBuilder.append("Headers: ").append(headers).append("\n");
+//
+//                        // 获取请求体
+//                        Method bodyMethod = request.getClass().getDeclaredMethod("body");
+//                        Object body = bodyMethod.invoke(request);
+//                        if (body != null) {
+//                            logBuilder.append("Body Class: ").append(body.getClass().getName()).append("\n");
+//
+//                            try {
+//                                // 通过 writeTo 方法解析请求体内容
+//                                Method writeToMethod = body.getClass().getDeclaredMethod("writeTo", OutputStream.class);
+//                                XposedBridge.log("writeToMethod: " + writeToMethod);
+//                                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+//                                writeToMethod.invoke(body, outputStream); // 将请求体写入内存流
+//                                String bodyContent = outputStream.toString("UTF-8"); // 读取流内容为字符串
+//                                logBuilder.append("Body Content: ").append(bodyContent).append("\n");
+//                            } catch (NoSuchMethodException e) {
+//                                logBuilder.append("Body does not have writeTo method\n");
+//                            } catch (Exception e) {
+//                                logBuilder.append("Failed to parse body content: ").append(e.getMessage()).append("\n");
+//                            }
+//                        } else {
+//                            logBuilder.append("Body: null\n");
+//                        }
+//
+//                        // 输出日志
+//                        XposedBridge.log(logBuilder.toString());
+//                    }
+//                }
+//            });
+//        } catch (ClassNotFoundException e) {
+//            XposedBridge.log(packageName + ": 未找到okhttp");
+//        } catch (Exception e) {
+//            XposedBridge.log(packageName + ": Hook OkHttp 发生错误: " + e.getMessage());
+//        }
+
     }
 
     /**
@@ -759,3 +827,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
 
 }
+
+
+//queryIntentActivitiesInternal Scheme: intent://home#Intent;scheme=damai;package=cn.damai;S.referrer=%23Intent%3Bcomponent%3Dcn.damai%2F.launcher.splash.SplashMainActivity%3Bend;i.DMNav_KRequestCodeReferrer=-1;S.HOMEPAGE_OUTER_URL=;end damai://home

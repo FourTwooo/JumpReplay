@@ -72,10 +72,8 @@ public class FloatWindowView extends LinearLayout {
         intentList.addAll(newIntentList); // 添加新数据
 
         List<String> displayList = new ArrayList<>();
-//        displayList.add("item1");
         for (Intent intent : newIntentList) {
             // 将Intent转换为String显示
-            XposedBridge.log(newIntentList.toString());
             displayList.add(intent.toUri(Intent.URI_INTENT_SCHEME));
         }
 
@@ -170,9 +168,17 @@ public class FloatWindowView extends LinearLayout {
         ListView listView = new ListView(context);
         listView.setBackgroundColor(Color.parseColor("#F5F7FF"));
         listView.setDividerHeight(1);
+
+//        listView.setPadding(0, 0, 0, dpToPx(20)); // 增加底部内边距
+//        listView.setClipToPadding(false);        // 确保内容不会因为裁剪而隐藏
+
+        // 计算 ListView 的实际高度
+        int toolbarHeight = dpToPx(30); // Toolbar 的高度
+        int listViewHeight = screenHeight * 3 / 5 - toolbarHeight; // 减去 Toolbar 的高度
+
         LinearLayout.LayoutParams listViewLayoutParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                screenHeight // 列表高度
+                listViewHeight  // 列表高度
         );
         listView.setLayoutParams(listViewLayoutParams);
 

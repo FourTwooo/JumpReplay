@@ -110,7 +110,7 @@ public class ShizukuServerApi {
 
         SearchManager searchManager = (SearchManager) context.getSystemService(Context.SEARCH_SERVICE);
 
-        @SuppressLint("DiscouragedPrivateApi") Field assistantField = Settings.Secure.class.getDeclaredField("ASSISTANT");
+        @SuppressLint({"DiscouragedPrivateApi", "PrivateApi"}) Field assistantField = Settings.Secure.class.getDeclaredField("ASSISTANT");
         assistantField.setAccessible(true);
         String ASSISTANT = (String) assistantField.get(null);
         // Get the current Assistant component name
