@@ -97,99 +97,64 @@
     <string name="empty_view_not_xposed_text">モジュールが有効になっていません！LSPatchを使用している場合は無視してください</string>
     <string name="open_window_main_switch">フローティングウィンドウを開く（プロセスの再起動で有効）</string>
     <string name="window_sub_switch">モジュールのフローティングウィンドウスイッチ</string>
-    <string name="pick_color">选择颜色</string>
-    <string name="cloud_empty_view">请输入接口地址并点击请求</string>
-    <string name="button_restore_default_url">恢复默认</string>
-    <string name="button_request_cloud">请求</string>
-    <string name="input_cloud_url">云配置接口地址</string>
-    <string name="cloud_summary">摘要</string>
-    <string name="cloud_remark">备注</string>
-    <string name="cloud_name">配置名称</string>
-    <string name="menu_blocker">拦截</string>
-    <string name="blocker_custom_group">自定义 Scheme</string>
-    <string name="blocker_add_scheme">添加 Scheme</string>
-    <string name="blocker_settings">设置</string>
-    <string name="blocker_generate">生成配置</string>
-    <string name="blocker_loading">正在扫描应用规则…</string>
-    <string name="blocker_empty">未找到可用规则</string>
-    <string name="blocker_input_scheme">输入自定义 scheme</string>
-    <string name="blocker_scheme_invalid">scheme 不能为空</string>
-    <string name="blocker_scheme_duplicate">该 scheme 已存在</string>
-    <string name="blocker_package_hint">Blocker 包名</string>
-    <string name="blocker_label_hint">Blocker 名称</string>
-    <string name="blocker_saved">已保存</string>
-    <string name="blocker_generate_no_rule">请先勾选至少一条规则</string>
-    <string name="blocker_generate_success">配置已生成</string>
-    <string name="blocker_config_title">拦截配置</string>
-    <string name="blocker_group_subtitle">%1$d/%2$d 已选</string>
-    <string name="blocker_group_subtitle_with_pkg">%1$s · %2$d/%3$d 已选</string>
-    <string name="blocker_rule_activity">Activity: %1$s</string>
+    <string name="pick_color">色を選択</string>
+    <string name="cloud_empty_view">インターフェースURLを入力してリクエストをクリックしてください</string>
+    <string name="button_restore_default_url">デフォルトに戻す</string>
+    <string name="button_request_cloud">リクエスト</string>
+    <string name="input_cloud_url">クラウド設定のAPI URL</string>
+    <string name="cloud_summary">概要</string>
+    <string name="cloud_remark">備考</string>
+    <string name="cloud_name">設定名</string>
+    <string name="menu_blocker">ブロック</string>
+    <string name="blocker_custom_group">カスタムスキーム</string>
+    <string name="blocker_add_scheme">スキームを追加</string>
+    <string name="blocker_settings">設定</string>
+    <string name="blocker_generate">設定を生成</string>
+    <string name="blocker_loading">アプリのルールをスキャン中…</string>
+    <string name="blocker_empty">利用可能なルールが見つかりません</string>
+    <string name="blocker_input_scheme">カスタムスキームを入力</string>
+    <string name="blocker_scheme_invalid">スキームは空にできません</string>
+    <string name="blocker_scheme_duplicate">このスキームは既に存在します</string>
+    <string name="blocker_package_hint">Blockerのパッケージ名</string>
+    <string name="blocker_label_hint">Blocker名</string>
+    <string name="blocker_saved">保存しました</string>
+    <string name="blocker_generate_no_rule">少なくとも1つのルールを選択してください</string>
+    <string name="blocker_generate_success">設定を生成しました</string>
+    <string name="blocker_config_title">ブロック設定</string>
+    <string name="blocker_group_subtitle">%1$d/%2$d 選択済み</string>
+    <string name="blocker_group_subtitle_with_pkg">%1$s · %2$d/%3$d 選択済み</string>
+    <string name="blocker_rule_activity">アクティビティ: %1$s</string>
     <string name="blocker_rule_match">scheme=%1$s host=%2$s path=%3$s</string>
-    <string name="blocker_template_missing">未找到模板 APK，请确认 assets/blocker/blocker_template.apk 已存在</string>
-    <string name="blocker_build">生成拦截器</string>
-    <string name="blocker_build_prepared">已准备打包数据</string>
-    <string name="blocker_building">正在生成拦截器…</string>
-    <string name="blocker_build_done">拦截器已生成，准备安装</string>
-    <string name="blocker_install_permission_required">请先允许本应用安装未知应用</string>
+    <string name="blocker_template_missing">テンプレートAPKが見つかりません。assets/blocker/blocker_template.apkが存在することを確認してください</string>
+    <string name="blocker_build">ブロッカーを生成</string>
+    <string name="blocker_build_prepared">パッケージデータの準備ができました</string>
+    <string name="blocker_building">ブロッカーを生成中…</string>
+    <string name="blocker_build_done">ブロッカーが生成されました。インストール準備完了</string>
+    <string name="blocker_install_permission_required">本アプリが不明なアプリをインストールすることを先に許可してください</string>
 
-    <string name="menu_history">历史更新</string>
-    <string name="menu_feedback">问题反馈</string>
+    <string name="menu_history">更新履歴</string>
+    <string name="menu_feedback">問題フィードバック</string>
 
-    <string name="history_loading">正在加载历史更新…</string>
-    <string name="history_empty">暂无历史更新</string>
-    <string name="history_error">加载失败：%1$s</string>
-    <string name="history_published_at">发布时间：%1$s</string>
+    <string name="history_loading">更新履歴を読み込み中…</string>
+    <string name="history_empty">更新履歴はありません</string>
+    <string name="history_error">読み込み失敗: %1$s</string>
+    <string name="history_published_at">公開日: %1$s</string>
 
-    <string name="update_found_title">发现新版本</string>
-    <string name="update_current_latest">当前版本：v%1$s\n最新版本：v%2$s</string>
+    <string name="update_found_title">新バージョンが見つかりました</string>
+    <string name="update_current_latest">現在のバージョン: v%1$s\n最新バージョン: v%2$s</string>
     <string name="update_action_now">更新</string>
-    <string name="update_action_later">稍后</string>
-    <string name="update_download_start">开始下载更新…</string>
-    <string name="update_download_done">下载完成，准备安装</string>
-    <string name="update_download_failed">下载失败：%1$s</string>
-    <string name="update_download_url_missing">未找到可用的 APK 下载地址</string>
-    <string name="update_install_failed">无法拉起安装器</string>
-    <string name="update_no_changelog">暂无更新说明</string>
+    <string name="update_action_later">後で</string>
+    <string name="update_download_start">アップデートのダウンロードを開始…</string>
+    <string name="update_download_done">ダウンロード完了、インストール準備中</string>
+    <string name="update_download_failed">ダウンロード失敗: %1$s</string>
+    <string name="update_download_url_missing">利用可能なAPKダウンロードURLが見つかりません</string>
+    <string name="update_install_failed">インストーラを起動できません</string>
+    <string name="update_no_changelog">更新内容はありません</string>
 
-    <string name="legal_notice_title">法律声明与使用协议</string>
-    <string name="legal_notice_agree">我已阅读并同意</string>
-    <string name="legal_notice_disagree">不同意并退出</string>
+    <string name="legal_notice_title">法的通知と利用規約</string>
+    <string name="legal_notice_agree">読み、同意します</string>
+    <string name="legal_notice_disagree">同意せずに終了</string>
 
-    <string name="legal_notice_content"><![CDATA[
-法律声明与使用协议
-
-项目性质声明
-本工具为技术研究性质的开源项目，仅用于：
-安卓系统合法授权范围内的通信机制分析
-应用开发调试过程中的合法数据监测
-网络安全领域的授权渗透测试
-计算机技术教学研究场景
-
-禁止性条款
-使用者承诺不会用于以下场景：
-未经授权的数据抓取（《网络安全法》第27条）
-实施网络入侵、破坏系统安全（《刑法》第285、286条）
-制作/传播恶意程序（《刑法》第285条第三款）
-任何形式的黑灰产、电信诈骗等违法活动
-侵犯他人隐私或商业秘密（《民法典》第1032条）
-
-责任豁免
-开发者声明：
-本工具不包含任何诱导/教唆违法使用的设计
-不对使用者行为承担连带责任（《民法典》第1195条）
-已尽合理注意义务提供技术警示
-保留对滥用者的法律追诉权利
-
-使用约束
-使用者须知：
-必须遵守《数据安全法》《个人信息保护法》等法律法规
-须获得被监测主体的明确书面授权
-禁止将工具用于生产环境监控
-需自行承担所有法律后果
-
-附加保护措施
-开发者已采取的风险防控措施：
-项目采用[GPL3]开源协议，禁止商业滥用
-    ]]></string>
+    <string name="disabled_string">インテントを無効にするにはバッテリー最適化が必要です。そうしないと、JumpReplayが起動していないためにインテントの無効化が失敗する可能性があります。</string>
 
 </resources>

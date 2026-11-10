@@ -58,7 +58,7 @@ public class HistoryFragment extends Fragment {
         emptyView.setVisibility(View.VISIBLE);
         emptyView.setText(getString(R.string.history_loading));
 
-        networkClient.getReleases(Constants.GitHub_RELEASES_URL, new NetworkClient.ReleaseListCallback() {
+        networkClient.getReleasesCached(requireContext(), Constants.GitHub_RELEASES_URL, false, new NetworkClient.ReleaseListCallback() {
             @Override
             public void onSuccess(List<ReleaseInfo> releases) {
                 progressBar.setVisibility(View.GONE);

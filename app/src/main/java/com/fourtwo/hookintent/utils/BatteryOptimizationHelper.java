@@ -1,14 +1,28 @@
 package com.fourtwo.hookintent.utils;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.text.method.ScrollingMovementMethod;
+import android.view.Gravity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.TextView;
 
-import androidx.appcompat.app.AlertDialog;
+import com.fourtwo.hookintent.R;
 
 public class BatteryOptimizationHelper {
 
@@ -31,24 +45,54 @@ public class BatteryOptimizationHelper {
     }
 
     public void showSimpleDialog(String message) {
-        // 创建 AlertDialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        if (!(context instanceof Activity)) {
+            requestIgnoreBatteryOptimizations();
+            return;
+        }
 
-        // 设置弹窗的文本内容
-        builder.setMessage(message);
+        Activity activity = (Activity) context;
+        if (activity.isFinishing()) {
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed()) {
+            return;
+        }
 
-        // 设置弹窗的「确定」按钮
-        builder.setPositiveButton("确定", (dialog, which) -> {
-            // 用户点击「确定」按钮后的逻辑
-            dialog.dismiss(); // 关闭弹窗
+        View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_battery_optimization, null);
+        TextView textMessage = dialogView.findViewById(R.id.text_message);
+        Button buttonConfirm = dialogView.findViewById(R.id.button_confirm);
+
+        textMessage.setText(message);
+        textMessage.setTextIsSelectable(false);
+        textMessage.setLongClickable(false);
+        textMessage.setClickable(false);
+        textMessage.setFocusable(false);
+        textMessage.setMovementMethod(new ScrollingMovementMethod());
+        textMessage.setVerticalScrollBarEnabled(true);
+        textMessage.setScrollbarFadingEnabled(false);
+
+        AlertDialog dialog = new AlertDialog.Builder(activity)
+                .setView(dialogView)
+                .setCancelable(false)
+                .create();
+
+        dialog.setCanceledOnTouchOutside(false);
+
+        buttonConfirm.setOnClickListener(v -> {
+            dialog.dismiss();
             requestIgnoreBatteryOptimizations();
         });
 
-        // 设置弹窗不可取消（点击外部不会关闭弹窗）
-        builder.setCancelable(false);
+        dialog.show();
 
-        // 显示弹窗
-        builder.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setLayout(
+                    (int) (activity.getResources().getDisplayMetrics().widthPixels * 0.90f),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
     }
 
     public void requestIgnoreBatteryOptimizations() {
@@ -79,6 +123,10 @@ public class BatteryOptimizationHelper {
         intent.setComponent(new ComponentName(packageName, activityDir));
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(intent);
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * context.getResources().getDisplayMetrics().density);
     }
 
     // 华为
@@ -185,5 +233,4 @@ public class BatteryOptimizationHelper {
     public void goSmartisanSetting() {
         showActivity("com.smartisanos.security");
     }
-
 }

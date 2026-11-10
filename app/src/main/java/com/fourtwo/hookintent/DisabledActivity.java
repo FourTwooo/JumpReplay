@@ -8,9 +8,14 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
-import android.view.MotionEvent;
 import android.widget.EditText;
 import android.widget.Toast;
+import android.graphics.drawable.GradientDrawable;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -53,7 +58,7 @@ public class DisabledActivity extends AppCompatActivity {
         if (!batteryHelper.isIgnoringBatteryOptimizations()) {
             Log.i(TAG, "不在白名单中");
             // 跳转到电池优化设置页面
-            batteryHelper.showSimpleDialog("禁用意图需要电池优化,否则会出现JumpReplay未启动导致意图禁用失效.");
+            batteryHelper.showSimpleDialog(getString(R.string.disabled_string));
         } else {
             Log.i(TAG, "在白名单中");
         }
@@ -102,73 +107,191 @@ public class DisabledActivity extends AppCompatActivity {
         return true; // 返回 true 以显示菜单
     }
 
-    @SuppressLint({"NotifyDataSetChanged", "ClickableViewAccessibility"})
+    private void updateRegexToggle(ImageView regexToggle, TextView modeText, boolean enabled) {
+        Drawable drawable = ContextCompat.getDrawable(this, R.drawable.regex);
+        if (drawable != null) {
+            drawable = DrawableCompat.wrap(drawable.mutate());
+            DrawableCompat.setTint(
+                    drawable,
+                    android.graphics.Color.parseColor(enabled ? "#2E6EF7" : "#6B7280")
+            );
+            regexToggle.setImageDrawable(drawable);
+        }
+
+        modeText.setText(enabled ? "正则匹配已启用" : "普通匹配");
+        modeText.setTextColor(android.graphics.Color.parseColor(enabled ? "#2E6EF7" : "#6B7280"));
+    }
+
+    private Button createDialogActionButton(String text, String fillColor, String strokeColor, String textColor) {
+        Button button = new Button(this);
+        button.setText(text);
+        button.setAllCaps(false);
+        button.setMinWidth(dp(78));
+        button.setPadding(dp(20), 0, dp(20), 0);
+        button.setTextSize(14);
+        button.setTypeface(null, android.graphics.Typeface.BOLD);
+        button.setTextColor(android.graphics.Color.parseColor(textColor));
+        button.setBackground(createRoundRect(fillColor, strokeColor, 999));
+        return button;
+    }
+
+    private GradientDrawable createRoundRect(String fillColor, String strokeColor, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setColor(android.graphics.Color.parseColor(fillColor));
+        drawable.setCornerRadius(dp(radiusDp));
+        if (strokeColor != null) {
+            drawable.setStroke(dp(1), android.graphics.Color.parseColor(strokeColor));
+        }
+        return drawable;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+    @SuppressLint("NotifyDataSetChanged")
     private void showAddTextDialog() {
-        // 创建一个 AlertDialog.Builder 用于构建对话框
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Add Scheme");
+        final boolean[] isRegex = {false};
 
-        // 创建 EditText
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(18), dp(18), dp(18), dp(18));
+        root.setBackground(createRoundRect("#FCFCFD", "#ECEEF2", 24));
+
+        TextView title = new TextView(this);
+        title.setText("添加 Scheme");
+        title.setTextSize(17);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(android.graphics.Color.parseColor("#1F2937"));
+        root.addView(title);
+
+        LinearLayout inputBox = new LinearLayout(this);
+        inputBox.setOrientation(LinearLayout.HORIZONTAL);
+        inputBox.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        inputBox.setBackground(createRoundRect("#F3F4F6", "#F3F4F6", 18));
+        inputBox.setPadding(dp(14), dp(8), dp(12), dp(8));
+
+        LinearLayout.LayoutParams inputBoxLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        inputBoxLp.topMargin = dp(14);
+        root.addView(inputBox, inputBoxLp);
+
         final EditText input = new EditText(this);
+        input.setHint("输入 Scheme 或正则");
+        input.setBackground(null);
+        input.setTextSize(14);
+        input.setHintTextColor(android.graphics.Color.parseColor("#9CA3AF"));
+        input.setTextColor(android.graphics.Color.parseColor("#1F2937"));
+        input.setSingleLine(true);
+        input.setPadding(0, dp(6), 0, dp(6));
 
-        // 设置右侧图标
-        input.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.pattern, 0);
+        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        );
+        inputBox.addView(input, inputLp);
 
-        // 设置图标是否为正则表达式的标志
-        final boolean[] isRegex = {false}; // 默认不是正则
+        ImageView regexToggle = new ImageView(this);
+        regexToggle.setPadding(dp(8), dp(8), dp(8), dp(8));
+        inputBox.addView(regexToggle, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
 
-        // 优化点击事件，通过 Drawable 的位置直接判断点击
-        input.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                // 获取 Drawable 的位置
-                if (input.getCompoundDrawables()[2] != null) { // 确保右侧 Drawable 存在
-                    int drawableStart = input.getWidth() - input.getPaddingRight() - input.getCompoundDrawables()[2].getBounds().width();
-                    if (event.getX() >= drawableStart) {
-                        // 点击了右侧图标，切换颜色
-                        isRegex[0] = !isRegex[0]; // 切换正则状态
-                        Drawable drawable = input.getCompoundDrawables()[2]; // 获取右侧 Drawable
-                        if (drawable != null) {
-                            drawable = DrawableCompat.wrap(drawable); // 包装 Drawable 以支持修改颜色
-                            if (isRegex[0]) {
-                                DrawableCompat.setTint(drawable, ContextCompat.getColor(this, R.color.black)); // 设置激活状态颜色
-                                Toast.makeText(getApplicationContext(), "正则模式已启用", Toast.LENGTH_SHORT).show();
-                            } else {
-                                DrawableCompat.setTint(drawable, ContextCompat.getColor(this, R.color.teal_700)); // 设置默认颜色
-                                Toast.makeText(getApplicationContext(), "正则模式已关闭", Toast.LENGTH_SHORT).show();
-                            }
-                            input.setCompoundDrawablesWithIntrinsicBounds(null, null, drawable, null); // 更新 Drawable
-                        }
+        TextView modeText = new TextView(this);
+        modeText.setTextSize(12);
+        modeText.setTextColor(android.graphics.Color.parseColor("#6B7280"));
+        LinearLayout.LayoutParams modeLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        modeLp.topMargin = dp(8);
+        root.addView(modeText, modeLp);
 
-                        return true; // 事件已处理
-                    }
-                }
-            }
-            return false; // 未处理的事件继续传递
+        updateRegexToggle(regexToggle, modeText, isRegex[0]);
+
+        regexToggle.setOnClickListener(v -> {
+            isRegex[0] = !isRegex[0];
+            updateRegexToggle(regexToggle, modeText, isRegex[0]);
         });
 
-        // 添加到对话框中
-        builder.setView(input);
+        LinearLayout buttonRow = new LinearLayout(this);
+        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
+        buttonRow.setGravity(android.view.Gravity.CENTER);
 
-        // 设置对话框的按钮
-        builder.setPositiveButton("OK", (dialog, which) -> {
+        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        rowLp.topMargin = dp(18);
+        root.addView(buttonRow, rowLp);
+
+        Button cancelButton = createDialogActionButton(
+                "取消",
+                "#F3F4F6",
+                "#E6E8EC",
+                "#6B7280"
+        );
+
+        Button confirmButton = createDialogActionButton(
+                "确定",
+                "#EAF1FF",
+                "#D6E4FF",
+                "#2E6EF7"
+        );
+
+        LinearLayout.LayoutParams cancelLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(38)
+        );
+        cancelLp.rightMargin = dp(8);
+
+        LinearLayout.LayoutParams confirmLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(38)
+        );
+        confirmLp.leftMargin = dp(8);
+
+        buttonRow.addView(cancelButton, cancelLp);
+        buttonRow.addView(confirmButton, confirmLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setView(root)
+                .create();
+
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setCancelable(true);
+
+        cancelButton.setOnClickListener(v -> dialog.dismiss());
+
+        confirmButton.setOnClickListener(v -> {
             String newText = input.getText().toString().trim();
-            if (!newText.isEmpty()) {
-                // 创建新的条目
-                Map<String, Object> newItem = new HashMap<>();
-                newItem.put("text", newText);
-                newItem.put("re", isRegex[0]);
-                newItem.put("open", true);
-
-                // 添加到适配器数据集
-                addDataToRecyclerView(newItem);
-
+            if (newText.isEmpty()) {
+                Toast.makeText(this, "Scheme 不能为空", Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            Map<String, Object> newItem = new HashMap<>();
+            newItem.put("text", newText);
+            newItem.put("re", isRegex[0]);
+            newItem.put("open", true);
+
+            addDataToRecyclerView(newItem);
+            dialog.dismiss();
         });
 
-        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+        dialog.show();
 
-        // 显示对话框
-        builder.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            dialog.getWindow().setLayout(
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.90f),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
     }
 
     /**

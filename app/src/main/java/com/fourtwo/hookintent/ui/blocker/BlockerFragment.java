@@ -16,6 +16,9 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.widget.LinearLayout;
 
 import com.android.apksig.ApkVerifier;
 import androidx.annotation.NonNull;
@@ -56,6 +59,104 @@ public class BlockerFragment extends Fragment {
     private final List<BlockerGroup> groups = new ArrayList<>();
     private BlockerExpandableAdapter adapter;
 
+    private LinearLayout createDialogRoot() {
+        LinearLayout root = new LinearLayout(requireContext());
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(18), dp(18), dp(18), dp(18));
+        root.setBackground(createRoundRect("#FCFCFD", "#ECEEF2", 24));
+        return root;
+    }
+
+    private TextView createDialogTitle(String text) {
+        TextView title = new TextView(requireContext());
+        title.setText(text);
+        title.setTextSize(17);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        title.setTextColor(android.graphics.Color.parseColor("#1F2937"));
+        return title;
+    }
+
+    private TextView createDialogFieldLabel(String text) {
+        TextView label = new TextView(requireContext());
+        label.setText(text);
+        label.setTextSize(12);
+        label.setTextColor(android.graphics.Color.parseColor("#6B7280"));
+        return label;
+    }
+
+    private EditText createDialogInput(String hint) {
+        EditText input = new EditText(requireContext());
+        input.setHint(hint);
+        input.setBackground(null);
+        input.setTextSize(14);
+        input.setHintTextColor(android.graphics.Color.parseColor("#9CA3AF"));
+        input.setTextColor(android.graphics.Color.parseColor("#1F2937"));
+        input.setSingleLine(true);
+        input.setPadding(0, dp(6), 0, dp(6));
+        return input;
+    }
+
+    private LinearLayout wrapDialogInput(EditText input) {
+        LinearLayout inputBox = new LinearLayout(requireContext());
+        inputBox.setOrientation(LinearLayout.HORIZONTAL);
+        inputBox.setGravity(Gravity.CENTER_VERTICAL);
+        inputBox.setBackground(createRoundRect("#F3F4F6", "#F3F4F6", 18));
+        inputBox.setPadding(dp(14), dp(8), dp(12), dp(8));
+
+        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        inputBox.addView(input, inputLp);
+        return inputBox;
+    }
+
+    private LinearLayout createDialogButtonRow() {
+        LinearLayout row = new LinearLayout(requireContext());
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        return row;
+    }
+
+    private Button createDialogActionButton(String text, String fillColor, String strokeColor, String textColor) {
+        Button button = new Button(requireContext());
+        button.setText(text);
+        button.setAllCaps(false);
+        button.setMinWidth(dp(78));
+        button.setPadding(dp(20), 0, dp(20), 0);
+        button.setTextSize(14);
+        button.setTypeface(null, android.graphics.Typeface.BOLD);
+        button.setTextColor(android.graphics.Color.parseColor(textColor));
+        button.setBackground(createRoundRect(fillColor, strokeColor, 999));
+        return button;
+    }
+
+    private GradientDrawable createRoundRect(String fillColor, String strokeColor, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setShape(GradientDrawable.RECTANGLE);
+        drawable.setColor(android.graphics.Color.parseColor(fillColor));
+        drawable.setCornerRadius(dp(radiusDp));
+        if (strokeColor != null) {
+            drawable.setStroke(dp(1), android.graphics.Color.parseColor(strokeColor));
+        }
+        return drawable;
+    }
+
+    private void applyDialogWindow(AlertDialog dialog) {
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(
+                    new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
+            );
+            dialog.getWindow().setLayout(
+                    (int) (getResources().getDisplayMetrics().widthPixels * 0.90f),
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+        }
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
     private String diagnoseBuiltApk(File apkFile) {
         StringBuilder sb = new StringBuilder();
 
@@ -185,87 +286,219 @@ public class BlockerFragment extends Fragment {
     }
 
     private void showAddSchemeDialog() {
-        final EditText input = new EditText(requireContext());
-        input.setHint(getString(R.string.blocker_input_scheme));
+        LinearLayout root = createDialogRoot();
 
-        new AlertDialog.Builder(requireContext())
-                .setTitle(R.string.blocker_add_scheme)
-                .setView(input)
-                .setPositiveButton(R.string.ok, (dialog, which) -> {
-                    String scheme = safe(input.getText().toString());
-                    if (scheme.isEmpty()) {
-                        Toast.makeText(requireContext(), R.string.blocker_scheme_invalid, Toast.LENGTH_SHORT).show();
-                        return;
-                    }
+        TextView title = createDialogTitle(getString(R.string.blocker_add_scheme));
+        root.addView(title);
 
-                    BlockerGroup customGroup = findCustomGroup();
-                    if (customGroup == null) {
-                        return;
-                    }
+        EditText input = createDialogInput(getString(R.string.blocker_input_scheme));
+        LinearLayout inputBox = wrapDialogInput(input);
 
-                    DeepLinkRule newRule = new DeepLinkRule(
-                            CUSTOM_GROUP_PACKAGE,
-                            getString(R.string.blocker_custom_group),
-                            "",
-                            scheme,
-                            "",
-                            "",
-                            "",
-                            "",
-                            ""
-                    );
-                    newRule.setSelected(true);
+        LinearLayout.LayoutParams inputBoxLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        inputBoxLp.topMargin = dp(14);
+        root.addView(inputBox, inputBoxLp);
 
-                    for (DeepLinkRule rule : customGroup.getRules()) {
-                        if (rule.sameAs(newRule)) {
-                            Toast.makeText(requireContext(), R.string.blocker_scheme_duplicate, Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                    }
+        LinearLayout buttonRow = createDialogButtonRow();
+        LinearLayout.LayoutParams buttonRowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        buttonRowLp.topMargin = dp(18);
+        root.addView(buttonRow, buttonRowLp);
 
-                    customGroup.getRules().add(newRule);
-                    saveCustomRules(customGroup.getRules());
-                    adapter.submit(groups);
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        Button cancelButton = createDialogActionButton(
+                getString(R.string.cancel),
+                "#F3F4F6",
+                "#E6E8EC",
+                "#6B7280"
+        );
+
+        Button confirmButton = createDialogActionButton(
+                getString(R.string.ok),
+                "#EAF1FF",
+                "#D6E4FF",
+                "#2E6EF7"
+        );
+
+        LinearLayout.LayoutParams cancelLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(38)
+        );
+        cancelLp.rightMargin = dp(8);
+
+        LinearLayout.LayoutParams confirmLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(38)
+        );
+        confirmLp.leftMargin = dp(8);
+
+        buttonRow.addView(cancelButton, cancelLp);
+        buttonRow.addView(confirmButton, confirmLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setView(root)
+                .create();
+
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setCancelable(true);
+
+        cancelButton.setOnClickListener(v -> dialog.dismiss());
+
+        confirmButton.setOnClickListener(v -> {
+            String scheme = safe(input.getText().toString());
+            if (scheme.isEmpty()) {
+                Toast.makeText(requireContext(), R.string.blocker_scheme_invalid, Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            BlockerGroup customGroup = findCustomGroup();
+            if (customGroup == null) {
+                return;
+            }
+
+            DeepLinkRule newRule = new DeepLinkRule(
+                    CUSTOM_GROUP_PACKAGE,
+                    getString(R.string.blocker_custom_group),
+                    "",
+                    scheme,
+                    "",
+                    "",
+                    "",
+                    "",
+                    ""
+            );
+            newRule.setSelected(true);
+
+            for (DeepLinkRule rule : customGroup.getRules()) {
+                if (rule.sameAs(newRule)) {
+                    Toast.makeText(requireContext(), R.string.blocker_scheme_duplicate, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+            }
+
+            customGroup.getRules().add(newRule);
+            saveCustomRules(customGroup.getRules());
+            adapter.submit(groups);
+            dialog.dismiss();
+        });
+
+        dialog.show();
+        applyDialogWindow(dialog);
     }
 
     private void showBlockerSettingsDialog() {
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_custom_view_blocker, null);
+        LinearLayout root = createDialogRoot();
 
-        EditText inputPackage = dialogView.findViewById(R.id.edit_input_1);
-        EditText inputLabel = dialogView.findViewById(R.id.edit_input_2);
+        TextView title = createDialogTitle(getString(R.string.blocker_settings));
+        root.addView(title);
 
-        inputPackage.setHint(getString(R.string.blocker_package_hint));
-        inputLabel.setHint(getString(R.string.blocker_label_hint));
+        TextView packageLabel = createDialogFieldLabel(getString(R.string.blocker_package_hint));
+        LinearLayout.LayoutParams packageLabelLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        packageLabelLp.topMargin = dp(14);
+        root.addView(packageLabel, packageLabelLp);
 
+        EditText inputPackage = createDialogInput(getString(R.string.blocker_package_hint));
         inputPackage.setText(getBlockerPackage());
+        LinearLayout packageBox = wrapDialogInput(inputPackage);
+        LinearLayout.LayoutParams packageBoxLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        packageBoxLp.topMargin = dp(8);
+        root.addView(packageBox, packageBoxLp);
+
+        TextView labelLabel = createDialogFieldLabel(getString(R.string.blocker_label_hint));
+        LinearLayout.LayoutParams labelLabelLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        labelLabelLp.topMargin = dp(14);
+        root.addView(labelLabel, labelLabelLp);
+
+        EditText inputLabel = createDialogInput(getString(R.string.blocker_label_hint));
         inputLabel.setText(getBlockerLabel());
+        LinearLayout labelBox = wrapDialogInput(inputLabel);
+        LinearLayout.LayoutParams labelBoxLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        labelBoxLp.topMargin = dp(8);
+        root.addView(labelBox, labelBoxLp);
 
-        new AlertDialog.Builder(requireContext())
-                .setTitle(R.string.blocker_settings)
-                .setView(dialogView)
-                .setPositiveButton(R.string.ok, (dialog, which) -> {
-                    String blockerPackage = safe(inputPackage.getText().toString());
-                    String blockerLabel = safe(inputLabel.getText().toString());
+        LinearLayout buttonRow = createDialogButtonRow();
+        LinearLayout.LayoutParams buttonRowLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        buttonRowLp.topMargin = dp(18);
+        root.addView(buttonRow, buttonRowLp);
 
-                    SharedPreferencesUtils.putStr(
-                            requireContext(),
-                            Constants.BLOCKER_OUTPUT_PACKAGE,
-                            blockerPackage.isEmpty() ? DEFAULT_BLOCKER_PACKAGE : blockerPackage
-                    );
+        Button cancelButton = createDialogActionButton(
+                getString(R.string.cancel),
+                "#F3F4F6",
+                "#E6E8EC",
+                "#6B7280"
+        );
 
-                    SharedPreferencesUtils.putStr(
-                            requireContext(),
-                            Constants.BLOCKER_OUTPUT_LABEL,
-                            blockerLabel.isEmpty() ? DEFAULT_BLOCKER_LABEL : blockerLabel
-                    );
+        Button confirmButton = createDialogActionButton(
+                getString(R.string.ok),
+                "#EAF1FF",
+                "#D6E4FF",
+                "#2E6EF7"
+        );
 
-                    Toast.makeText(requireContext(), R.string.blocker_saved, Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        LinearLayout.LayoutParams cancelLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(38)
+        );
+        cancelLp.rightMargin = dp(8);
+
+        LinearLayout.LayoutParams confirmLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(38)
+        );
+        confirmLp.leftMargin = dp(8);
+
+        buttonRow.addView(cancelButton, cancelLp);
+        buttonRow.addView(confirmButton, confirmLp);
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setView(root)
+                .create();
+
+        dialog.setCanceledOnTouchOutside(true);
+        dialog.setCancelable(true);
+
+        cancelButton.setOnClickListener(v -> dialog.dismiss());
+
+        confirmButton.setOnClickListener(v -> {
+            String blockerPackage = safe(inputPackage.getText().toString());
+            String blockerLabel = safe(inputLabel.getText().toString());
+
+            SharedPreferencesUtils.putStr(
+                    requireContext(),
+                    Constants.BLOCKER_OUTPUT_PACKAGE,
+                    blockerPackage.isEmpty() ? DEFAULT_BLOCKER_PACKAGE : blockerPackage
+            );
+
+            SharedPreferencesUtils.putStr(
+                    requireContext(),
+                    Constants.BLOCKER_OUTPUT_LABEL,
+                    blockerLabel.isEmpty() ? DEFAULT_BLOCKER_LABEL : blockerLabel
+            );
+
+            Toast.makeText(requireContext(), R.string.blocker_saved, Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+        });
+
+        dialog.show();
+        applyDialogWindow(dialog);
     }
 
     private void buildBlocker() {
@@ -369,19 +602,6 @@ public class BlockerFragment extends Fragment {
             return true;
         } catch (Exception e) {
             return false;
-        }
-    }
-
-    private void copyAssetToFile(String assetPath, File outFile) throws Exception {
-        try (InputStream inputStream = requireContext().getAssets().open(assetPath);
-             FileOutputStream outputStream = new FileOutputStream(outFile)) {
-
-            byte[] buffer = new byte[8192];
-            int len;
-            while ((len = inputStream.read(buffer)) != -1) {
-                outputStream.write(buffer, 0, len);
-            }
-            outputStream.flush();
         }
     }
 

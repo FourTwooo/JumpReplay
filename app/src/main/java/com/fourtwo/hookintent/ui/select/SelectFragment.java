@@ -22,6 +22,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.utils.StyledInputDialogHelper;
 
 import java.util.HashMap;
 import java.util.List;
@@ -36,33 +37,25 @@ public class SelectFragment extends Fragment {
 
     @SuppressLint("NotifyDataSetChanged")
     private void showAddTextDialog() {
-        // 创建一个 AlertDialog.Builder 用于构建对话框
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
-        builder.setTitle("Add Text");
+        StyledInputDialogHelper.showSingleInputDialog(
+                requireContext(),
+                "Add Text",
+                "请输入内容",
+                null,
+                (newText, dialog) -> {
+                    if (newText.isEmpty()) {
+                        return;
+                    }
 
-        // 设置输入框到对话框
-        final EditText input = new EditText(requireContext());
-        builder.setView(input);
+                    Map<String, Object> newItem = new HashMap<>();
+                    newItem.put("text", newText);
+                    newItem.put("type", false);
 
-        // 设置对话框的按钮
-        builder.setPositiveButton("OK", (dialog, which) -> {
-            String newText = input.getText().toString().trim();
-            if (!newText.isEmpty()) {
-                // 创建新的条目
-                Map<String, Object> newItem = new HashMap<>();
-                newItem.put("text", newText);
-                newItem.put("type", false); // 默认未选中
-
-                // 添加到适配器数据集
-                adapter.addItem(newItem);
-                adapter.notifyDataSetChanged();
-            }
-        });
-
-        builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
-
-        // 显示对话框
-        builder.show();
+                    adapter.addItem(newItem);
+                    adapter.notifyDataSetChanged();
+                    dialog.dismiss();
+                }
+        );
     }
 
     @Override

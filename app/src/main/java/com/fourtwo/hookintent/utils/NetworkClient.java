@@ -1,15 +1,17 @@
 package com.fourtwo.hookintent.utils;
 
+import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+
 import androidx.annotation.NonNull;
 
+import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ReleaseInfo;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import android.os.Handler;
-import android.os.Looper;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -193,49 +195,79 @@ public class NetworkClient {
 
                 try {
                     String responseData = response.body().string();
-                    JSONArray array = new JSONArray(responseData);
-                    List<ReleaseInfo> releases = new ArrayList<>();
+                    List<ReleaseInfo> releases = parseReleases(responseData);
+                    mainHandler.post(() -> callback.onSuccess(releases));
+                } catch (JSONException e) {
+                    mainHandler.post(() -> callback.onFailure("解析JSON失败：" + e.getMessage()));
+                }
+            }
+        });
+    }
 
-                    for (int i = 0; i < array.length(); i++) {
-                        JSONObject obj = array.getJSONObject(i);
+    public void getReleasesCached(Context context, String url, boolean forceRefresh, ReleaseListCallback callback) {
+        String cachedJson = SharedPreferencesUtils.getStr(context, Constants.RELEASES_CACHE_JSON);
+        long cachedTime = parseLongSafely(SharedPreferencesUtils.getStr(context, Constants.RELEASES_CACHE_TIME));
+        long now = System.currentTimeMillis();
 
-                        String tagName = obj.optString("tag_name", "");
-                        String name = obj.optString("name", "");
-                        String body = obj.optString("body", "");
-                        String publishedAt = obj.optString("published_at", "");
-                        boolean prerelease = obj.optBoolean("prerelease", false);
-                        boolean draft = obj.optBoolean("draft", false);
+        boolean hasCache = cachedJson != null && !cachedJson.trim().isEmpty();
+        boolean cacheFresh = hasCache && (now - cachedTime) < Constants.RELEASES_CACHE_EXPIRE_MS;
 
-                        String downloadUrl = "";
-                        JSONArray assets = obj.optJSONArray("assets");
-                        if (assets != null) {
-                            for (int j = 0; j < assets.length(); j++) {
-                                JSONObject asset = assets.getJSONObject(j);
-                                String assetName = asset.optString("name", "");
-                                String contentType = asset.optString("content_type", "");
-                                String browserDownloadUrl = asset.optString("browser_download_url", "");
+        if (!forceRefresh && cacheFresh) {
+            try {
+                List<ReleaseInfo> releases = parseReleases(cachedJson);
+                mainHandler.post(() -> callback.onSuccess(releases));
+                return;
+            } catch (JSONException ignored) {
+            }
+        }
 
-                                if ("application/vnd.android.package-archive".equals(contentType)
-                                        || assetName.endsWith(".apk")) {
-                                    downloadUrl = browserDownloadUrl;
-                                    break;
-                                }
-                            }
-                        }
-
-                        releases.add(new ReleaseInfo(
-                                tagName,
-                                name,
-                                body,
-                                downloadUrl,
-                                publishedAt,
-                                prerelease,
-                                draft
-                        ));
+        Request request = buildJsonRequest(url);
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                if (hasCache) {
+                    try {
+                        List<ReleaseInfo> releases = parseReleases(cachedJson);
+                        mainHandler.post(() -> callback.onSuccess(releases));
+                        return;
+                    } catch (JSONException ignored) {
                     }
+                }
+                mainHandler.post(() -> callback.onFailure("请求失败：" + e.getMessage()));
+            }
+
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                if (!response.isSuccessful() || response.body() == null) {
+                    if (hasCache) {
+                        try {
+                            List<ReleaseInfo> releases = parseReleases(cachedJson);
+                            mainHandler.post(() -> callback.onSuccess(releases));
+                            return;
+                        } catch (JSONException ignored) {
+                        }
+                    }
+                    mainHandler.post(() -> callback.onFailure("请求失败，响应不成功"));
+                    return;
+                }
+
+                try {
+                    String responseData = response.body().string();
+                    List<ReleaseInfo> releases = parseReleases(responseData);
+
+                    SharedPreferencesUtils.putStr(context, Constants.RELEASES_CACHE_JSON, responseData);
+                    SharedPreferencesUtils.putStr(context, Constants.RELEASES_CACHE_TIME, String.valueOf(System.currentTimeMillis()));
 
                     mainHandler.post(() -> callback.onSuccess(releases));
                 } catch (JSONException e) {
+                    if (hasCache) {
+                        try {
+                            List<ReleaseInfo> releases = parseReleases(cachedJson);
+                            mainHandler.post(() -> callback.onSuccess(releases));
+                            return;
+                        } catch (JSONException ignored) {
+                        }
+                    }
                     mainHandler.post(() -> callback.onFailure("解析JSON失败：" + e.getMessage()));
                 }
             }
@@ -291,6 +323,62 @@ public class NetworkClient {
                 }
             }
         });
+    }
+
+    private List<ReleaseInfo> parseReleases(String responseData) throws JSONException {
+        JSONArray array = new JSONArray(responseData);
+        List<ReleaseInfo> releases = new ArrayList<>();
+
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject obj = array.getJSONObject(i);
+
+            String tagName = obj.optString("tag_name", "");
+            String name = obj.optString("name", "");
+            String body = obj.optString("body", "");
+            String publishedAt = obj.optString("published_at", "");
+            boolean prerelease = obj.optBoolean("prerelease", false);
+            boolean draft = obj.optBoolean("draft", false);
+
+            String downloadUrl = "";
+            JSONArray assets = obj.optJSONArray("assets");
+            if (assets != null) {
+                for (int j = 0; j < assets.length(); j++) {
+                    JSONObject asset = assets.getJSONObject(j);
+                    String assetName = asset.optString("name", "");
+                    String contentType = asset.optString("content_type", "");
+                    String browserDownloadUrl = asset.optString("browser_download_url", "");
+
+                    if ("application/vnd.android.package-archive".equals(contentType)
+                            || assetName.endsWith(".apk")) {
+                        downloadUrl = browserDownloadUrl;
+                        break;
+                    }
+                }
+            }
+
+            releases.add(new ReleaseInfo(
+                    tagName,
+                    name,
+                    body,
+                    downloadUrl,
+                    publishedAt,
+                    prerelease,
+                    draft
+            ));
+        }
+
+        return releases;
+    }
+
+    private long parseLongSafely(String value) {
+        try {
+            if (value == null || value.trim().isEmpty()) {
+                return 0L;
+            }
+            return Long.parseLong(value.trim());
+        } catch (Exception ignored) {
+            return 0L;
+        }
     }
 
     private String processVersion(String version) {

@@ -45,9 +45,9 @@
     <string name="action_language">Language</string>
     <string name="dialog_select_language">Select language</string>
     <string name="lang_follow_system">Follow system</string>
-    <string name="lang_simplified_chinese">简体中文</string>
+    <string name="lang_simplified_chinese">Simplified Chinese</string>
     <string name="lang_english">English</string>
-    <string name="lang_japan">日本語</string>
+    <string name="lang_japan">Japanese</string>
     <string name="cancel">Cancel</string>
 
     <string name="root_service_available">Root service available</string>
@@ -96,100 +96,65 @@
     <string name="empty_view_not_xposed_text">Module not activated! If using LSPatch, please ignore this</string>
     <string name="open_window_main_switch">Open floating window (restart process to take effect)</string>
     <string name="window_sub_switch">Module floating window switch</string>
-    <string name="pick_color">选择颜色</string>
-    <string name="cloud_empty_view">请输入接口地址并点击请求</string>
-    <string name="button_restore_default_url">恢复默认</string>
-    <string name="button_request_cloud">请求</string>
-    <string name="input_cloud_url">云配置接口地址</string>
-    <string name="cloud_summary">摘要</string>
-    <string name="cloud_remark">备注</string>
-    <string name="cloud_name">配置名称</string>
+    <string name="pick_color">Choose color</string>
+    <string name="cloud_empty_view">Please enter the API URL and click request</string>
+    <string name="button_restore_default_url">Restore default</string>
+    <string name="button_request_cloud">Request</string>
+    <string name="input_cloud_url">Cloud configuration API URL</string>
+    <string name="cloud_summary">Summary</string>
+    <string name="cloud_remark">Remark</string>
+    <string name="cloud_name">Configuration name</string>
 
-    <string name="menu_blocker">拦截</string>
-    <string name="blocker_custom_group">自定义 Scheme</string>
-    <string name="blocker_add_scheme">添加 Scheme</string>
-    <string name="blocker_settings">设置</string>
-    <string name="blocker_generate">生成配置</string>
-    <string name="blocker_loading">正在扫描应用规则...</string>
-    <string name="blocker_empty">未找到可用规则</string>
-    <string name="blocker_input_scheme">输入自定义 scheme</string>
-    <string name="blocker_scheme_invalid">scheme 不能为空</string>
-    <string name="blocker_scheme_duplicate">该 scheme 已存在</string>
-    <string name="blocker_package_hint">Blocker 包名</string>
-    <string name="blocker_label_hint">Blocker 名称</string>
-    <string name="blocker_saved">已保存</string>
-    <string name="blocker_generate_no_rule">请先勾选至少一条规则</string>
-    <string name="blocker_generate_success">配置已生成</string>
-    <string name="blocker_config_title">拦截配置</string>
-    <string name="blocker_group_subtitle">%1$d/%2$d 已选</string>
-    <string name="blocker_group_subtitle_with_pkg">%1$s · %2$d/%3$d 已选</string>
+    <string name="menu_blocker">Block</string>
+    <string name="blocker_custom_group">Custom Scheme</string>
+    <string name="blocker_add_scheme">Add Scheme</string>
+    <string name="blocker_settings">Settings</string>
+    <string name="blocker_generate">Generate configuration</string>
+    <string name="blocker_loading">Scanning app rules...</string>
+    <string name="blocker_empty">No available rules found</string>
+    <string name="blocker_input_scheme">Enter custom scheme</string>
+    <string name="blocker_scheme_invalid">Scheme cannot be empty</string>
+    <string name="blocker_scheme_duplicate">This scheme already exists</string>
+    <string name="blocker_package_hint">Blocker package name</string>
+    <string name="blocker_label_hint">Blocker name</string>
+    <string name="blocker_saved">Saved</string>
+    <string name="blocker_generate_no_rule">Please select at least one rule first</string>
+    <string name="blocker_generate_success">Configuration generated</string>
+    <string name="blocker_config_title">Block configuration</string>
+    <string name="blocker_group_subtitle">%1$d/%2$d selected</string>
+    <string name="blocker_group_subtitle_with_pkg">%1$s · %2$d/%3$d selected</string>
     <string name="blocker_rule_activity">Activity: %1$s</string>
     <string name="blocker_rule_match">scheme=%1$s host=%2$s path=%3$s</string>
-    <string name="blocker_template_missing">未找到模板 APK，请确认 assets/blocker/blocker_template.apk 已存在</string>
-    <string name="blocker_build">生成拦截器</string>
-    <string name="blocker_build_prepared">已准备打包数据</string>
-    <string name="blocker_building">正在生成拦截器...</string>
-    <string name="blocker_build_done">拦截器已生成，准备安装</string>
-    <string name="blocker_install_permission_required">请先允许本应用安装未知应用</string>
+    <string name="blocker_template_missing">Template APK not found, please ensure assets/blocker/blocker_template.apk exists</string>
+    <string name="blocker_build">Generate blocker</string>
+    <string name="blocker_build_prepared">Packing data prepared</string>
+    <string name="blocker_building">Generating blocker...</string>
+    <string name="blocker_build_done">Blocker generated, ready to install</string>
+    <string name="blocker_install_permission_required">Please allow this app to install unknown apps first</string>
 
-    <string name="menu_history">历史更新</string>
-    <string name="menu_feedback">问题反馈</string>
+    <string name="menu_history">Update history</string>
+    <string name="menu_feedback">Feedback</string>
 
-    <string name="history_loading">正在加载历史更新…</string>
-    <string name="history_empty">暂无历史更新</string>
-    <string name="history_error">加载失败：%1$s</string>
-    <string name="history_published_at">发布时间：%1$s</string>
+    <string name="history_loading">Loading update history…</string>
+    <string name="history_empty">No update history</string>
+    <string name="history_error">Load failed: %1$s</string>
+    <string name="history_published_at">Published at: %1$s</string>
 
-    <string name="update_found_title">发现新版本</string>
-    <string name="update_current_latest">当前版本：v%1$s\n最新版本：v%2$s</string>
-    <string name="update_action_now">更新</string>
-    <string name="update_action_later">稍后</string>
-    <string name="update_download_start">开始下载更新…</string>
-    <string name="update_download_done">下载完成，准备安装</string>
-    <string name="update_download_failed">下载失败：%1$s</string>
-    <string name="update_download_url_missing">未找到可用的 APK 下载地址</string>
-    <string name="update_install_failed">无法拉起安装器</string>
-    <string name="update_no_changelog">暂无更新说明</string>
+    <string name="update_found_title">New version found</string>
+    <string name="update_current_latest">Current version: v%1$s\nLatest version: v%2$s</string>
+    <string name="update_action_now">Update</string>
+    <string name="update_action_later">Later</string>
+    <string name="update_download_start">Starting download…</string>
+    <string name="update_download_done">Download complete, ready to install</string>
+    <string name="update_download_failed">Download failed: %1$s</string>
+    <string name="update_download_url_missing">No APK download URL found</string>
+    <string name="update_install_failed">Unable to launch installer</string>
+    <string name="update_no_changelog">No changelog</string>
 
-    <string name="legal_notice_title">法律声明与使用协议</string>
-    <string name="legal_notice_agree">我已阅读并同意</string>
-    <string name="legal_notice_disagree">不同意并退出</string>
+    <string name="legal_notice_title">Legal notice and user agreement</string>
+    <string name="legal_notice_agree">I have read and agree</string>
+    <string name="legal_notice_disagree">Disagree and exit</string>
 
-    <string name="legal_notice_content"><![CDATA[
-法律声明与使用协议
-
-项目性质声明
-本工具为技术研究性质的开源项目，仅用于：
-安卓系统合法授权范围内的通信机制分析
-应用开发调试过程中的合法数据监测
-网络安全领域的授权渗透测试
-计算机技术教学研究场景
-
-禁止性条款
-使用者承诺不会用于以下场景：
-未经授权的数据抓取（《网络安全法》第27条）
-实施网络入侵、破坏系统安全（《刑法》第285、286条）
-制作/传播恶意程序（《刑法》第285条第三款）
-任何形式的黑灰产、电信诈骗等违法活动
-侵犯他人隐私或商业秘密（《民法典》第1032条）
-
-责任豁免
-开发者声明：
-本工具不包含任何诱导/教唆违法使用的设计
-不对使用者行为承担连带责任（《民法典》第1195条）
-已尽合理注意义务提供技术警示
-保留对滥用者的法律追诉权利
-
-使用约束
-使用者须知：
-必须遵守《数据安全法》《个人信息保护法》等法律法规
-须获得被监测主体的明确书面授权
-禁止将工具用于生产环境监控
-需自行承担所有法律后果
-
-附加保护措施
-开发者已采取的风险防控措施：
-项目采用[GPL3]开源协议，禁止商业滥用
-    ]]></string>
+    <string name="disabled_string">Disabling intents requires battery optimization, otherwise intent disabling may fail because JumpReplay is not started.</string>
 
 </resources>

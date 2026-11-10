@@ -46,4 +46,9 @@ public final class Constants {
     public static final String LEGAL_NOTICE_VERSION = "20260324_1";
 
     public static final String UPDATE_APK_FILE_NAME = "JumpReplay_update.apk";
+
+    public static final String RELEASES_CACHE_JSON = "releasesCacheJson";
+    public static final String RELEASES_CACHE_TIME = "releasesCacheTime";
+    public static final long RELEASES_CACHE_EXPIRE_MS = 6L * 60L * 60L * 1000L; // 6小时
+
 }

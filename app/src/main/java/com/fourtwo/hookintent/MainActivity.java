@@ -37,7 +37,9 @@ import com.google.android.material.navigation.NavigationView;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
@@ -62,6 +64,25 @@ public class MainActivity extends AppCompatActivity {
         super.onRestoreInstanceState(savedInstanceState);
     }
 
+    private String readRawText(int resId) {
+        StringBuilder builder = new StringBuilder();
+        try (InputStream inputStream = getResources().openRawResource(resId);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+
+            String line;
+            boolean first = true;
+            while ((line = reader.readLine()) != null) {
+                if (!first) {
+                    builder.append("\n");
+                }
+                builder.append(line);
+                first = false;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "readRawText failed", e);
+        }
+        return builder.toString();
+    }
     public static String getAppVersionName(Context context) {
         String versionName = "";
         try {
@@ -189,11 +210,16 @@ public class MainActivity extends AppCompatActivity {
 
         ScrollView scrollView = new ScrollView(this);
         int padding = dpToPx(20);
+        scrollView.setFillViewport(true);
 
         TextView contentView = new TextView(this);
-        contentView.setText(getString(R.string.legal_notice_content));
+        contentView.setText(readRawText(R.raw.legal_notice));
         contentView.setTextSize(14f);
-        contentView.setTextIsSelectable(true);
+        contentView.setTextIsSelectable(false);
+        contentView.setLongClickable(false);
+        contentView.setClickable(false);
+        contentView.setFocusable(false);
+        contentView.setLineSpacing(0f, 1.25f);
         contentView.setPadding(padding, padding, padding, padding);
 
         scrollView.addView(contentView);
@@ -210,9 +236,7 @@ public class MainActivity extends AppCompatActivity {
                     );
                     onAccepted.run();
                 })
-                .setNegativeButton(R.string.legal_notice_disagree, (d, which) -> {
-                    finishAffinity();
-                })
+                .setNegativeButton(R.string.legal_notice_disagree, (d, which) -> finishAffinity())
                 .create();
 
         dialog.setCanceledOnTouchOutside(false);
@@ -220,7 +244,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkForAppUpdate() {
-        networkClient.getReleases(Constants.GitHub_RELEASES_URL, new NetworkClient.ReleaseListCallback() {
+        networkClient.getReleasesCached(this, Constants.GitHub_RELEASES_URL, false, new NetworkClient.ReleaseListCallback() {
             @Override
             public void onSuccess(List<ReleaseInfo> releases) {
                 ReleaseInfo latest = findLatestStableRelease(releases);

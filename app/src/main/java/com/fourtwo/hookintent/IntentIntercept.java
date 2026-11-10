@@ -33,6 +33,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -311,6 +312,24 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         return bitmap;
     }
 
+    private void showShortcutPermissionGuideDialog(String message) {
+        if (isFinishing()) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && isDestroyed()) {
+            return;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("无法创建桌面快捷方式")
+                .setMessage(message + "\n\n你可以进入应用权限或桌面权限设置，打开“创建桌面快捷方式”权限后再试。")
+                .setPositiveButton("去设置", (dialog, which) ->
+                        ShortcutHelper.openShortcutPermissionSettings(this)
+                )
+                .setNegativeButton("取消", null)
+                .show();
+    }
     public void SetShortcut() {
         // 在 Activity 或 Fragment 中使用 Dialog
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -367,34 +386,90 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
         // 提交按钮
         submitButton.setOnClickListener(v -> {
-            String name = Objects.requireNonNull(shortcutName.getText()).toString();
-            String intent = Objects.requireNonNull(intentString.getText()).toString();
+            String name = Objects.requireNonNull(shortcutName.getText()).toString().trim();
+            String intent = Objects.requireNonNull(intentString.getText()).toString().trim();
+
+            if (name.isEmpty()) {
+                shortcutName.setError("请输入快捷方式名称");
+                return;
+            }
+
+            if (intent.isEmpty()) {
+                intentString.setError("Intent 不能为空");
+                return;
+            }
 
             ArrayList<String> dynamicParams = new ArrayList<>();
             for (int i = 0; i < dynamicParamsContainer.getChildCount(); i++) {
-                // 获取子 View（LinearLayout）
                 LinearLayout paramContainer = (LinearLayout) dynamicParamsContainer.getChildAt(i);
-
-                // 从 LinearLayout 中获取 EditText
-                EditText paramInput = (EditText) paramContainer.getChildAt(0); // 第一个子 View 是 EditText
+                EditText paramInput = (EditText) paramContainer.getChildAt(0);
                 dynamicParams.add(paramInput.getText().toString());
             }
 
-            // 获取 iconPreview 的图标
             Bitmap shortcutIcon = getBitmapFromImageView(iconPreview);
 
-            Log.d(TAG, "onOptionsItemSelected: " + dynamicParams);
-            dialog.dismiss();
-
-            // 调用 createShortcut 方法
             ShortcutHelper.createShortcut(
                     this,
                     name,
-                    shortcutIcon, // 动态传递图标
+                    shortcutIcon,
                     intent,
                     dynamicParams,
                     enableFeatureCheckbox.isChecked(),
-                    dropdownSpinner.getSelectedItem().toString()
+                    dropdownSpinner.getSelectedItem() == null
+                            ? ""
+                            : dropdownSpinner.getSelectedItem().toString(),
+                    new ShortcutHelper.ShortcutCallback() {
+                        @Override
+                        public void onNotSupported() {
+                            Toast.makeText(
+                                    IntentIntercept.this,
+                                    "当前桌面不支持创建快捷方式",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+
+                        @Override
+                        public void onPermissionDenied() {
+                            showShortcutPermissionGuideDialog(
+                                    "检测到当前应用没有创建桌面快捷方式权限，请在系统设置中允许后重试。"
+                            );
+                        }
+
+                        @Override
+                        public void onRequestSent() {
+                            dialog.dismiss();
+                            Toast.makeText(
+                                    IntentIntercept.this,
+                                    "请在系统弹窗中确认创建快捷方式",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+
+                        @Override
+                        public void onPinned() {
+                            Toast.makeText(
+                                    IntentIntercept.this,
+                                    "快捷方式已创建",
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+
+                        @Override
+                        public void onNoResultMaybeDenied() {
+                            showShortcutPermissionGuideDialog(
+                                    "没有收到桌面创建成功回调。可能是你取消了系统弹窗，也可能是 ROM 禁止了创建桌面快捷方式。"
+                            );
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            Toast.makeText(
+                                    IntentIntercept.this,
+                                    "创建快捷方式失败：" + e.getMessage(),
+                                    Toast.LENGTH_SHORT
+                            ).show();
+                        }
+                    }
             );
         });
 

@@ -28,6 +28,7 @@ import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
+import com.fourtwo.hookintent.utils.StyledInputDialogHelper;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -354,14 +355,12 @@ public class FilterFragment extends Fragment {
             return;
         }
 
-        final EditText input = new EditText(requireContext());
-        input.setHint(getString(R.string.key_input_text));
-
-        new AlertDialog.Builder(requireContext())
-                .setTitle(getString(R.string.add_key))
-                .setView(input)
-                .setPositiveButton(getString(R.string.ok), (dialog, which) -> {
-                    String newKey = input.getText().toString().trim();
+        StyledInputDialogHelper.showSingleInputDialog(
+                requireContext(),
+                getString(R.string.add_key),
+                getString(R.string.key_input_text),
+                null,
+                (newKey, dialog) -> {
                     if (newKey.isEmpty()) {
                         Toast.makeText(requireContext(), getString(R.string.key_false), Toast.LENGTH_SHORT).show();
                         return;
@@ -381,9 +380,9 @@ public class FilterFragment extends Fragment {
                     groupData.put(newKey, new ArrayList<Map<String, Object>>());
                     saveFilterData();
                     refreshFieldList();
-                })
-                .setNegativeButton(getString(R.string.no), null)
-                .show();
+                    dialog.dismiss();
+                }
+        );
     }
 
     private void goSelect(String item) {

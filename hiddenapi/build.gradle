@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+plugins {
+    id('com.android.library')
+}
+
+android {
+    namespace 'com.fourtwo.hookintent.hiddenapi'
+    compileSdk 35
+    buildToolsVersion = '35.0.0'
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    annotationProcessor "dev.rikka.tools.refine:annotation-processor:4.0.0"
+    compileOnly "dev.rikka.tools.refine:annotation:4.0.0"
+    compileOnly "org.jetbrains:annotations:26.0.1"
+    compileOnly "androidx.annotation:annotation:1.9.1"
+}
+
+
