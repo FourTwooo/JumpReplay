@@ -21,13 +21,14 @@ public class PermissionManager {
     private static final String TAG = "PermissionManager";
 
     private static final Shizuku.OnBinderReceivedListener BINDER_RECEIVED_LISTENER = () -> {
-        if (Shizuku.isPreV11()) {
-            Log.d(TAG, "Shizuku pre-v11 is not supported");
-        } else {
-            Log.d(TAG, "Binder received ");
+        try {
+            isBinderAvailable = Shizuku.pingBinder();
+            isShizukuPermissionGranted = PermissionManager.isBinderAvailable && !Shizuku.isPreV11()
+                    && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
+        } catch (RuntimeException error) {
+            isShizukuPermissionGranted = false;
+            Log.w(TAG, "Cannot query Shizuku state", error);
         }
-        isBinderAvailable = Shizuku.pingBinder();
-        isShizukuPermissionGranted = !Shizuku.isPreV11() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
     };
 
     private static final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> {
@@ -35,18 +36,28 @@ public class PermissionManager {
         isShizukuPermissionGranted = false;
     };
 
+    private static boolean shizukuInitialized;
+    private static final Shizuku.OnRequestPermissionResultListener PERMISSION_RESULT_LISTENER =
+            (code, result) -> isShizukuPermissionGranted = result == PackageManager.PERMISSION_GRANTED;
+
     public static boolean isShizukuPermissionGranted;
     public static boolean isRootPermissionGranted;
     public static boolean isBinderAvailable;
 
 
-    public static void ShizukuInit() {
+    public static synchronized void ShizukuInit() {
+        if (shizukuInitialized) return;
+        shizukuInitialized = true;
+        Shizuku.addRequestPermissionResultListener(PERMISSION_RESULT_LISTENER);
         // 注册监听器
         Shizuku.addBinderReceivedListenerSticky(BINDER_RECEIVED_LISTENER);
         Shizuku.addBinderDeadListener(BINDER_DEAD_LISTENER);
     }
 
-    public static void ShizukuCleanUp() {
+    public static synchronized void ShizukuCleanUp() {
+        if (!shizukuInitialized) return;
+        shizukuInitialized = false;
+        Shizuku.removeRequestPermissionResultListener(PERMISSION_RESULT_LISTENER);
         // 移除监听器
         Shizuku.removeBinderReceivedListener(BINDER_RECEIVED_LISTENER);
         Shizuku.removeBinderDeadListener(BINDER_DEAD_LISTENER);
@@ -75,7 +86,18 @@ public class PermissionManager {
             if (Boolean.TRUE.equals(isRoot)) {
                 if ("root".equals(SelectedItem)) {
                     // root
-                    RootServiceApi.startActivityAsRoot(context, intent);
+                    Intent target = new Intent(intent);
+                    RootServiceApi.connectAsync(context, error -> {
+                        try {
+                            if (error != null) throw error;
+                            RootServiceApi.startActivityAsRoot(context, target);
+                            Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
+                        } catch (Exception failure) {
+                            Log.e(TAG, "Root启动失败", failure);
+                            Toast.makeText(context, "调用失败：" + failure.getMessage(), Toast.LENGTH_LONG).show();
+                        }
+                    });
+                    return;
                 } else if ("Shizuku - 系统助手".equals(SelectedItem)) {
                     // Shizuku - 系统助手
                     ShizukuServerApi.launchAssistantAsync(context, intent);

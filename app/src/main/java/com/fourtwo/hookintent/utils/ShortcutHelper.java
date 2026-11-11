@@ -136,6 +136,7 @@ public final class ShortcutHelper {
 
         Intent shortcutIntent = new Intent(appContext, ShortcutActivity.class);
         shortcutIntent.setAction(Intent.ACTION_VIEW);
+        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         shortcutIntent.putExtra("isChecked", Boolean.TRUE.equals(isChecked));
         shortcutIntent.putExtra("SelectedItem", selectedItem == null ? "" : selectedItem);
 

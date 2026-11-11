@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            versionNameSuffix "-audit.1"
+            versionNameSuffix "-shortcut.1"
         }
         release {
             minifyEnabled false

@@ -17,8 +17,12 @@ import android.os.RemoteException;
 import android.provider.Settings;
 import android.widget.Toast;
 import com.fourtwo.hookintent.manager.PermissionManager;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.channels.FileLock;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import rikka.shizuku.Shizuku;
@@ -67,16 +71,54 @@ public class ShizukuServerApi {
 
     public static void launchAssistantAsync(Context context, Intent intent) {
         Context app = context.getApplicationContext();
+        launchAssistantAsync(app, intent, error -> Toast.makeText(app,
+                error == null ? "调用成功" : "调用失败: " + error.getMessage(), Toast.LENGTH_LONG).show());
+    }
+
+    public static void launchAssistantAsync(Context context, Intent intent, java.util.function.Consumer<Exception> complete) {
+        launchAssistantAsync(context, intent, complete, () -> true);
+    }
+
+    static void launchAssistantAsync(Context context, Intent intent, java.util.function.Consumer<Exception> complete,
+            java.util.function.BooleanSupplier active) {
+        Context app = context.getApplicationContext();
+        Intent target = new Intent(intent);
         ASSISTANT_EXECUTOR.execute(() -> {
-            String result = "调用成功";
-            try { launchAssistantWithTemporaryReplacement(app, intent); }
-            catch (Exception e) { result = "调用失败: " + e.getMessage(); }
-            String message = result;
-            MAIN.post(() -> Toast.makeText(app, message, Toast.LENGTH_LONG).show());
+            Exception failure = null;
+            try { launchAssistantWithTemporaryReplacement(app, target, active); }
+            catch (Exception e) { failure = e; }
+            Exception result = failure;
+            MAIN.post(() -> complete.accept(result));
         });
     }
 
     public static synchronized void launchAssistantWithTemporaryReplacement(Context context, Intent intent)
+            throws IllegalAccessException, NoSuchFieldException, NoSuchMethodException, InvocationTargetException {
+        launchAssistantWithTemporaryReplacement(context, intent, () -> true);
+    }
+
+    private static synchronized void launchAssistantWithTemporaryReplacement(Context context, Intent intent,
+            java.util.function.BooleanSupplier active)
+            throws IllegalAccessException, NoSuchFieldException, NoSuchMethodException, InvocationTargetException {
+        // The Java monitor only serializes this process. Main UI and :shortcut share the setting.
+        File directory = new File(context.getFilesDir(), "privileged_operations");
+        if (!directory.isDirectory() && !directory.mkdirs() && !directory.isDirectory()) {
+            throw new IllegalStateException("无法创建助手操作锁目录");
+        }
+        try (RandomAccessFile file = new RandomAccessFile(new File(directory, "assistant.lock"), "rw");
+             FileLock ignored = file.getChannel().lock()) {
+            requireActive(active);
+            launchAssistantLocked(context, intent, active);
+        } catch (IOException error) {
+            throw new IllegalStateException("无法锁定系统助手操作", error);
+        }
+    }
+
+    private static void requireActive(java.util.function.BooleanSupplier active) {
+        if (!active.getAsBoolean()) throw new java.util.concurrent.CancellationException("助手启动已取消");
+    }
+
+    private static void launchAssistantLocked(Context context, Intent intent, java.util.function.BooleanSupplier active)
             throws IllegalAccessException, NoSuchFieldException, NoSuchMethodException, InvocationTargetException {
         if (!requestShizukuPermission()) throw new SecurityException("Shizuku未连接或未授权");
         ComponentName component = intent.getComponent();
@@ -90,11 +132,13 @@ public class ShizukuServerApi {
         final String key = "assistant";
         String previous = Settings.Secure.getString(context.getContentResolver(), key);
         String replacement = component.flattenToString();
+        requireActive(active);
         if (!Settings.Secure.putString(context.getContentResolver(), key, replacement)) throw new IllegalStateException("无法临时修改系统助手");
         try {
             SearchManager manager = (SearchManager) context.getSystemService(Context.SEARCH_SERVICE);
             Method launch = SearchManager.class.getDeclaredMethod("launchAssist", Bundle.class);
             launch.setAccessible(true);
+            requireActive(active);
             Object result = launch.invoke(manager, intent.getExtras() == null ? new Bundle() : intent.getExtras());
             if (Boolean.FALSE.equals(result)) throw new IllegalStateException("系统未启动助手");
             // This method runs on the serial worker; restoration cannot freeze the Activity.

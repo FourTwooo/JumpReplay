@@ -1,12 +1,14 @@
 package com.fourtwo.hookintent;
 
 import android.app.Application;
+import android.content.Context;
 import android.os.Build;
 
 import androidx.multidex.BuildConfig;
 
 import com.fourtwo.hookintent.manager.PermissionManager;
 import com.topjohnwu.superuser.Shell;
+import com.fourtwo.hookintent.utils.ShizukuProcessBridge;
 
 import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
@@ -19,6 +21,11 @@ public class MainApplication extends Application {
                 .setTimeout(10));
     }
     @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(base);
+        ShizukuProcessBridge.prepare(base);
+    }
+    @Override
     public void onCreate() {
         super.onCreate();
 
@@ -27,11 +34,10 @@ public class MainApplication extends Application {
             HiddenApiBypass.addHiddenApiExemptions("L");
         }
 
-        // ROOT提权
-        Shell.getShell(shell -> {
-            PermissionManager.isRootPermissionGranted = shell.isRoot();
-            PermissionManager.init(this);
-        });
+        PermissionManager.ShizukuInit();
+        ShizukuProcessBridge.requestBinder(this);
+        // A provider-only background start must not request Root just to deliver Shizuku's Binder.
+        // The visible main Activity warms Root; shortcut Root mode connects on demand.
     }
 
     @Override

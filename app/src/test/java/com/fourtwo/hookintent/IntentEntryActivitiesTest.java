@@ -33,6 +33,7 @@ public class IntentEntryActivitiesTest {
             assertFalse(controller.get().isFinishing());
             Intent second = new Intent().putExtra("target_intent", "demo://second?q=a+b%26c");
             controller.newIntent(second);
+            Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
             Intent launched = Shadows.shadowOf(controller.get()).getNextStartedActivity();
             assertNotNull(launched);
             assertEquals("demo://second?q=a+b%26c", launched.getDataString());

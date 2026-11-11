@@ -19,7 +19,11 @@ import android.widget.Toast;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.fourtwo.hookintent.manager.PermissionManager;
+import com.fourtwo.hookintent.utils.AndroidShortcutBackend;
+import com.fourtwo.hookintent.utils.ShortcutLaunchCoordinator;
+import android.os.Handler;
+import android.os.Looper;
+import android.widget.ProgressBar;
 
 import java.net.URISyntaxException;
 import com.fourtwo.hookintent.utils.ShortcutParameterReplacer;
@@ -29,6 +33,27 @@ import com.fourtwo.hookintent.utils.IntentReplay;
 public class ShortcutActivity extends AppCompatActivity {
 
     private AlertDialog parameterDialog;
+    private AlertDialog waitingDialog;
+    private TextView waitingText;
+    private String waitingMessage;
+    private final Handler launchUi = new Handler(Looper.getMainLooper());
+    private ShortcutLaunchCoordinator launches;
+    private final Runnable showWaiting = () -> {
+        if (isFinishing() || isDestroyed() || waitingMessage == null || waitingDialog != null) return;
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.HORIZONTAL);
+        layout.setGravity(Gravity.CENTER_VERTICAL);
+        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
+        layout.addView(new ProgressBar(this), new LinearLayout.LayoutParams(dp(30), dp(30)));
+        waitingText = new TextView(this);
+        waitingText.setText(waitingMessage);
+        waitingText.setPadding(dp(16), 0, 0, 0);
+        layout.addView(waitingText);
+        waitingDialog = new AlertDialog.Builder(this).setView(layout).create();
+        waitingDialog.setCanceledOnTouchOutside(false);
+        waitingDialog.setOnCancelListener(dialog -> { launches.cancel(); finish(); });
+        waitingDialog.show();
+    };
     private Intent originalTarget;
     private String originalTargetText;
 
@@ -36,6 +61,7 @@ public class ShortcutActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        launches = new ShortcutLaunchCoordinator(new AndroidShortcutBackend(this), launchUi);
         handleShortcut(getIntent());
     }
 
@@ -43,6 +69,8 @@ public class ShortcutActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
+        launches.cancel();
+        hideWaiting();
         if (parameterDialog != null) {
             parameterDialog.setOnDismissListener(null);
             parameterDialog.dismiss();
@@ -70,15 +98,53 @@ public class ShortcutActivity extends AppCompatActivity {
             if (replaceParams != null && replaceParams.length > 0) {
                 showReplaceParamsDialog(targetIntent, replaceParams, isChecked, selectedItem);
             } else {
-                PermissionManager.startActivity(this,
-                        IntentReplay.fromText(targetIntent, originalTarget, originalTargetText), isChecked, selectedItem);
-                finish();
+                launchTarget(IntentReplay.fromText(targetIntent, originalTarget, originalTargetText),
+                        isChecked, selectedItem, null);
             }
         } catch (Exception error) {
             Log.e("ShortcutActivity", "Cannot open shortcut", error);
             Toast.makeText(this, "快捷方式内容无效：" + error.getMessage(), Toast.LENGTH_LONG).show();
             finish();
         }
+    }
+
+    private void hideWaiting() {
+        waitingMessage = null;
+        launchUi.removeCallbacks(showWaiting);
+        if (waitingDialog != null) {
+            waitingDialog.setOnCancelListener(null);
+            waitingDialog.dismiss();
+            waitingDialog = null;
+        }
+        waitingText = null;
+    }
+
+    private void launchTarget(Intent target, boolean privileged, String mode, Button confirm) {
+        if (confirm != null) confirm.setEnabled(false);
+        launches.launch(target, privileged, mode, new ShortcutLaunchCoordinator.Callback() {
+            @Override public void waiting(String message) {
+                if (isFinishing() || isDestroyed()) return;
+                if (confirm != null) confirm.setText(message);
+                else {
+                    waitingMessage = message;
+                    if (waitingText != null) waitingText.setText(message);
+                    launchUi.removeCallbacks(showWaiting);
+                    launchUi.postDelayed(showWaiting, 150);
+                }
+            }
+            @Override public void complete(Exception error) {
+                hideWaiting();
+                if (isFinishing() || isDestroyed()) return;
+                if (error != null) {
+                    Toast.makeText(ShortcutActivity.this, "启动失败：" + error.getMessage(), Toast.LENGTH_LONG).show();
+                    if (confirm != null) { confirm.setEnabled(true); confirm.setText("确认"); }
+                    else finish();
+                    return;
+                }
+                if (parameterDialog != null) parameterDialog.dismiss();
+                else finish();
+            }
+        });
     }
 
     /**
@@ -192,9 +258,7 @@ public class ShortcutActivity extends AppCompatActivity {
                 }
                 String finalTargetIntent = ShortcutParameterReplacer.replace(targetIntent, replaceParams, replacements);
                 Intent newIntent = IntentReplay.fromText(finalTargetIntent, originalTarget, originalTargetText);
-                PermissionManager.startActivity(this, newIntent, isChecked, selectedItem);
-                Log.d("TransparentDialogActivity", "替换后启动的 Intent: " + finalTargetIntent);
-                dialog.dismiss();
+                launchTarget(newIntent, isChecked, selectedItem, confirmButton);
             } catch (Exception e) {
                 Log.e("TransparentDialogActivity", "Intent URI 解析失败", e);
                 Toast.makeText(this, "Intent URI 解析失败", Toast.LENGTH_SHORT).show();
@@ -204,6 +268,7 @@ public class ShortcutActivity extends AppCompatActivity {
         parameterDialog = dialog;
         dialog.setOnDismissListener(dialogInterface -> {
             parameterDialog = null;
+            launches.cancel();
             finish();
         });
 
@@ -298,6 +363,9 @@ public class ShortcutActivity extends AppCompatActivity {
     }
     @Override
     protected void onDestroy() {
+        if (launches != null) launches.cancel();
+        hideWaiting();
+        launchUi.removeCallbacksAndMessages(null);
         if (parameterDialog != null) {
             parameterDialog.setOnDismissListener(null);
             parameterDialog.dismiss();

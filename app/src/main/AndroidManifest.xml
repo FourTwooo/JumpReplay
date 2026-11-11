@@ -80,6 +80,10 @@
             android:permission="com.topjohnwu.libsu.SERVICE_PERMISSION"
             tools:ignore="Instantiatable" />
 
+        <service
+            android:name=".service.ShortcutRootService"
+            android:exported="false" />
+
 
         <activity
             android:name=".MainActivity"
@@ -150,6 +154,8 @@
 
         <activity
             android:name=".ShortcutActivity"
+            android:process=":shortcut"
+            android:taskAffinity="${applicationId}.shortcut"
             android:label="@string/shortcut_activity_label"
             android:theme="@style/TransparentActivity"
             android:exported="true"
