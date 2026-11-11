@@ -1,0 +1,5 @@
+<resources>
+    <string name="dialog_shortcut_parameters">替换参数</string>
+    <string name="dialog_replace_parameter">替换 %1$s 的值</string>
+    <string name="dialog_loading_apps">正在加载应用列表…</string>
+</resources>

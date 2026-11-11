@@ -2,7 +2,6 @@ package com.fourtwo.hookintent.ui.detail;
 
 import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -14,10 +13,12 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
 import androidx.core.util.Pair;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.R;
 
 import java.util.List;
@@ -70,7 +71,7 @@ public class DetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
 
             // Set long press listener for copying data
             dataHolder.itemView.setOnLongClickListener(v -> {
-                AlertDialog.Builder builder = new AlertDialog.Builder(v.getContext());
+                AlertDialog.Builder builder = AppDialogs.builder(v.getContext());
                 builder.setTitle("选择要复制的内容")
                         .setItems(new String[]{"复制 Key", "复制 Value"}, (dialog, which) -> {
                             ClipboardManager clipboard = (ClipboardManager) v.getContext().getSystemService(Context.CLIPBOARD_SERVICE);

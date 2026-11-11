@@ -1,49 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="horizontal">
-
-    <!-- 标题部分 -->
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:padding="20dp">
     <LinearLayout
         android:id="@+id/linearLayout"
-        android:layout_marginTop="10dp"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:orientation="horizontal"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="MissingConstraints,UseCompoundDrawables">
-
+        tools:ignore="MissingConstraints,UseCompoundDrawables"
+        app:layout_constraintEnd_toEndOf="parent">
         <TextView
             android:id="@+id/all_package"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
-            android:layout_weight="1"
             android:text="共0个应用"
-            android:textColor="@android:color/black"
-            android:textSize="16sp" />
-
+            android:textColor="@color/dialog_text"
+            android:textAppearance="@style/TextAppearance.HookIntent.DialogTitle" />
         <Spinner
             android:id="@+id/dropdown_spinner"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:spinnerMode="dropdown"
             android:entries="@array/packages_array"
-            tools:ignore="MissingConstraints" />
-
+            tools:ignore="MissingConstraints"
+            android:minHeight="48dp"
+            android:layout_marginTop="8dp" />
     </LinearLayout>
-
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/packages_list"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingBottom="50dp"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:paddingBottom="8dp"
         android:clipToPadding="false"
-        android:layout_marginTop="25dp"
+        android:layout_marginTop="12dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -51,6 +47,4 @@
         tools:ignore="MissingConstraints,NotSibling"
         tools:itemCount="2"
         tools:listitem="@layout/dialog_custom_packages_list" />
-
-
 </androidx.constraintlayout.widget.ConstraintLayout>

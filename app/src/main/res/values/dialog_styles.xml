@@ -1,0 +1,69 @@
+<resources>
+    <style name="Theme.HookIntent.Dialog" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/dialog_surface_background</item>
+        <item name="android:windowMinWidthMajor">65%</item>
+        <item name="android:windowMinWidthMinor">90%</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.32</item>
+        <item name="colorPrimary">@color/dialog_accent</item>
+        <item name="colorSecondary">@color/dialog_accent</item>
+        <item name="colorAccent">@color/dialog_accent</item>
+        <item name="android:colorAccent">@color/dialog_accent</item>
+        <item name="android:buttonBarButtonStyle">@style/Widget.HookIntent.DialogButton</item>
+        <item name="colorSurface">@color/dialog_surface</item>
+        <item name="colorOnSurface">@color/dialog_text</item>
+        <item name="android:colorBackground">@color/dialog_surface</item>
+        <item name="android:textColorPrimary">@color/dialog_text</item>
+        <item name="android:textColorSecondary">@color/dialog_secondary</item>
+        <item name="android:textColorHint">@color/dialog_hint</item>
+        <item name="android:textColorLink">@color/dialog_accent</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="buttonBarButtonStyle">@style/Widget.HookIntent.DialogButton</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.HookIntent.DialogButton</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.HookIntent.DialogNegativeButton</item>
+        <item name="buttonBarNeutralButtonStyle">@style/Widget.HookIntent.DialogNegativeButton</item>
+        <item name="materialButtonStyle">@style/Widget.HookIntent.DialogButton</item>
+        <item name="editTextStyle">@style/Widget.HookIntent.DialogInput</item>
+        <item name="android:textAppearanceLarge">@style/TextAppearance.HookIntent.DialogTitle</item>
+        <item name="android:textAppearanceMedium">@style/TextAppearance.HookIntent.DialogBody</item>
+        <item name="textInputStyle">@style/Widget.HookIntent.DialogTextInput</item>
+    </style>
+    <style name="TextAppearance.HookIntent.DialogTitle" parent="TextAppearance.AppCompat.Title">
+        <item name="android:textSize">17sp</item>
+        <item name="android:textColor">@color/dialog_text</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+    <style name="TextAppearance.HookIntent.DialogBody" parent="TextAppearance.AppCompat.Body1">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/dialog_text</item>
+        <item name="android:fontFamily">sans-serif</item>
+    </style>
+    <style name="Widget.HookIntent.DialogButton" parent="Widget.MaterialComponents.Button.TextButton.Dialog">
+        <item name="android:minWidth">64dp</item><item name="android:minHeight">48dp</item>
+        <item name="android:textSize">14sp</item><item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans-serif-medium</item><item name="android:includeFontPadding">true</item>
+        <item name="android:paddingTop">8dp</item><item name="android:paddingBottom">8dp</item>
+        <item name="android:paddingStart">16dp</item><item name="android:paddingEnd">16dp</item>
+        <item name="android:textColor">@color/dialog_accent</item>
+        <item name="backgroundTint">@android:color/transparent</item><item name="rippleColor">@color/dialog_ripple</item>
+        <item name="android:insetTop">0dp</item><item name="android:insetBottom">0dp</item>
+    </style>
+    <style name="Widget.HookIntent.DialogNegativeButton" parent="Widget.HookIntent.DialogButton">
+        <item name="android:textColor">@color/dialog_secondary</item>
+    </style>
+    <style name="Widget.HookIntent.DialogInput" parent="Widget.AppCompat.EditText">
+        <item name="android:background">@drawable/dialog_input_background</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">12dp</item><item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">10dp</item><item name="android:paddingBottom">10dp</item>
+        <item name="android:textSize">14sp</item><item name="android:textColor">@color/dialog_text</item>
+        <item name="android:textColorHint">@color/dialog_hint</item><item name="android:includeFontPadding">true</item>
+    </style>
+    <style name="Widget.HookIntent.DialogTextInput" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/dialog_accent</item><item name="boxStrokeWidth">1dp</item><item name="boxStrokeWidthFocused">2dp</item>
+        <item name="boxBackgroundColor">@color/dialog_input_surface</item>
+        <item name="boxCornerRadiusTopStart">8dp</item><item name="boxCornerRadiusTopEnd">8dp</item>
+        <item name="boxCornerRadiusBottomStart">8dp</item><item name="boxCornerRadiusBottomEnd">8dp</item>
+    </style>
+</resources>
+

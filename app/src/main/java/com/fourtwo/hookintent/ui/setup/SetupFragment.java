@@ -14,7 +14,6 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.os.LocaleListCompat;
 import androidx.core.view.MenuProvider;
@@ -24,6 +23,7 @@ import androidx.cardview.widget.CardView;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.MainActivity;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
@@ -246,7 +246,7 @@ public class SetupFragment extends Fragment {
 
         int checkedItem = findLanguageIndex(getCurrentLanguageTag());
 
-        new AlertDialog.Builder(requireContext())
+        AppDialogs.builder(requireContext())
                 .setTitle(R.string.dialog_select_language)
                 .setSingleChoiceItems(labels, checkedItem, (dialog, which) -> {
                     applyLanguage(LANGUAGE_TAGS[which]);

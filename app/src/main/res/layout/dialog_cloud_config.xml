@@ -1,37 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
-
+    android:padding="20dp">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
+        android:orientation="vertical">
         <AutoCompleteTextView
             android:id="@+id/input_cloud_url"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:background="@android:color/transparent"
             android:completionThreshold="0"
             android:hint="云配置接口地址"
             android:inputType="textUri"
             android:maxLines="1"
             android:minHeight="48dp"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp" />
-
+            style="@style/Widget.HookIntent.DialogInput" />
         <Button
             android:id="@+id/button_request_cloud"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="请求" />
+            android:text="请求"
+            style="@style/Widget.HookIntent.DialogButton"
+            android:minHeight="48dp"
+            android:layout_gravity="end"
+            android:layout_marginTop="4dp" />
     </LinearLayout>
-
     <TextView
         android:id="@+id/cloud_url_hint"
         android:layout_width="match_parent"
@@ -39,15 +36,15 @@
         android:paddingTop="6dp"
         android:paddingBottom="10dp"
         android:text="点击输入框可选择历史地址，长按可删除当前地址"
-        android:textSize="12sp" />
-
+        android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+        android:textColor="@color/dialog_secondary" />
     <ProgressBar
         android:id="@+id/cloud_progress_bar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:visibility="gone" />
-
+        android:visibility="gone"
+        android:indeterminateTint="@color/dialog_accent" />
     <TextView
         android:id="@+id/cloud_empty_view"
         android:layout_width="match_parent"
@@ -56,13 +53,12 @@
         android:paddingTop="24dp"
         android:paddingBottom="24dp"
         android:text="请输入接口地址并点击请求"
-        android:textSize="14sp" />
-
+        android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+        android:textColor="@color/dialog_text" />
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/cloud_recycler_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:visibility="gone" />
-
 </LinearLayout>

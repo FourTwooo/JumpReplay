@@ -3,7 +3,6 @@ package com.fourtwo.hookintent.ui.home;
 import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
@@ -18,6 +17,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.navigation.NavController;
@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.DiffUtil;
 import java.util.Objects;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.base.DetailPayloadStore;
@@ -145,7 +146,7 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
     }
 
     private void showPopupWindow(View view, ItemData item) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(view.getContext());
+        AlertDialog.Builder builder = AppDialogs.builder(view.getContext());
         builder.setTitle(item.getCategory())
                 .setMessage(String.valueOf(item.getItem_from()) + "\n\n" + String.valueOf(item.getItem_data()))
                 .setPositiveButton("OK", (dialog, which) -> dialog.dismiss())

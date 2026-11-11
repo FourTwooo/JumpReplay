@@ -2,7 +2,7 @@ package com.fourtwo.hookintent.utils;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.app.Dialog;
 import android.content.ComponentName;
 import android.content.Context;
@@ -58,41 +58,15 @@ public class BatteryOptimizationHelper {
             return;
         }
 
-        View dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_battery_optimization, null);
-        TextView textMessage = dialogView.findViewById(R.id.text_message);
-        Button buttonConfirm = dialogView.findViewById(R.id.button_confirm);
-
-        textMessage.setText(message);
-        textMessage.setTextIsSelectable(false);
-        textMessage.setLongClickable(false);
-        textMessage.setClickable(false);
-        textMessage.setFocusable(false);
-        textMessage.setMovementMethod(new ScrollingMovementMethod());
-        textMessage.setVerticalScrollBarEnabled(true);
-        textMessage.setScrollbarFadingEnabled(false);
-
-        AlertDialog dialog = new AlertDialog.Builder(activity)
-                .setView(dialogView)
+        AlertDialog dialog = AppDialogs.builder(activity)
+                .setMessage(message)
                 .setCancelable(false)
-                .create();
-
+                .setPositiveButton(R.string.ok, (dismissed, which) -> {
+                    dismissed.dismiss();
+                    requestIgnoreBatteryOptimizations();
+                }).create();
         dialog.setCanceledOnTouchOutside(false);
-
-        buttonConfirm.setOnClickListener(v -> {
-            dialog.dismiss();
-            requestIgnoreBatteryOptimizations();
-        });
-
         dialog.show();
-
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setLayout(
-                    (int) (activity.getResources().getDisplayMetrics().widthPixels * 0.90f),
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-        }
     }
 
     public void requestIgnoreBatteryOptimizations() {

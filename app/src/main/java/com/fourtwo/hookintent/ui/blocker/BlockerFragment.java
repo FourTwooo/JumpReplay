@@ -1,6 +1,6 @@
 package com.fourtwo.hookintent.ui.blocker;
 
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
@@ -19,8 +19,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.GradientDrawable;
-import android.view.Gravity;
 import android.widget.LinearLayout;
 
 import com.android.apksig.ApkVerifier;
@@ -34,6 +32,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.utils.BlockerApkBuilder;
 import com.fourtwo.hookintent.utils.ManifestRuleScanner;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
@@ -69,102 +68,6 @@ public class BlockerFragment extends Fragment {
     private Future<?> buildTask;
     private int viewGeneration;
     private final List<AlertDialog> dialogs = new ArrayList<>();
-
-    private LinearLayout createDialogRoot() {
-        LinearLayout root = new LinearLayout(requireContext());
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(18));
-        root.setBackground(createRoundRect("#FCFCFD", "#ECEEF2", 24));
-        return root;
-    }
-
-    private TextView createDialogTitle(String text) {
-        TextView title = new TextView(requireContext());
-        title.setText(text);
-        title.setTextSize(17);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(android.graphics.Color.parseColor("#1F2937"));
-        return title;
-    }
-
-    private TextView createDialogFieldLabel(String text) {
-        TextView label = new TextView(requireContext());
-        label.setText(text);
-        label.setTextSize(12);
-        label.setTextColor(android.graphics.Color.parseColor("#6B7280"));
-        return label;
-    }
-
-    private EditText createDialogInput(String hint) {
-        EditText input = new EditText(requireContext());
-        input.setHint(hint);
-        input.setBackground(null);
-        input.setTextSize(14);
-        input.setHintTextColor(android.graphics.Color.parseColor("#9CA3AF"));
-        input.setTextColor(android.graphics.Color.parseColor("#1F2937"));
-        input.setSingleLine(true);
-        input.setPadding(0, dp(6), 0, dp(6));
-        return input;
-    }
-
-    private LinearLayout wrapDialogInput(EditText input) {
-        LinearLayout inputBox = new LinearLayout(requireContext());
-        inputBox.setOrientation(LinearLayout.HORIZONTAL);
-        inputBox.setGravity(Gravity.CENTER_VERTICAL);
-        inputBox.setBackground(createRoundRect("#F3F4F6", "#F3F4F6", 18));
-        inputBox.setPadding(dp(14), dp(8), dp(12), dp(8));
-
-        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        inputBox.addView(input, inputLp);
-        return inputBox;
-    }
-
-    private LinearLayout createDialogButtonRow() {
-        LinearLayout row = new LinearLayout(requireContext());
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        return row;
-    }
-
-    private Button createDialogActionButton(String text, String fillColor, String strokeColor, String textColor) {
-        Button button = new Button(requireContext());
-        button.setText(text);
-        button.setAllCaps(false);
-        button.setMinWidth(dp(78));
-        button.setPadding(dp(20), 0, dp(20), 0);
-        button.setTextSize(14);
-        button.setTypeface(null, android.graphics.Typeface.BOLD);
-        button.setTextColor(android.graphics.Color.parseColor(textColor));
-        button.setBackground(createRoundRect(fillColor, strokeColor, 999));
-        return button;
-    }
-
-    private GradientDrawable createRoundRect(String fillColor, String strokeColor, int radiusDp) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.RECTANGLE);
-        drawable.setColor(android.graphics.Color.parseColor(fillColor));
-        drawable.setCornerRadius(dp(radiusDp));
-        if (strokeColor != null) {
-            drawable.setStroke(dp(1), android.graphics.Color.parseColor(strokeColor));
-        }
-        return drawable;
-    }
-
-    private void applyDialogWindow(AlertDialog dialog) {
-        trackDialog(dialog);
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(
-                    new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
-            );
-            dialog.getWindow().setLayout(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.90f),
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-        }
-    }
 
     private void trackDialog(AlertDialog dialog) {
         dialogs.add(dialog);
@@ -362,68 +265,24 @@ public class BlockerFragment extends Fragment {
     }
 
     private void showAddSchemeDialog() {
-        LinearLayout root = createDialogRoot();
+        LinearLayout root = AppDialogs.content(requireContext());
+        EditText input = AppDialogs.input(requireContext());
+        input.setHint(R.string.blocker_input_scheme);
+        input.setSingleLine(true);
+        root.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView title = createDialogTitle(getString(R.string.blocker_add_scheme));
-        root.addView(title);
-
-        EditText input = createDialogInput(getString(R.string.blocker_input_scheme));
-        LinearLayout inputBox = wrapDialogInput(input);
-
-        LinearLayout.LayoutParams inputBoxLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        inputBoxLp.topMargin = dp(14);
-        root.addView(inputBox, inputBoxLp);
-
-        LinearLayout buttonRow = createDialogButtonRow();
-        LinearLayout.LayoutParams buttonRowLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        buttonRowLp.topMargin = dp(18);
-        root.addView(buttonRow, buttonRowLp);
-
-        Button cancelButton = createDialogActionButton(
-                getString(R.string.cancel),
-                "#F3F4F6",
-                "#E6E8EC",
-                "#6B7280"
-        );
-
-        Button confirmButton = createDialogActionButton(
-                getString(R.string.ok),
-                "#EAF1FF",
-                "#D6E4FF",
-                "#2E6EF7"
-        );
-
-        LinearLayout.LayoutParams cancelLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        cancelLp.rightMargin = dp(8);
-
-        LinearLayout.LayoutParams confirmLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        confirmLp.leftMargin = dp(8);
-
-        buttonRow.addView(cancelButton, cancelLp);
-        buttonRow.addView(confirmButton, confirmLp);
-
-        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+        AlertDialog dialog = AppDialogs.builder(requireContext())
+                .setTitle(R.string.blocker_add_scheme)
                 .setView(root)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.ok, null)
                 .create();
-
         dialog.setCanceledOnTouchOutside(true);
         dialog.setCancelable(true);
-
-        cancelButton.setOnClickListener(v -> dialog.dismiss());
-
-        confirmButton.setOnClickListener(v -> {
+        trackDialog(dialog);
+        // Replace the positive action after show so validation failures keep the form open.
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String scheme = safe(input.getText().toString());
             if (scheme.isEmpty()) {
                 Toast.makeText(requireContext(), R.string.blocker_scheme_invalid, Toast.LENGTH_SHORT).show();
@@ -459,101 +318,43 @@ public class BlockerFragment extends Fragment {
             saveCustomRules(customGroup.getRules());
             adapter.submit(groups);
             dialog.dismiss();
-        });
-
+        }));
         dialog.show();
-        applyDialogWindow(dialog);
     }
 
     private void showBlockerSettingsDialog() {
-        LinearLayout root = createDialogRoot();
-
-        TextView title = createDialogTitle(getString(R.string.blocker_settings));
-        root.addView(title);
-
-        TextView packageLabel = createDialogFieldLabel(getString(R.string.blocker_package_hint));
-        LinearLayout.LayoutParams packageLabelLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        packageLabelLp.topMargin = dp(14);
-        root.addView(packageLabel, packageLabelLp);
-
-        EditText inputPackage = createDialogInput(getString(R.string.blocker_package_hint));
+        LinearLayout root = AppDialogs.content(requireContext());
+        TextView packageLabel = new TextView(root.getContext());
+        packageLabel.setText(R.string.blocker_package_hint);
+        root.addView(packageLabel);
+        EditText inputPackage = AppDialogs.input(requireContext());
+        inputPackage.setHint(R.string.blocker_package_hint);
+        inputPackage.setSingleLine(true);
         inputPackage.setText(getBlockerPackage());
-        LinearLayout packageBox = wrapDialogInput(inputPackage);
-        LinearLayout.LayoutParams packageBoxLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        packageBoxLp.topMargin = dp(8);
-        root.addView(packageBox, packageBoxLp);
+        root.addView(inputPackage, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView labelLabel = createDialogFieldLabel(getString(R.string.blocker_label_hint));
-        LinearLayout.LayoutParams labelLabelLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        labelLabelLp.topMargin = dp(14);
-        root.addView(labelLabel, labelLabelLp);
-
-        EditText inputLabel = createDialogInput(getString(R.string.blocker_label_hint));
+        TextView labelLabel = new TextView(root.getContext());
+        labelLabel.setText(R.string.blocker_label_hint);
+        labelLabel.setPadding(0, dp(16), 0, 0);
+        root.addView(labelLabel);
+        EditText inputLabel = AppDialogs.input(requireContext());
+        inputLabel.setHint(R.string.blocker_label_hint);
+        inputLabel.setSingleLine(true);
         inputLabel.setText(getBlockerLabel());
-        LinearLayout labelBox = wrapDialogInput(inputLabel);
-        LinearLayout.LayoutParams labelBoxLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        labelBoxLp.topMargin = dp(8);
-        root.addView(labelBox, labelBoxLp);
+        root.addView(inputLabel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout buttonRow = createDialogButtonRow();
-        LinearLayout.LayoutParams buttonRowLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        buttonRowLp.topMargin = dp(18);
-        root.addView(buttonRow, buttonRowLp);
-
-        Button cancelButton = createDialogActionButton(
-                getString(R.string.cancel),
-                "#F3F4F6",
-                "#E6E8EC",
-                "#6B7280"
-        );
-
-        Button confirmButton = createDialogActionButton(
-                getString(R.string.ok),
-                "#EAF1FF",
-                "#D6E4FF",
-                "#2E6EF7"
-        );
-
-        LinearLayout.LayoutParams cancelLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        cancelLp.rightMargin = dp(8);
-
-        LinearLayout.LayoutParams confirmLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        confirmLp.leftMargin = dp(8);
-
-        buttonRow.addView(cancelButton, cancelLp);
-        buttonRow.addView(confirmButton, confirmLp);
-
-        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+        AlertDialog dialog = AppDialogs.builder(requireContext())
+                .setTitle(R.string.blocker_settings)
                 .setView(root)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.ok, null)
                 .create();
-
         dialog.setCanceledOnTouchOutside(true);
         dialog.setCancelable(true);
-
-        cancelButton.setOnClickListener(v -> dialog.dismiss());
-
-        confirmButton.setOnClickListener(v -> {
+        trackDialog(dialog);
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String blockerPackage = safe(inputPackage.getText().toString());
             String blockerLabel = safe(inputLabel.getText().toString());
 
@@ -571,10 +372,8 @@ public class BlockerFragment extends Fragment {
 
             Toast.makeText(requireContext(), R.string.blocker_saved, Toast.LENGTH_SHORT).show();
             dialog.dismiss();
-        });
-
+        }));
         dialog.show();
-        applyDialogWindow(dialog);
     }
 
     private void buildBlocker() {
@@ -625,7 +424,7 @@ public class BlockerFragment extends Fragment {
                     buildButton.setEnabled(true);
                     emptyView.setVisibility(View.GONE);
 
-                    AlertDialog resultDialog = new AlertDialog.Builder(requireContext())
+                    AlertDialog resultDialog = AppDialogs.builder(requireContext())
                             .setTitle("构建结果")
                             .setMessage(
                                     getString(R.string.blocker_build_done) + "\n"

@@ -36,6 +36,7 @@ import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.IntentIntercept;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
@@ -403,7 +404,8 @@ public class DetailFragment extends Fragment {
     private void showAmCommandDialog(String amCommand, boolean hasError, String optionName) {
         final String originalText = amCommand;
         // 使用 LayoutInflater 加载自定义视图
-        LayoutInflater inflater = LayoutInflater.from(requireContext());
+        AlertDialog.Builder dialogBuilder = AppDialogs.builder(requireContext());
+        LayoutInflater inflater = LayoutInflater.from(dialogBuilder.getContext());
         View dialogView = inflater.inflate(R.layout.dialog_custom_view, null);
 
         // 获取视图中的元素
@@ -456,15 +458,11 @@ public class DetailFragment extends Fragment {
             Toast.makeText(requireContext(), "已复制到剪贴板", Toast.LENGTH_SHORT).show();
         });
 
-        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+        AlertDialog dialog = dialogBuilder
                 .setView(dialogView)
                 // .setPositiveButton("关闭", null)
                 .create();
 
-        // 设置弹窗背景为圆角背景
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
-        }
         dialog.show();
     }
 

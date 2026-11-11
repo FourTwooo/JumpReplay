@@ -1,0 +1,5 @@
+<resources>
+    <string name="dialog_shortcut_parameters">Shortcut parameters</string>
+    <string name="dialog_replace_parameter">Replace %1$s</string>
+    <string name="dialog_loading_apps">Loading apps…</string>
+</resources>

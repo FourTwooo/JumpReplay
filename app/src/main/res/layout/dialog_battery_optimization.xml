@@ -1,26 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="4dp">
-
+    android:padding="20dp">
     <LinearLayout
         android:id="@+id/card_root"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@drawable/bg_battery_dialog_card"
         android:orientation="vertical"
-        android:padding="16dp">
-
+        android:padding="0dp">
         <LinearLayout
             android:id="@+id/layout_message_box"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_battery_dialog_message"
             android:orientation="vertical"
-            android:padding="14dp">
-
+            android:padding="0dp">
             <TextView
                 android:id="@+id/text_message"
                 android:layout_width="match_parent"
@@ -28,32 +24,23 @@
                 android:lineSpacingExtra="2dp"
                 android:maxLines="8"
                 android:scrollbars="vertical"
-                android:textColor="#4B5563"
-                android:textSize="14sp" />
+                android:textColor="@color/dialog_text"
+                android:textAppearance="@style/TextAppearance.HookIntent.DialogBody" />
         </LinearLayout>
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:orientation="horizontal">
-
+            android:gravity="end"
+            android:orientation="horizontal"
+            android:padding="0dp">
             <Button
                 android:id="@+id/button_confirm"
                 android:layout_width="wrap_content"
-                android:layout_height="38dp"
-                android:background="@drawable/bg_battery_dialog_button"
-                android:minWidth="78dp"
-                android:paddingStart="20dp"
-                android:paddingEnd="20dp"
+                android:layout_height="wrap_content"
                 android:text="@string/ok"
-                android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:textSize="14sp"
-                android:textStyle="bold" />
+                style="@style/Widget.HookIntent.DialogButton"
+                android:minHeight="48dp" />
         </LinearLayout>
-
     </LinearLayout>
-
 </LinearLayout>

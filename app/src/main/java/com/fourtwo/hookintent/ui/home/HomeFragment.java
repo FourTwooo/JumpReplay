@@ -32,6 +32,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.MainActivity;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
@@ -122,11 +123,11 @@ public class HomeFragment extends Fragment {
                     Log.d(TAG, "onMenuItemSelected: connectedClients size = " + connectedClients.size());
 
                     // 创建弹窗
-                    AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+                    AlertDialog.Builder builder = AppDialogs.builder(requireContext());
 //                    builder.setTitle("应用通信连接");
 
                     // 加载弹窗布局
-                    View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_custom_services, null);
+                    View dialogView = LayoutInflater.from(builder.getContext()).inflate(R.layout.dialog_custom_services, null);
                     RecyclerView recyclerView = dialogView.findViewById(R.id.services_list);
                     recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
@@ -139,12 +140,8 @@ public class HomeFragment extends Fragment {
                     // 创建弹窗
                     AlertDialog dialog = builder.create();
 
-                    // 设置弹窗背景为圆角背景
-                    if (dialog.getWindow() != null) {
-                        dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
-                    }
-
                     dialog.show();
+                    AppDialogs.sizeForList(dialog);
 
                     return true;
                 }

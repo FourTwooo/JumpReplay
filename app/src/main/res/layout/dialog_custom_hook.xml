@@ -1,212 +1,210 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<?xml version="1.0" encoding="utf-8"?>
+<com.fourtwo.hookintent.utils.DialogScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:padding="16dp">
-
+    android:padding="0dp"
+    android:clipToPadding="false">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="8dp">
-
-        <!-- Package Name Input -->
+        android:padding="20dp">
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@android:color/transparent"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
-            app:strokeColor="@color/teal_700"
-            app:strokeWidth="4dp">
-
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/dialog_border"
+            app:strokeWidth="0dp"
+            app:cardBackgroundColor="@android:color/transparent">
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/idTILQuery"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:endIconMode="custom"
                 app:endIconDrawable="@drawable/ic_search"
-                android:hint="Package Name">
-
+                android:hint="Package Name"
+                style="@style/Widget.HookIntent.DialogTextInput">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/input_package_name"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@android:color/transparent"
-                    android:drawablePadding="-100dp"/>
+                    android:background="@null"
+                    android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+                    android:textColor="@color/dialog_text"
+                    android:textColorHint="@color/dialog_hint"
+                    android:minHeight="48dp" />
             </com.google.android.material.textfield.TextInputLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <!-- Method Name Input -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@android:color/transparent"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
-            app:strokeColor="@color/teal_700"
-            app:strokeWidth="4dp">
-
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/dialog_border"
+            app:strokeWidth="0dp"
+            app:cardBackgroundColor="@android:color/transparent">
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Method Name">
-
+                android:hint="Method Name"
+                style="@style/Widget.HookIntent.DialogTextInput">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/input_method_name"
-                    android:background="@android:color/transparent"
+                    android:background="@null"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+                    android:textColor="@color/dialog_text"
+                    android:textColorHint="@color/dialog_hint"
+                    android:minHeight="48dp" />
             </com.google.android.material.textfield.TextInputLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <!-- Class Name Input -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:background="@android:color/transparent"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
-            app:strokeColor="@color/teal_700"
-            app:strokeWidth="4dp">
-
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp"
+            app:strokeColor="@color/dialog_border"
+            app:strokeWidth="0dp"
+            app:cardBackgroundColor="@android:color/transparent">
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="Class Name">
-
+                android:hint="Class Name"
+                style="@style/Widget.HookIntent.DialogTextInput">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/input_class_name"
-                    android:background="@android:color/transparent"
+                    android:background="@null"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+                    android:textColor="@color/dialog_text"
+                    android:textColorHint="@color/dialog_hint"
+                    android:minHeight="48dp" />
             </com.google.android.material.textfield.TextInputLayout>
         </com.google.android.material.card.MaterialCardView>
-
-        <!-- Category Input with Color Picker -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
-
-            <!-- Category Input -->
+            android:orientation="vertical">
             <com.google.android.material.card.MaterialCardView
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:background="@android:color/transparent"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="4dp"
-                app:strokeColor="@color/teal_700"
-                app:strokeWidth="4dp">
-
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                app:strokeColor="@color/dialog_border"
+                app:strokeWidth="0dp"
+                app:cardBackgroundColor="@android:color/transparent">
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Category">
-
+                    android:hint="Category"
+                    style="@style/Widget.HookIntent.DialogTextInput">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/input_category"
-                        android:background="@android:color/transparent"
+                        android:background="@null"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                        android:layout_height="wrap_content"
+                        android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+                        android:textColor="@color/dialog_text"
+                        android:textColorHint="@color/dialog_hint"
+                        android:minHeight="48dp" />
                 </com.google.android.material.textfield.TextInputLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- Color Picker Button -->
             <Button
                 android:id="@+id/button_pick_color"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_marginEnd="8dp"
-                android:text="@string/pick_color" />
+                android:text="@string/pick_color"
+                style="@style/Widget.HookIntent.DialogButton"
+                android:minHeight="48dp"
+                android:layout_gravity="end"
+                android:layout_marginTop="4dp" />
         </LinearLayout>
-
-        <!-- Title Selection -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Select Title"
             android:textStyle="bold"
-            android:paddingTop="16dp" />
-        <!-- Title Args Input -->
+            android:paddingTop="16dp"
+            android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+            android:textColor="@color/dialog_text" />
         <LinearLayout
             android:id="@+id/layout_title_args"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal">
-
             <CheckBox
                 android:id="@+id/checkbox_title_args"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Args" />
-
-            <!-- Args Input -->
+                android:text="Args"
+                android:minHeight="48dp" />
             <EditText
                 android:id="@+id/input_title_args_index"
-                android:layout_width="50dp"
+                android:layout_width="72dp"
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:textAlignment="center"
-                android:hint="0" />
+                android:hint="0"
+                style="@style/Widget.HookIntent.DialogInput"
+                android:minHeight="48dp" />
         </LinearLayout>
-
-        <!-- Data Selection -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Select Data"
             android:textStyle="bold"
-            android:paddingTop="16dp" />
-        <!-- Data Args Input -->
+            android:paddingTop="16dp"
+            android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+            android:textColor="@color/dialog_text" />
         <LinearLayout
             android:id="@+id/layout_data_args"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal">
-
             <CheckBox
                 android:id="@+id/checkbox_data_args"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Args" />
-
-            <!-- Args Input -->
+                android:text="Args"
+                android:minHeight="48dp" />
             <EditText
                 android:id="@+id/input_data_args_index"
-                android:layout_width="50dp"
+                android:layout_width="72dp"
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:textAlignment="center"
-                android:hint="0" />
+                android:hint="0"
+                style="@style/Widget.HookIntent.DialogInput"
+                android:minHeight="48dp" />
         </LinearLayout>
-
-        <!-- Confirm Button -->
         <Button
             android:id="@+id/button_confirm"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
-            android:text="确认" />
-
+            android:text="确认"
+            style="@style/Widget.HookIntent.DialogButton"
+            android:minHeight="48dp"
+            android:layout_gravity="end" />
         <RelativeLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content">
-
             <ProgressBar
                 android:id="@+id/setting_progressBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerInParent="true"
                 android:visibility="gone" />
-
             <TextView
                 android:id="@+id/setting_loadingText"
                 android:layout_width="wrap_content"
@@ -215,9 +213,9 @@
                 android:layout_centerHorizontal="true"
                 android:layout_marginTop="16dp"
                 android:text="正在加载所有应用"
-                android:visibility="gone" />
-
+                android:visibility="gone"
+                android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
+                android:textColor="@color/dialog_secondary" />
         </RelativeLayout>
     </LinearLayout>
-
-</ScrollView>
+</com.fourtwo.hookintent.utils.DialogScrollView>

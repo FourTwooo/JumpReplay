@@ -1,7 +1,6 @@
 package com.fourtwo.hookintent;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.util.Log;
@@ -10,13 +9,12 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.widget.EditText;
 import android.widget.Toast;
-import android.graphics.drawable.GradientDrawable;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
@@ -24,6 +22,7 @@ import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.adapter.DisabledActivityAdapter;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
@@ -113,37 +112,13 @@ public class DisabledActivity extends AppCompatActivity {
             drawable = DrawableCompat.wrap(drawable.mutate());
             DrawableCompat.setTint(
                     drawable,
-                    android.graphics.Color.parseColor(enabled ? "#2E6EF7" : "#6B7280")
+                    ContextCompat.getColor(this, enabled ? R.color.dialog_accent : R.color.dialog_secondary)
             );
             regexToggle.setImageDrawable(drawable);
         }
 
         modeText.setText(enabled ? "正则匹配已启用" : "普通匹配");
-        modeText.setTextColor(android.graphics.Color.parseColor(enabled ? "#2E6EF7" : "#6B7280"));
-    }
-
-    private Button createDialogActionButton(String text, String fillColor, String strokeColor, String textColor) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setAllCaps(false);
-        button.setMinWidth(dp(78));
-        button.setPadding(dp(20), 0, dp(20), 0);
-        button.setTextSize(14);
-        button.setTypeface(null, android.graphics.Typeface.BOLD);
-        button.setTextColor(android.graphics.Color.parseColor(textColor));
-        button.setBackground(createRoundRect(fillColor, strokeColor, 999));
-        return button;
-    }
-
-    private GradientDrawable createRoundRect(String fillColor, String strokeColor, int radiusDp) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.RECTANGLE);
-        drawable.setColor(android.graphics.Color.parseColor(fillColor));
-        drawable.setCornerRadius(dp(radiusDp));
-        if (strokeColor != null) {
-            drawable.setStroke(dp(1), android.graphics.Color.parseColor(strokeColor));
-        }
-        return drawable;
+        modeText.setTextColor(ContextCompat.getColor(this, enabled ? R.color.dialog_accent : R.color.dialog_secondary));
     }
 
     private int dp(int value) {
@@ -153,61 +128,28 @@ public class DisabledActivity extends AppCompatActivity {
     private void showAddTextDialog() {
         final boolean[] isRegex = {false};
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(18));
-        root.setBackground(createRoundRect("#FCFCFD", "#ECEEF2", 24));
+        LinearLayout root = AppDialogs.content(this);
+        LinearLayout inputRow = new LinearLayout(root.getContext());
+        inputRow.setOrientation(LinearLayout.HORIZONTAL);
+        inputRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
 
-        TextView title = new TextView(this);
-        title.setText("添加 Scheme");
-        title.setTextSize(17);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setTextColor(android.graphics.Color.parseColor("#1F2937"));
-        root.addView(title);
-
-        LinearLayout inputBox = new LinearLayout(this);
-        inputBox.setOrientation(LinearLayout.HORIZONTAL);
-        inputBox.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        inputBox.setBackground(createRoundRect("#F3F4F6", "#F3F4F6", 18));
-        inputBox.setPadding(dp(14), dp(8), dp(12), dp(8));
-
-        LinearLayout.LayoutParams inputBoxLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        inputBoxLp.topMargin = dp(14);
-        root.addView(inputBox, inputBoxLp);
-
-        final EditText input = new EditText(this);
+        final EditText input = AppDialogs.input(this);
         input.setHint("输入 Scheme 或正则");
-        input.setBackground(null);
-        input.setTextSize(14);
-        input.setHintTextColor(android.graphics.Color.parseColor("#9CA3AF"));
-        input.setTextColor(android.graphics.Color.parseColor("#1F2937"));
         input.setSingleLine(true);
-        input.setPadding(0, dp(6), 0, dp(6));
+        inputRow.addView(input, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
-        );
-        inputBox.addView(input, inputLp);
+        ImageView regexToggle = new ImageView(root.getContext());
+        regexToggle.setPadding(dp(12), dp(12), dp(12), dp(12));
+        regexToggle.setContentDescription("切换正则匹配");
+        inputRow.addView(regexToggle, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        root.addView(inputRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        ImageView regexToggle = new ImageView(this);
-        regexToggle.setPadding(dp(8), dp(8), dp(8), dp(8));
-        inputBox.addView(regexToggle, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
-
-        TextView modeText = new TextView(this);
+        TextView modeText = new TextView(root.getContext());
         modeText.setTextSize(12);
-        modeText.setTextColor(android.graphics.Color.parseColor("#6B7280"));
         LinearLayout.LayoutParams modeLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         modeLp.topMargin = dp(8);
         root.addView(modeText, modeLp);
 
@@ -218,56 +160,18 @@ public class DisabledActivity extends AppCompatActivity {
             updateRegexToggle(regexToggle, modeText, isRegex[0]);
         });
 
-        LinearLayout buttonRow = new LinearLayout(this);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-        buttonRow.setGravity(android.view.Gravity.CENTER);
-
-        LinearLayout.LayoutParams rowLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        rowLp.topMargin = dp(18);
-        root.addView(buttonRow, rowLp);
-
-        Button cancelButton = createDialogActionButton(
-                "取消",
-                "#F3F4F6",
-                "#E6E8EC",
-                "#6B7280"
-        );
-
-        Button confirmButton = createDialogActionButton(
-                "确定",
-                "#EAF1FF",
-                "#D6E4FF",
-                "#2E6EF7"
-        );
-
-        LinearLayout.LayoutParams cancelLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        cancelLp.rightMargin = dp(8);
-
-        LinearLayout.LayoutParams confirmLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        confirmLp.leftMargin = dp(8);
-
-        buttonRow.addView(cancelButton, cancelLp);
-        buttonRow.addView(confirmButton, confirmLp);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = AppDialogs.builder(this)
+                .setTitle("添加 Scheme")
                 .setView(root)
+                .setPositiveButton("确定", null)
+                .setNegativeButton("取消", null)
                 .create();
 
         dialog.setCanceledOnTouchOutside(true);
         dialog.setCancelable(true);
-
-        cancelButton.setOnClickListener(v -> dialog.dismiss());
-
-        confirmButton.setOnClickListener(v -> {
+        dialog.show();
+        // A validation failure must keep the editor open, just like the original custom button.
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String newText = input.getText().toString().trim();
             if (newText.isEmpty()) {
                 Toast.makeText(this, "Scheme 不能为空", Toast.LENGTH_SHORT).show();
@@ -282,16 +186,6 @@ public class DisabledActivity extends AppCompatActivity {
             addDataToRecyclerView(newItem);
             dialog.dismiss();
         });
-
-        dialog.show();
-
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
-            dialog.getWindow().setLayout(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.90f),
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-        }
     }
 
     /**

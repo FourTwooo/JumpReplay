@@ -1,7 +1,7 @@
 package com.fourtwo.hookintent.ui.settings;
 
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -41,6 +41,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.utils.LoadingOverlay;
 import com.fourtwo.hookintent.utils.NetworkClient;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
@@ -148,7 +149,7 @@ public class SettingsFragment extends Fragment {
 
     @SuppressLint("NotifyDataSetChanged")
     private void onCategoryLongPressed(String category, int position) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        AlertDialog.Builder builder = AppDialogs.builder(requireContext());
         builder.setTitle("操作标签")
                 .setItems(new String[]{"删除", "编辑"}, (dialog, which) -> {
                     if (which == 0) {
@@ -245,7 +246,7 @@ public class SettingsFragment extends Fragment {
     private void showColorPickerDialog(Context context, String category) {
         Map<String, String> COLORS = JsonHandler.jsonToMap(SharedPreferencesUtils.getStr(context, Constants.COLORS_CONFIG));
         int color = COLORS.containsKey(category) ? Color.parseColor(COLORS.get(category)) : Color.GRAY;
-        AmbilWarnaDialog dialog = new AmbilWarnaDialog(context, color, new AmbilWarnaDialog.OnAmbilWarnaListener() {
+        AmbilWarnaDialog dialog = new AmbilWarnaDialog(AppDialogs.context(context), color, new AmbilWarnaDialog.OnAmbilWarnaListener() {
             @Override
             public void onOk(AmbilWarnaDialog dialog, int color) {
                 String colorHex = String.format("#%06X", (0xFFFFFF & color));
@@ -265,6 +266,7 @@ public class SettingsFragment extends Fragment {
             }
         });
         dialog.show();
+        AppDialogs.styleExternal(dialog.getDialog());
     }
 
     private void prepareCategoryData() {
@@ -402,8 +404,8 @@ public class SettingsFragment extends Fragment {
                                 @NonNull Context context,
                                 @NonNull Runnable onSaveCallback) {
 
-        View dialogView = LayoutInflater.from(context).inflate(R.layout.dialog_custom_hook, null);
-        AlertDialog.Builder builder = new AlertDialog.Builder(context);
+        AlertDialog.Builder builder = AppDialogs.builder(context);
+        View dialogView = LayoutInflater.from(builder.getContext()).inflate(R.layout.dialog_custom_hook, null);
         builder.setView(dialogView);
 
         TextInputEditText inputPackageName = dialogView.findViewById(R.id.input_package_name);
@@ -451,9 +453,9 @@ public class SettingsFragment extends Fragment {
 
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (!currentView(generation)) { loadingOverlay.hide(); return; }
-                    androidx.appcompat.app.AlertDialog.Builder builderPackages = new androidx.appcompat.app.AlertDialog.Builder(requireContext());
+                    AlertDialog.Builder builderPackages = AppDialogs.builder(requireContext());
 
-                    View dialogPackagesView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_custom_packages, null);
+                    View dialogPackagesView = LayoutInflater.from(builderPackages.getContext()).inflate(R.layout.dialog_custom_packages, null);
                     RecyclerView recyclerView = dialogPackagesView.findViewById(R.id.packages_list);
                     recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
@@ -461,7 +463,7 @@ public class SettingsFragment extends Fragment {
                     TextView all_package = dialogPackagesView.findViewById(R.id.all_package);
 
                     List<Map<String, Object>> filteredList = new ArrayList<>(appInfoHash);
-                    androidx.appcompat.app.AlertDialog dialog;
+                    AlertDialog dialog;
 
                     all_package.setText(String.format("共%d个应用", filteredList.size()));
 
@@ -516,19 +518,10 @@ public class SettingsFragment extends Fragment {
                         }
                     });
 
-                    if (dialog.getWindow() != null) {
-                        dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
-                    }
-
                     loadingOverlay.hide();
 
                     dialog.show();
-                    if (dialog.getWindow() != null) {
-                        dialog.getWindow().setLayout(
-                                (int) (getResources().getDisplayMetrics().widthPixels * 0.9),
-                                (int) (getResources().getDisplayMetrics().heightPixels * 0.9)
-                        );
-                    }
+                    AppDialogs.sizeForList(dialog);
                 });
             });
         });
@@ -563,10 +556,6 @@ public class SettingsFragment extends Fragment {
 
         AlertDialog dialog = track(builder.create());
 
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
-        }
-
         buttonPickColor.setOnClickListener(v -> {
             String category = Objects.requireNonNull(inputCategory.getText()).toString();
             if (category.isEmpty()) {
@@ -579,7 +568,7 @@ public class SettingsFragment extends Fragment {
                 colorConfig = Color.parseColor(COLORS.get(category));
             }
 
-            AmbilWarnaDialog colorDialog = new AmbilWarnaDialog(v.getContext(), colorConfig, new AmbilWarnaDialog.OnAmbilWarnaListener() {
+            AmbilWarnaDialog colorDialog = new AmbilWarnaDialog(AppDialogs.context(v.getContext()), colorConfig, new AmbilWarnaDialog.OnAmbilWarnaListener() {
                 @Override
                 public void onOk(AmbilWarnaDialog dialog, int color) {
                     newColor[0][0] = color;
@@ -591,6 +580,7 @@ public class SettingsFragment extends Fragment {
                 }
             });
             colorDialog.show();
+            AppDialogs.styleExternal(colorDialog.getDialog());
         });
 
         buttonConfirm.setOnClickListener(v -> {
@@ -692,7 +682,7 @@ public class SettingsFragment extends Fragment {
     }
 
     private void showAddEntryModeDialog() {
-        new AlertDialog.Builder(requireContext())
+        AppDialogs.builder(requireContext())
                 .setTitle("添加方式")
                 .setItems(new String[]{"手动添加", "云端导入"}, (dialog, which) -> {
                     if (which == 0) {
@@ -705,7 +695,8 @@ public class SettingsFragment extends Fragment {
     }
 
     private void showCloudConfigDialog() {
-        View dialogView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cloud_config, null);
+        AlertDialog.Builder builder = AppDialogs.builder(requireContext());
+        View dialogView = LayoutInflater.from(builder.getContext()).inflate(R.layout.dialog_cloud_config, null);
 
         AutoCompleteTextView inputUrl = dialogView.findViewById(R.id.input_cloud_url);
         Button requestButton = dialogView.findViewById(R.id.button_request_cloud);
@@ -715,7 +706,6 @@ public class SettingsFragment extends Fragment {
 
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setView(dialogView);
         AlertDialog dialog = track(builder.create());
 
@@ -780,13 +770,7 @@ public class SettingsFragment extends Fragment {
         });
 
         dialog.show();
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
-            dialog.getWindow().setLayout(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.95),
-                    (int) (getResources().getDisplayMetrics().heightPixels * 0.9)
-            );
-        }
+        AppDialogs.sizeForList(dialog);
 
         if (!initUrl.isEmpty() && !initUrl.startsWith("REPLACE_WITH_")) {
             requestCloudTemplates(initUrl, cloudAdapter, progressBar, emptyView, recyclerView, () -> {
@@ -807,7 +791,7 @@ public class SettingsFragment extends Fragment {
             return;
         }
 
-        new AlertDialog.Builder(requireContext())
+        AppDialogs.builder(requireContext())
                 .setTitle("删除地址")
                 .setMessage("从历史地址中删除当前 URL？\n\n" + url)
                 .setPositiveButton("删除", (dialog, which) -> {

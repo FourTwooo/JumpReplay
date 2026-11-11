@@ -18,6 +18,7 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.Menu;
+import android.view.LayoutInflater;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -42,6 +43,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.adapter.IntentInterceptAdapter;
 import com.fourtwo.hookintent.base.DetailPayloadStore;
 import com.fourtwo.hookintent.base.IntentPayloadCodec;
@@ -322,16 +324,11 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         currentIconPreview = iconPreview;
 
         // 创建图标选择对话框
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View view = getLayoutInflater().inflate(R.layout.icon_selection_dialog, null);
+        AlertDialog.Builder builder = AppDialogs.builder(this);
+        View view = LayoutInflater.from(builder.getContext()).inflate(R.layout.icon_selection_dialog, null);
         builder.setView(view);
 
         iconSelectionDialog = builder.create(); // 保存对话框实例
-
-        // 设置弹窗背景为圆角背景
-        if (iconSelectionDialog.getWindow() != null) {
-            iconSelectionDialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
-        }
 
         GridView iconsGrid = view.findViewById(R.id.icons_grid);
         ImageView customIconButton = view.findViewById(R.id.custom_icon_button);
@@ -346,6 +343,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
                     bindAppIcons(iconsGrid, iconPreview, icons);
                     loadingOverlay.hide();
                     targetDialog.show();
+                    AppDialogs.sizeForList(targetDialog);
                 });
             } catch (Exception | OutOfMemoryError error) {
                 uiHandler.post(() -> {
@@ -386,7 +384,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
             return;
         }
 
-        new AlertDialog.Builder(this)
+        AppDialogs.builder(this)
                 .setTitle("无法创建桌面快捷方式")
                 .setMessage(message + "\n\n你可以进入应用权限或桌面权限设置，打开“创建桌面快捷方式”权限后再试。")
                 .setPositiveButton("去设置", (dialog, which) ->
@@ -397,15 +395,11 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     }
     public void SetShortcut() {
         // 在 Activity 或 Fragment 中使用 Dialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View view = getLayoutInflater().inflate(R.layout.shortcut_config_dialog, null);
+        AlertDialog.Builder builder = AppDialogs.builder(this);
+        View view = LayoutInflater.from(builder.getContext()).inflate(R.layout.shortcut_config_dialog, null);
         builder.setView(view);
 
         AlertDialog dialog = builder.create();
-        // 设置弹窗背景为圆角背景
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
-        }
 
         // 获取控件
         TextInputEditText shortcutName = view.findViewById(R.id.shortcut_name);
@@ -426,16 +420,16 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         // 动态添加参数
         addParamButton.setOnClickListener(v -> {
             // 创建一个水平布局，用来包含 EditText 和删除按钮
-            LinearLayout paramContainer = new LinearLayout(this);
+            LinearLayout paramContainer = new LinearLayout(view.getContext());
             paramContainer.setOrientation(LinearLayout.HORIZONTAL);
 
             // 创建 EditText 参数输入框
-            EditText paramInput = new EditText(this);
+            EditText paramInput = AppDialogs.input(this);
             paramInput.setHint("请输入参数");
             paramInput.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
             // 创建删除按钮
-            ImageButton deleteButton = new ImageButton(this);
+            ImageButton deleteButton = new ImageButton(view.getContext());
             deleteButton.setBackground(null); // 移除默认背景
             deleteButton.setImageResource(R.drawable.baseline_delete_outline_24);
             deleteButton.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));

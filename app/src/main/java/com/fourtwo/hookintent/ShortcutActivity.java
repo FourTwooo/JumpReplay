@@ -5,14 +5,8 @@ import android.os.Bundle;
 import android.util.Log;
 import android.widget.EditText;
 import android.widget.LinearLayout;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
-import android.graphics.drawable.GradientDrawable;
-import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,12 +14,12 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.fourtwo.hookintent.utils.AndroidShortcutBackend;
+import com.fourtwo.hookintent.utils.AppDialogs;
+import com.fourtwo.hookintent.utils.DialogScrollView;
 import com.fourtwo.hookintent.utils.ShortcutLaunchCoordinator;
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.ProgressBar;
 
-import java.net.URISyntaxException;
 import com.fourtwo.hookintent.utils.ShortcutParameterReplacer;
 import com.fourtwo.hookintent.utils.ShortcutPayloadStore;
 import com.fourtwo.hookintent.utils.IntentReplay;
@@ -35,21 +29,15 @@ public class ShortcutActivity extends AppCompatActivity {
     private AlertDialog parameterDialog;
     private AlertDialog waitingDialog;
     private TextView waitingText;
+    private TextView launchStatus;
     private String waitingMessage;
     private final Handler launchUi = new Handler(Looper.getMainLooper());
     private ShortcutLaunchCoordinator launches;
     private final Runnable showWaiting = () -> {
         if (isFinishing() || isDestroyed() || waitingMessage == null || waitingDialog != null) return;
-        LinearLayout layout = new LinearLayout(this);
-        layout.setOrientation(LinearLayout.HORIZONTAL);
-        layout.setGravity(Gravity.CENTER_VERTICAL);
-        layout.setPadding(dp(24), dp(20), dp(24), dp(20));
-        layout.addView(new ProgressBar(this), new LinearLayout.LayoutParams(dp(30), dp(30)));
-        waitingText = new TextView(this);
-        waitingText.setText(waitingMessage);
-        waitingText.setPadding(dp(16), 0, 0, 0);
-        layout.addView(waitingText);
-        waitingDialog = new AlertDialog.Builder(this).setView(layout).create();
+        AppDialogs.ProgressContent content = AppDialogs.progress(this, waitingMessage);
+        waitingText = content.message;
+        waitingDialog = AppDialogs.builder(this).setView(content).create();
         waitingDialog.setCanceledOnTouchOutside(false);
         waitingDialog.setOnCancelListener(dialog -> { launches.cancel(); finish(); });
         waitingDialog.show();
@@ -70,6 +58,7 @@ public class ShortcutActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         launches.cancel();
+        launchStatus = null;
         hideWaiting();
         if (parameterDialog != null) {
             parameterDialog.setOnDismissListener(null);
@@ -124,7 +113,9 @@ public class ShortcutActivity extends AppCompatActivity {
         launches.launch(target, privileged, mode, new ShortcutLaunchCoordinator.Callback() {
             @Override public void waiting(String message) {
                 if (isFinishing() || isDestroyed()) return;
-                if (confirm != null) confirm.setText(message);
+                if (confirm != null) {
+                    if (launchStatus != null) { launchStatus.setText(message); launchStatus.setVisibility(android.view.View.VISIBLE); }
+                }
                 else {
                     waitingMessage = message;
                     if (waitingText != null) waitingText.setText(message);
@@ -137,7 +128,10 @@ public class ShortcutActivity extends AppCompatActivity {
                 if (isFinishing() || isDestroyed()) return;
                 if (error != null) {
                     Toast.makeText(ShortcutActivity.this, "启动失败：" + error.getMessage(), Toast.LENGTH_LONG).show();
-                    if (confirm != null) { confirm.setEnabled(true); confirm.setText("确认"); }
+                    if (confirm != null) {
+                        confirm.setEnabled(true);
+                        if (launchStatus != null) launchStatus.setVisibility(android.view.View.GONE);
+                    }
                     else finish();
                     return;
                 }
@@ -154,208 +148,59 @@ public class ShortcutActivity extends AppCompatActivity {
      * @param replaceParams 替换参数列表
      */
     private void showReplaceParamsDialog(String targetIntent, String[] replaceParams, Boolean isChecked, String selectedItem) {
-        final EditText[] editTexts = new EditText[replaceParams.length];
-
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(18), dp(18), dp(18), dp(18));
-        root.setBackground(createRoundRect("#FCFCFD", "#ECEEF2", 24));
-
-//        TextView title = createDialogTitle("替换参数");
-//        root.addView(title);
-
-        ScrollView scrollView = new ScrollView(this);
-        LinearLayout.LayoutParams scrollLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                replaceParams.length > 3 ? dp(280) : ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        scrollLp.topMargin = dp(14);
-        root.addView(scrollView, scrollLp);
-
-        LinearLayout formContainer = new LinearLayout(this);
-        formContainer.setOrientation(LinearLayout.VERTICAL);
-        scrollView.addView(formContainer, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        ));
-
-        for (int i = 0; i < replaceParams.length; i++) {
-//            TextView label = createDialogFieldLabel(replaceParams[i]);
-//            if (i > 0) {
-//                LinearLayout.LayoutParams labelLp = new LinearLayout.LayoutParams(
-//                        ViewGroup.LayoutParams.WRAP_CONTENT,
-//                        ViewGroup.LayoutParams.WRAP_CONTENT
-//                );
-//                labelLp.topMargin = dp(14);
-//                formContainer.addView(label, labelLp);
-//            } else {
-//                formContainer.addView(label);
-//            }
-
-            EditText input = createDialogInput("替换 " + replaceParams[i] + " 的值");
-            editTexts[i] = input;
-
-            LinearLayout inputBox = wrapDialogInput(input);
-            LinearLayout.LayoutParams inputBoxLp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-            inputBoxLp.topMargin = dp(8);
-            formContainer.addView(inputBox, inputBoxLp);
+        EditText[] inputs = new EditText[replaceParams.length];
+        LinearLayout content = AppDialogs.content(this);
+        for (int index = 0; index < replaceParams.length; index++) {
+            EditText input = AppDialogs.input(this);
+            input.setHint(getString(R.string.dialog_replace_parameter, replaceParams[index]));
+            input.setSingleLine(true);
+            inputs[index] = input;
+            LinearLayout.LayoutParams parameters = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (index > 0) parameters.topMargin = dp(12);
+            content.addView(input, parameters);
         }
-
-        LinearLayout buttonRow = createDialogButtonRow();
-        LinearLayout.LayoutParams buttonRowLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        buttonRowLp.topMargin = dp(18);
-        root.addView(buttonRow, buttonRowLp);
-
-        Button cancelButton = createDialogActionButton(
-                "取消",
-                "#F3F4F6",
-                "#E6E8EC",
-                "#6B7280"
-        );
-
-        Button confirmButton = createDialogActionButton(
-                "确认",
-                "#EAF1FF",
-                "#D6E4FF",
-                "#2E6EF7"
-        );
-
-        LinearLayout.LayoutParams cancelLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        cancelLp.rightMargin = dp(8);
-
-        LinearLayout.LayoutParams confirmLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                dp(38)
-        );
-        confirmLp.leftMargin = dp(8);
-
-        buttonRow.addView(cancelButton, cancelLp);
-        buttonRow.addView(confirmButton, confirmLp);
-
-        AlertDialog dialog = new AlertDialog.Builder(this)
-                .setView(root)
+        launchStatus = new TextView(AppDialogs.context(this));
+        launchStatus.setTextAppearance(this, R.style.TextAppearance_HookIntent_DialogBody);
+        launchStatus.setVisibility(android.view.View.GONE);
+        LinearLayout.LayoutParams statusParameters = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        statusParameters.topMargin = dp(12);
+        content.addView(launchStatus, statusParameters);
+        DialogScrollView scroll = new DialogScrollView(AppDialogs.context(this));
+        scroll.addView(content);
+        AlertDialog dialog = AppDialogs.builder(this)
+                .setTitle(R.string.dialog_shortcut_parameters)
+                .setView(scroll)
+                .setNegativeButton(R.string.cancel, (dismissed, which) -> dismissed.dismiss())
+                .setPositiveButton(R.string.ok, null)
                 .create();
-
         dialog.setCanceledOnTouchOutside(true);
-        dialog.setCancelable(true);
-
-        cancelButton.setOnClickListener(v -> dialog.dismiss());
-
-        confirmButton.setOnClickListener(v -> {
-            try {
-                String[] replacements = new String[replaceParams.length];
-                for (int i = 0; i < replaceParams.length; i++) {
-                    replacements[i] = editTexts[i].getText() == null ? "" : editTexts[i].getText().toString();
+        dialog.setOnShowListener(shown -> {
+            Button confirm = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            confirm.setOnClickListener(view -> {
+                try {
+                    String[] replacements = new String[replaceParams.length];
+                    for (int index = 0; index < replaceParams.length; index++) {
+                        replacements[index] = inputs[index].getText() == null ? "" : inputs[index].getText().toString();
+                    }
+                    String finalText = ShortcutParameterReplacer.replace(targetIntent, replaceParams, replacements);
+                    Intent target = IntentReplay.fromText(finalText, originalTarget, originalTargetText);
+                    launchTarget(target, isChecked, selectedItem, confirm);
+                } catch (Exception error) {
+                    Log.e("ShortcutActivity", "Cannot read shortcut parameters", error);
+                    Toast.makeText(this, "Intent URI 解析失败", Toast.LENGTH_SHORT).show();
                 }
-                String finalTargetIntent = ShortcutParameterReplacer.replace(targetIntent, replaceParams, replacements);
-                Intent newIntent = IntentReplay.fromText(finalTargetIntent, originalTarget, originalTargetText);
-                launchTarget(newIntent, isChecked, selectedItem, confirmButton);
-            } catch (Exception e) {
-                Log.e("TransparentDialogActivity", "Intent URI 解析失败", e);
-                Toast.makeText(this, "Intent URI 解析失败", Toast.LENGTH_SHORT).show();
-            }
+            });
         });
-
         parameterDialog = dialog;
-        dialog.setOnDismissListener(dialogInterface -> {
+        dialog.setOnDismissListener(dismissed -> {
             parameterDialog = null;
+            launchStatus = null;
             launches.cancel();
             finish();
         });
-
         dialog.show();
-
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(
-                    (int) (getResources().getDisplayMetrics().widthPixels * 0.90f),
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-            );
-        }
-    }
-
-    private TextView createDialogTitle(String text) {
-        TextView title = new TextView(this);
-        title.setText(text);
-        title.setTextSize(17);
-        title.setTypeface(null, Typeface.BOLD);
-        title.setTextColor(Color.parseColor("#1F2937"));
-        return title;
-    }
-
-    private TextView createDialogFieldLabel(String text) {
-        TextView label = new TextView(this);
-        label.setText(text);
-        label.setTextSize(12);
-        label.setTextColor(Color.parseColor("#6B7280"));
-        return label;
-    }
-
-    private EditText createDialogInput(String hint) {
-        EditText input = new EditText(this);
-        input.setHint(hint);
-        input.setBackground(null);
-        input.setTextSize(14);
-        input.setHintTextColor(Color.parseColor("#9CA3AF"));
-        input.setTextColor(Color.parseColor("#1F2937"));
-        input.setSingleLine(true);
-        input.setPadding(0, dp(6), 0, dp(6));
-        return input;
-    }
-
-    private LinearLayout wrapDialogInput(EditText input) {
-        LinearLayout inputBox = new LinearLayout(this);
-        inputBox.setOrientation(LinearLayout.HORIZONTAL);
-        inputBox.setGravity(Gravity.CENTER_VERTICAL);
-        inputBox.setBackground(createRoundRect("#F3F4F6", "#F3F4F6", 18));
-        inputBox.setPadding(dp(14), dp(8), dp(12), dp(8));
-
-        LinearLayout.LayoutParams inputLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-        inputBox.addView(input, inputLp);
-        return inputBox;
-    }
-
-    private LinearLayout createDialogButtonRow() {
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER);
-        return row;
-    }
-
-    private Button createDialogActionButton(String text, String fillColor, String strokeColor, String textColor) {
-        Button button = new Button(this);
-        button.setText(text);
-        button.setAllCaps(false);
-        button.setMinWidth(dp(78));
-        button.setPadding(dp(20), 0, dp(20), 0);
-        button.setTextSize(14);
-        button.setTypeface(null, Typeface.BOLD);
-        button.setTextColor(Color.parseColor(textColor));
-        button.setBackground(createRoundRect(fillColor, strokeColor, 999));
-        return button;
-    }
-
-    private GradientDrawable createRoundRect(String fillColor, String strokeColor, int radiusDp) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setShape(GradientDrawable.RECTANGLE);
-        drawable.setColor(Color.parseColor(fillColor));
-        drawable.setCornerRadius(dp(radiusDp));
-        if (strokeColor != null) {
-            drawable.setStroke(dp(1), Color.parseColor(strokeColor));
-        }
-        return drawable;
     }
 
     private int dp(int value) {

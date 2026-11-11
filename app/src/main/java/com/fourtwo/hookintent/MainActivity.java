@@ -26,6 +26,7 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ReleaseInfo;
 import com.fourtwo.hookintent.databinding.ActivityMainBinding;
@@ -211,11 +212,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        ScrollView scrollView = new ScrollView(this);
+        AlertDialog.Builder dialogBuilder = AppDialogs.builder(this);
+        ScrollView scrollView = new ScrollView(dialogBuilder.getContext());
         int padding = dpToPx(20);
         scrollView.setFillViewport(true);
 
-        TextView contentView = new TextView(this);
+        TextView contentView = new TextView(dialogBuilder.getContext());
         contentView.setText(readRawText(R.raw.legal_notice));
         contentView.setTextSize(14f);
         contentView.setTextIsSelectable(false);
@@ -227,7 +229,7 @@ public class MainActivity extends AppCompatActivity {
 
         scrollView.addView(contentView);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = dialogBuilder
                 .setTitle(R.string.legal_notice_title)
                 .setView(scrollView)
                 .setCancelable(false)
@@ -291,10 +293,11 @@ public class MainActivity extends AppCompatActivity {
         if (!canUpdateUi()) return;
         String currentVersion = getAppVersionName(this);
 
-        ScrollView scrollView = new ScrollView(this);
+        AlertDialog.Builder dialogBuilder = AppDialogs.builder(this);
+        ScrollView scrollView = new ScrollView(dialogBuilder.getContext());
         int padding = dpToPx(20);
 
-        TextView contentView = new TextView(this);
+        TextView contentView = new TextView(dialogBuilder.getContext());
         contentView.setText(
                 getString(R.string.update_current_latest, currentVersion, normalizeVersionString(release.getDisplayVersion()))
                         + "\n\n"
@@ -307,7 +310,7 @@ public class MainActivity extends AppCompatActivity {
         contentView.setPadding(padding, padding, padding, padding);
         scrollView.addView(contentView);
 
-        new AlertDialog.Builder(this)
+        dialogBuilder
                 .setTitle(R.string.update_found_title)
                 .setView(scrollView)
                 .setPositiveButton(R.string.update_action_now, (dialog, which) -> downloadAndInstallUpdate(release))
