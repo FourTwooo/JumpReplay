@@ -1,0 +1,20 @@
+<resources>
+    <color name="screen_bg">#17191E</color>
+    <color name="screen_surface">#252930</color>
+    <color name="screen_text">#E9ECF2</color>
+    <color name="screen_secondary">#B8C0CE</color>
+    <color name="screen_hint">#A2ACBC</color>
+    <color name="screen_primary">#30343C</color>
+    <color name="screen_control_active">#A6C8FF</color>
+    <color name="screen_toolbar">#30343C</color>
+    <color name="screen_border">#454D5B</color>
+    <color name="screen_input">#252B38</color>
+    <color name="screen_code">#20242C</color>
+    <color name="screen_pressed">#353D4B</color>
+    <color name="screen_accent">#A6C8FF</color>
+    <color name="screen_divider">#454D5B</color>
+    <color name="screen_nav_selected">#A6C8FF</color>
+    <color name="light_red">#402D31</color>
+    <color name="light_green">#263D38</color>
+    <color name="red">#EAA09A</color>
+</resources>

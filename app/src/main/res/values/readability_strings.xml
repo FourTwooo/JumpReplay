@@ -1,0 +1,13 @@
+<resources>
+    <string name="detail_fields">字段</string>
+    <string name="detail_stack">调用堆栈</string>
+    <string name="detail_copy_full">长按复制完整内容</string>
+    <string name="detail_copied">已复制到剪贴板</string>
+    <string name="home_empty_title">还没有捕获记录</string>
+    <string name="home_empty_body">点击右下角开始捕获，再到目标应用中操作。</string>
+    <string name="home_empty_wait_title">等待新的跳转</string>
+    <string name="home_empty_wait_body">在目标应用中操作后，记录会显示在这里。</string>
+    <string name="home_empty_search_title">没有匹配的记录</string>
+    <string name="home_empty_search_body">试试其他关键词，或清空搜索查看全部记录。</string>
+    <string name="home_module_hint">未检测到模块激活状态，LSPatch 可忽略此提示。</string>
+</resources>

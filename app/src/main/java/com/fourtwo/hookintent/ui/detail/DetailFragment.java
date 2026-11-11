@@ -96,10 +96,12 @@ public class DetailFragment extends Fragment {
         tabLayout = view.findViewById(R.id.tabLayout);
         TextView tabTextView = view.findViewById(R.id.tabTextView);
         tabTextView.setMovementMethod(new ScrollingMovementMethod());
+        enableFullCopy(urlTextView);
+        enableFullCopy(tabTextView);
 
         // 设置 TabLayout 的选项卡
-        tabLayout.addTab(tabLayout.newTab().setText("Text"));
-        tabLayout.addTab(tabLayout.newTab().setText("StackTrace"));
+        tabLayout.addTab(tabLayout.newTab().setText(R.string.detail_fields));
+        tabLayout.addTab(tabLayout.newTab().setText(R.string.detail_stack));
 
         loadItemData();
 
@@ -186,6 +188,18 @@ public class DetailFragment extends Fragment {
 
 
         return view;
+    }
+
+    private void enableFullCopy(TextView textView) {
+        androidx.appcompat.widget.TooltipCompat.setTooltipText(textView, getString(R.string.detail_copy_full));
+        textView.setOnLongClickListener(view -> {
+            ClipboardManager clipboard = (ClipboardManager) requireContext().getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(ClipData.newPlainText("Detail", textView.getText()));
+                Toast.makeText(requireContext(), R.string.detail_copied, Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        });
     }
 
     @Override

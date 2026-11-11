@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/white"
+    android:background="@color/screen_bg"
     tools:context=".IntentIntercept">
 
     <!-- AppBar -->
@@ -17,7 +17,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#888888"
+            android:background="@color/screen_toolbar"
             app:popupTheme="@style/Theme.HookIntent.PopupOverlay"
             tools:menu="@menu/intercept_main_drawer" />
     </com.google.android.material.appbar.AppBarLayout>
@@ -39,7 +39,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#DADADA"
+        android:background="@color/screen_surface"
         android:elevation="8dp"
         android:padding="6dp">
 
@@ -49,9 +49,9 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/white"
+            android:backgroundTint="@color/screen_surface"
             android:text="@string/reset_intent"
-            android:textColor="@color/black"
+            android:textColor="@color/screen_text"
             android:textStyle="bold"
             app:cornerRadius="50dp"
             app:iconGravity="start"

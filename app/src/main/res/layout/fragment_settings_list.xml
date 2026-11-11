@@ -81,7 +81,7 @@
 
     <!-- Switch Button -->
     <com.suke.widget.SwitchButton
-        app:sb_checked_color="@color/teal_700"
+        app:sb_checked_color="@color/screen_control_active"
         android:id="@+id/switch_toggle"
         android:layout_width="60dp"
         android:layout_height="40dp"

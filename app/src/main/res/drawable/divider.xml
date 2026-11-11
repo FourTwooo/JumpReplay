@@ -2,5 +2,5 @@
     android:shape="rectangle">
     <size android:height="1dp" />
     <corners android:radius="12dp"/> <!-- 圆角半径 -->
-    <solid android:color="#3BE0E0E0" /> <!-- 选择较浅的颜色 -->
+    <solid android:color="@color/screen_divider" /> <!-- 选择较浅的颜色 -->
 </shape>

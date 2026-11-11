@@ -43,10 +43,6 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
 
     private List<ItemData> mData;
     private List<ItemData> filteredData;
-    private final int normalColor = Color.WHITE;
-    private final int pressedColor = Color.LTGRAY;
-
-
     public HomeAdapter(List<ItemData> data) {
         this.mData = data != null ? new ArrayList<>(data) : new ArrayList<>();
         this.filteredData = new ArrayList<>(this.mData);
@@ -115,6 +111,8 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
             @SuppressLint("ClickableViewAccessibility")
             @Override
             public boolean onTouch(View v, MotionEvent event) {
+                int normalColor = ContextCompat.getColor(v.getContext(), R.color.screen_bg);
+                int pressedColor = ContextCompat.getColor(v.getContext(), R.color.screen_pressed);
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
                         startColorAnimation(holder.itemView, normalColor, pressedColor);

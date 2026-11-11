@@ -5,7 +5,6 @@ import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -53,7 +52,7 @@ public class DetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
                     RecyclerView.LayoutParams.MATCH_PARENT,
                     1  // Set height for the separator
             ));
-            view.setBackgroundResource(android.R.color.darker_gray);  // Set a different color for separator
+            view.setBackgroundResource(R.color.screen_border);  // Set a different color for separator
             return new SeparatorViewHolder(view);
         } else {
             View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.detail_item_data, parent, false);
@@ -92,8 +91,8 @@ public class DetailAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
                 @SuppressLint("ClickableViewAccessibility")
                 @Override
                 public boolean onTouch(View v, MotionEvent event) {
-                    int normalColor = Color.WHITE;
-                    int pressedColor = Color.LTGRAY;
+                    int normalColor = androidx.core.content.ContextCompat.getColor(v.getContext(), R.color.screen_bg);
+                    int pressedColor = androidx.core.content.ContextCompat.getColor(v.getContext(), R.color.screen_pressed);
                     switch (event.getAction()) {
                         case MotionEvent.ACTION_DOWN:
                             startColorAnimation(dataHolder.itemView, normalColor, pressedColor);

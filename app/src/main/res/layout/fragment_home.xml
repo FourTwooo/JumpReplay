@@ -7,19 +7,19 @@
     android:focusableInTouchMode="true"
     tools:context=".ui.home.HomeFragment">
 
-    <TextView
-        android:id="@+id/empty_view"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:text="@string/empty_view"
-        android:textSize="18sp"
-        android:visibility="gone"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
-
+    <LinearLayout android:id="@+id/empty_state" android:layout_width="0dp"
+        android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center"
+        android:layout_marginStart="32dp" android:layout_marginEnd="32dp" android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/home_search_box"
+        app:layout_constraintBottom_toTopOf="@id/fab"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
+        <TextView android:id="@+id/empty_title" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center" android:textSize="16sp"
+            android:fontFamily="sans-serif-medium" android:textColor="@color/screen_text" />
+        <TextView android:id="@+id/empty_view" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:gravity="center" android:textSize="14sp"
+            android:layout_marginTop="8dp" android:lineSpacingExtra="4dp" android:textColor="@color/screen_secondary" />
+    </LinearLayout>
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/home_search_box"
@@ -49,6 +49,7 @@
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recycler_view"
+        android:paddingBottom="88dp" android:clipToPadding="false"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -62,6 +63,13 @@
         tools:listitem="@layout/fragment_item_list"
         tools:itemCount="2"
         tools:ignore="NotSibling" />
+
+    <TextView android:id="@+id/module_hint" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:text="@string/home_module_hint" android:textColor="@color/screen_secondary"
+        android:textSize="12sp" android:lineSpacingExtra="2dp" android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp" android:layout_marginBottom="24dp"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toStartOf="@id/fab"
+        app:layout_constraintBottom_toBottomOf="parent" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab"

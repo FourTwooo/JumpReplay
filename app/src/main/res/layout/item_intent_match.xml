@@ -44,7 +44,7 @@
         android:layout_marginTop="1dp"
         android:text="@string/intent_app_activity"
         android:textSize="12sp"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="@color/screen_secondary"
         app:layout_constraintEnd_toStartOf="@id/open_button"
         app:layout_constraintStart_toEndOf="@id/app_icon"
         app:layout_constraintTop_toBottomOf="@id/app_name" />
@@ -56,7 +56,7 @@
         android:layout_height="40dp"
         android:layout_marginStart="8dp"
         android:background="?selectableItemBackgroundBorderless"
-        android:tint="@color/teal_700"
+        android:tint="@color/screen_secondary"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent"

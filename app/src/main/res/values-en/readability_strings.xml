@@ -1,0 +1,13 @@
+<resources>
+    <string name="detail_fields">Fields</string>
+    <string name="detail_stack">Stack trace</string>
+    <string name="detail_copy_full">Long press to copy full content</string>
+    <string name="detail_copied">Copied to clipboard</string>
+    <string name="home_empty_title">No captures yet</string>
+    <string name="home_empty_body">Start capturing with the button below, then use the target app.</string>
+    <string name="home_empty_wait_title">Waiting for a new intent</string>
+    <string name="home_empty_wait_body">Use the target app. Captured intents will appear here.</string>
+    <string name="home_empty_search_title">No matching records</string>
+    <string name="home_empty_search_body">Try another keyword, or clear the search to see all records.</string>
+    <string name="home_module_hint">Module activation was not detected. LSPatch users can ignore this.</string>
+</resources>

@@ -57,6 +57,10 @@ public class HomeFragment extends Fragment {
     private final String TAG = "HomeFragment";
     private RecyclerView recyclerView;
     private TextView emptyView;
+    private TextView emptyTitle;
+    private View emptyState;
+    private View moduleHint;
+    private EditText searchInput;
     private HomeAdapter adapter;
     private MainViewModel viewModel;
 
@@ -76,6 +80,7 @@ public class HomeFragment extends Fragment {
         }
         input.setError(null);
         repository.setQuery(query, regexSearch);
+        updateEmptyState();
     }
 
     @Override public void onSaveInstanceState(@NonNull Bundle state) {
@@ -309,24 +314,23 @@ public class HomeFragment extends Fragment {
         if (isHook) {
             fab.setImageResource(android.R.drawable.ic_media_pause);
             fab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#47AA4B")));
-            setEmptyView(getString(R.string.empty_view_not));
         } else {
-            setEmptyView(getString(R.string.empty_view));
             fab.setImageResource(android.R.drawable.ic_media_play);
             fab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#CE1A7EAC")));
         }
+        updateEmptyState();
         HookStatusManager.setHook(isHook);
         Log.d(TAG, "isHook: " + isHook);
     }
 
-    @SuppressLint("SetTextI18n")
-    private void setEmptyView(String text) {
-        if (MainActivity.isXposed()) {
-            emptyView.setText(text);
-        } else {
-            emptyView.setText(getString(R.string.empty_view_not_xposed_text));
-            emptyView.setTextColor(ContextCompat.getColor(requireContext(), R.color.red));
-        }
+    private void updateEmptyState() {
+        if (emptyTitle == null) return;
+        boolean searching = searchInput != null && !searchInput.getText().toString().trim().isEmpty();
+        emptyTitle.setText(searching ? R.string.home_empty_search_title
+                : isHook ? R.string.home_empty_wait_title : R.string.home_empty_title);
+        emptyView.setText(searching ? R.string.home_empty_search_body
+                : isHook ? R.string.home_empty_wait_body : R.string.home_empty_body);
+        moduleHint.setVisibility(MainActivity.isXposed() ? View.GONE : View.VISIBLE);
     }
 
     @Nullable
@@ -336,7 +340,11 @@ public class HomeFragment extends Fragment {
 
         recyclerView = root.findViewById(R.id.recycler_view);
         emptyView = root.findViewById(R.id.empty_view);
-        setEmptyView(getString(R.string.empty_view));
+        emptyTitle = root.findViewById(R.id.empty_title);
+        emptyState = root.findViewById(R.id.empty_state);
+        moduleHint = root.findViewById(R.id.module_hint);
+        searchInput = root.findViewById(R.id.searchEditText);
+        updateEmptyState();
 
         // Set up RecyclerView
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -347,12 +355,13 @@ public class HomeFragment extends Fragment {
     }
 
     private void toggleEmptyView(List<ItemData> data) {
+        updateEmptyState();
         if (data == null || data.isEmpty()) {
             recyclerView.setVisibility(View.GONE);
-            emptyView.setVisibility(View.VISIBLE);
+            emptyState.setVisibility(View.VISIBLE);
         } else {
             recyclerView.setVisibility(View.VISIBLE);
-            emptyView.setVisibility(View.GONE);
+            emptyState.setVisibility(View.GONE);
         }
     }
 

@@ -35,7 +35,7 @@
                     android:layout_centerInParent="true"
                     android:contentDescription="TODO"
                     android:src="@drawable/outline_cancel_24"
-                    app:tint="@color/teal_700" />
+                    app:tint="@color/screen_secondary" />
 
             </RelativeLayout>
 
@@ -52,7 +52,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Shizuku 服务不可用"
-                    android:textColor="#000000"
+                    android:textColor="@color/screen_text"
                     android:textSize="16sp" />
 
                 <!-- 描述文本 -->
@@ -62,7 +62,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="版本 13.5, root"
-                    android:textColor="#808080"
+                    android:textColor="@color/screen_secondary"
                     android:textSize="14sp" />
             </LinearLayout>
 
@@ -98,7 +98,7 @@
                     android:layout_centerInParent="true"
                     android:contentDescription="TODO"
                     android:src="@drawable/baseline_check_circle_outline_24"
-                    app:tint="@color/teal_700" />
+                    app:tint="@color/screen_secondary" />
 
             </RelativeLayout>
 
@@ -116,7 +116,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Root 服务可用"
-                    android:textColor="#000000"
+                    android:textColor="@color/screen_text"
                     android:textSize="16sp" />
 
                 <!-- 描述文本 -->
@@ -126,7 +126,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text=""
-                    android:textColor="#808080"
+                    android:textColor="@color/screen_secondary"
                     android:textSize="14sp" />
             </LinearLayout>
         </LinearLayout>
@@ -161,7 +161,7 @@
                     android:layout_centerInParent="true"
                     android:contentDescription="TODO"
                     android:src="@drawable/outline_cancel_24"
-                    app:tint="@color/teal_700" />
+                    app:tint="@color/screen_secondary" />
 
             </RelativeLayout>
 
@@ -178,7 +178,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Xposed 框架不可用"
-                    android:textColor="#000000"
+                    android:textColor="@color/screen_text"
                     android:textSize="16sp" />
 
                 <!-- 描述文本 -->
@@ -188,7 +188,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
                     android:text="部分功能不可用(LSPatch则忽略)"
-                    android:textColor="#808080"
+                    android:textColor="@color/screen_secondary"
                     android:textSize="14sp" />
             </LinearLayout>
 
@@ -200,7 +200,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="20dp"
-        app:cardBackgroundColor="@color/teal_200"
+        app:cardBackgroundColor="@color/screen_surface"
         app:cardCornerRadius="36dp"
         app:cardElevation="0dp">
 

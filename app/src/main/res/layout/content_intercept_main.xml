@@ -72,7 +72,7 @@
         android:paddingBottom="2dp"
         android:layout_marginBottom="8dp"
         android:text="@string/match_apps"
-        android:textColor="@color/teal_700"
+        android:textColor="@color/screen_secondary"
         android:textSize="18sp"
         android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"

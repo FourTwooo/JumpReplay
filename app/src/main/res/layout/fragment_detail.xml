@@ -1,67 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@android:color/white"
-    android:padding="2dp">
-
-    <!-- Always visible URL TextView -->
-    <TextView
-        android:id="@+id/urlTextView"
-        android:layout_width="0dp"
-        android:text="@string/activity"
-        android:layout_height="wrap_content"
-        android:paddingBottom="8dp"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:background="@color/screen_bg">
+    <TextView android:id="@+id/urlTextView" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_margin="12dp" android:padding="12dp" android:textSize="13sp"
+        android:fontFamily="monospace" android:textColor="@color/screen_text"
+        android:background="@color/screen_code" android:breakStrategy="simple"
+        android:hyphenationFrequency="none" android:lineSpacingExtra="3dp"
+        android:maxLines="4" android:ellipsize="end"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
-
-    <!-- FrameLayout for dynamic content -->
-    <FrameLayout
-        android:id="@+id/contentFrame"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        app:layout_constraintBottom_toTopOf="@id/tabLayout"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/urlTextView"
-        app:layout_constraintVertical_bias="0"
-        tools:ignore="UnknownId" >
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/dataRecyclerView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:divider="#e0e0e0"
-            tools:listitem="@layout/detail_item_data"
-            tools:itemCount="3"
-            android:dividerHeight="1dp" />
-
-        <TextView
-            android:id="@+id/tabTextView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:breakStrategy="simple"
-            android:gravity="start"
-            android:padding="16dp"
-            android:scrollbars="vertical"
-            android:textSize="16sp"
-            android:visibility="gone"
-            tools:ignore="UnusedAttribute" />
-
+    <com.google.android.material.tabs.TabLayout android:id="@+id/tabLayout"
+        android:layout_width="0dp" android:layout_height="wrap_content"
+        android:background="@color/screen_bg" app:tabTextColor="@color/screen_secondary"
+        app:tabSelectedTextColor="@color/screen_accent" app:tabIndicatorColor="@color/screen_accent"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/urlTextView" />
+    <FrameLayout android:id="@+id/contentFrame" android:layout_width="0dp" android:layout_height="0dp"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tabLayout" app:layout_constraintBottom_toBottomOf="parent">
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/dataRecyclerView"
+            android:layout_width="match_parent" android:layout_height="match_parent"
+            android:paddingBottom="16dp" android:clipToPadding="false" />
+        <TextView android:id="@+id/tabTextView" android:layout_width="match_parent"
+            android:layout_height="match_parent" android:layout_margin="12dp"
+            android:background="@color/screen_code" android:textColor="@color/screen_text"
+            android:padding="14dp" android:fontFamily="monospace" android:textSize="12sp"
+            android:breakStrategy="simple" android:hyphenationFrequency="none" android:lineSpacingExtra="4dp"
+            android:gravity="start" android:scrollbars="vertical" android:visibility="gone" />
     </FrameLayout>
-
-    <!-- Always visible TabLayout -->
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/tabLayout"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:tabTextAppearance="@android:style/TextAppearance.Widget.TabWidget" />
-
 </androidx.constraintlayout.widget.ConstraintLayout>

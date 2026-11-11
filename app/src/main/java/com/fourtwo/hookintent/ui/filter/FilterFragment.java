@@ -277,7 +277,7 @@ public class FilterFragment extends Fragment {
             button.setText(getProtocolDisplayName(protocolKey));
             button.setAllCaps(false);
             button.setBackgroundResource(R.drawable.button_background_selector);
-            button.setTextColor(ContextCompat.getColor(requireContext(), R.color.black));
+            button.setTextColor(ContextCompat.getColor(requireContext(), R.color.screen_text));
 
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -326,7 +326,7 @@ public class FilterFragment extends Fragment {
             button.setSelected(selected);
             button.setTextColor(ContextCompat.getColor(
                     requireContext(),
-                    selected ? R.color.white : R.color.black
+                    selected ? R.color.white : R.color.screen_text
             ));
         }
     }

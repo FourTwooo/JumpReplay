@@ -10,7 +10,7 @@
         android:padding="4dp"
         android:layout_width="match_parent"
         android:layout_height="30dp"
-        android:background="#888888"
+        android:background="@color/screen_toolbar"
         android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
         app:contentInsetStart="0dp"
         app:contentInsetEnd="0dp"/>
@@ -20,6 +20,6 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="#F5F7FF"
+        android:background="@color/screen_input"
         android:divider="#959595"/>
 </LinearLayout>

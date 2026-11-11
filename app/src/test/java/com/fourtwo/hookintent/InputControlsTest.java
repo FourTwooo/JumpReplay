@@ -45,6 +45,68 @@ public class InputControlsTest {
             FrameLayout frame = new FrameLayout(this); frame.setId(12345); setContentView(frame);
         }
     }
+    @Test public void emptyStateExplainsCaptureAndSearchSeparatelyFromModuleStatus() {
+        try (ActivityController<Host> controller = Robolectric.buildActivity(Host.class).setup()) {
+            Host host = controller.get();
+            host.getSupportFragmentManager().beginTransaction().add(12345, new HomeFragment()).commitNow();
+            android.widget.TextView title = host.findViewById(R.id.empty_title);
+            com.fourtwo.hookintent.viewmodel.MainViewModel model = new androidx.lifecycle.ViewModelProvider(host)
+                    .get(com.fourtwo.hookintent.viewmodel.MainViewModel.class);
+            model.setIsHook(false);
+            assertEquals(host.getString(R.string.home_empty_title), title.getText().toString());
+            model.setIsHook(true);
+            assertEquals(host.getString(R.string.home_empty_wait_title), title.getText().toString());
+            ((EditText) host.findViewById(R.id.searchEditText)).setText("unmatched-query");
+            assertEquals(host.getString(R.string.home_empty_search_title), title.getText().toString());
+            assertEquals(android.view.View.VISIBLE, host.findViewById(R.id.module_hint).getVisibility());
+            assertNotEquals(host.getString(R.string.empty_view_not_xposed_text),
+                    ((android.widget.TextView)host.findViewById(R.id.empty_view)).getText().toString());
+            model.setIsHook(false);
+        }
+    }
+
+    @Test public void longDetailValueStaysCompleteAndCopiesInFull() {
+        try (ActivityController<Host> controller = Robolectric.buildActivity(Host.class).setup()) {
+            Host host = controller.get();
+            String value = "demo://example/path?payload=" + new String(new char[400]).replace('\0', 'x');
+            com.fourtwo.hookintent.ui.detail.DetailAdapter adapter = new com.fourtwo.hookintent.ui.detail.DetailAdapter(
+                    java.util.Collections.singletonList(new androidx.core.util.Pair<>("scheme_raw_url", value)));
+            androidx.recyclerview.widget.RecyclerView parent = new androidx.recyclerview.widget.RecyclerView(host);
+            parent.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(host));
+            androidx.recyclerview.widget.RecyclerView.ViewHolder holder = adapter.createViewHolder(parent, 0);
+            adapter.bindViewHolder(holder, 0);
+            android.widget.TextView text = holder.itemView.findViewById(R.id.valueTextView);
+            holder.itemView.measure(android.view.View.MeasureSpec.makeMeasureSpec(320, android.view.View.MeasureSpec.EXACTLY),
+                    android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED));
+            holder.itemView.layout(0, 0, 320, holder.itemView.getMeasuredHeight());
+            assertEquals(value, text.getText().toString());
+            assertNull(text.getEllipsize());
+            assertEquals(android.graphics.Typeface.MONOSPACE, text.getTypeface());
+            assertTrue(holder.itemView.performLongClick());
+            AlertDialog dialog = (AlertDialog) ShadowDialog.getLatestDialog();
+            dialog.getListView().performItemClick(null, 1, 1);
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) host.getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            assertEquals(value, clipboard.getPrimaryClip().getItemAt(0).getText().toString());
+            dialog.dismiss();
+        }
+    }
+
+    @Test @Config(qualifiers = "night") public void nightDetailAndSearchUseReadableDarkSurfaces() {
+        try (ActivityController<Host> controller = Robolectric.buildActivity(Host.class).setup()) {
+            Host host = controller.get();
+            android.view.View detail = host.getLayoutInflater().inflate(R.layout.fragment_detail, null);
+            int background = ((android.graphics.drawable.ColorDrawable) detail.getBackground()).getColor();
+            android.widget.TextView stack = detail.findViewById(R.id.tabTextView);
+            int code = ((android.graphics.drawable.ColorDrawable) stack.getBackground()).getColor();
+            assertTrue(androidx.core.graphics.ColorUtils.calculateLuminance(background) < 0.1);
+            assertTrue(androidx.core.graphics.ColorUtils.calculateContrast(stack.getCurrentTextColor(), code) > 4.5);
+            android.view.View home = host.getLayoutInflater().inflate(R.layout.fragment_home, null);
+            int input = ((android.graphics.drawable.GradientDrawable)home.findViewById(R.id.home_search_box).getBackground()).getColor().getDefaultColor();
+            assertTrue(androidx.core.graphics.ColorUtils.calculateContrast(
+                    ((EditText)home.findViewById(R.id.searchEditText)).getCurrentTextColor(), input) > 4.5);
+        }
+    }
+
     @Test public void homeDoesNotAutofocusAndRegexCanBeTurnedOffAfterAnError() {
         try (ActivityController<Host> controller = Robolectric.buildActivity(Host.class).setup()) {
             controller.get().getSupportFragmentManager().beginTransaction().add(12345, new HomeFragment()).commitNow();
