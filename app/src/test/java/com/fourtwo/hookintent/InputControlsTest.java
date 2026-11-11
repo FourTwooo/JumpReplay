@@ -77,4 +77,21 @@ public class InputControlsTest {
             dialog.dismiss();
         }
     }
+
+    @Test public void disabledSchemeOpensAndRegexSwitchWorksInsideTheField() {
+        try (ActivityController<DisabledActivity> controller = Robolectric.buildActivity(DisabledActivity.class).setup()) {
+            android.view.Menu menu = new android.widget.PopupMenu(controller.get(), new android.view.View(controller.get())).getMenu();
+            assertTrue(controller.get().onOptionsItemSelected(menu.add(0, R.id.add_text, 0, "添加")));
+            Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
+            AlertDialog dialog = (AlertDialog) ShadowDialog.getLatestDialog();
+            android.view.View icon = dialog.findViewById(com.google.android.material.R.id.text_input_end_icon);
+            assertNotNull(icon);
+            assertEquals(controller.get().getString(R.string.input_regex_off), icon.getContentDescription().toString());
+            icon.performClick();
+            assertEquals(controller.get().getString(R.string.input_regex_on), icon.getContentDescription().toString());
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).performClick();
+            assertTrue(dialog.isShowing());
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).performClick();
+        }
+    }
 }

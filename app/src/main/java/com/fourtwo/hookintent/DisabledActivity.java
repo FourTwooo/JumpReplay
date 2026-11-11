@@ -138,7 +138,7 @@ public class DisabledActivity extends AppCompatActivity {
         inputBox.setEndIconCheckable(true);
         final EditText input = new com.google.android.material.textfield.TextInputEditText(inputBox.getContext());
         input.setSingleLine(true);
-        inputBox.addView(input, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        inputBox.addView(input, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         root.addView(inputBox, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
