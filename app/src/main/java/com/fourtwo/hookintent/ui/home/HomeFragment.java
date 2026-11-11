@@ -63,6 +63,25 @@ public class HomeFragment extends Fragment {
     private CaptureRepository repository;
     private boolean hasMore;
     private boolean loadingMore;
+    private boolean regexSearch;
+
+    private void search(EditText input) {
+        String query = input.getText().toString();
+        if (regexSearch && !query.trim().isEmpty()) {
+            try { java.util.regex.Pattern.compile(query.trim()); }
+            catch (java.util.regex.PatternSyntaxException error) {
+                input.setError(getString(R.string.input_regex_invalid));
+                return;
+            }
+        }
+        input.setError(null);
+        repository.setQuery(query, regexSearch);
+    }
+
+    @Override public void onSaveInstanceState(@NonNull Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putBoolean("capture_search_regex", regexSearch);
+    }
 
     private FloatingActionButton fab;
     private static boolean isHook = false; // 保留 isHook 状态
@@ -179,6 +198,19 @@ public class HomeFragment extends Fragment {
 
         // Initialize search EditText and set its TextWatcher
         EditText searchEditText = view.findViewById(R.id.searchEditText);
+        if (savedInstanceState != null) regexSearch = savedInstanceState.getBoolean("capture_search_regex");
+        com.google.android.material.textfield.TextInputLayout searchBox = view.findViewById(R.id.home_search_box);
+        Runnable updateSearchIcon = () -> {
+            searchBox.setEndIconContentDescription(regexSearch ? R.string.input_regex_on : R.string.input_regex_off);
+            searchBox.setEndIconTintList(ColorStateList.valueOf(ContextCompat.getColor(requireContext(),
+                    regexSearch ? R.color.dialog_accent : R.color.dialog_secondary)));
+        };
+        updateSearchIcon.run();
+        searchBox.setEndIconOnClickListener(button -> {
+            regexSearch = !regexSearch;
+            updateSearchIcon.run();
+            search(searchEditText);
+        });
         searchEditText.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -186,7 +218,7 @@ public class HomeFragment extends Fragment {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                repository.setQuery(s.toString());
+                search(searchEditText);
             }
 
             @Override
@@ -342,7 +374,7 @@ public class HomeFragment extends Fragment {
         EditText searchEditText = requireView().findViewById(R.id.searchEditText);
         String currentSearchText = searchEditText != null ? searchEditText.getText().toString().trim() : "";
 
-        repository.setQuery(currentSearchText);
+        if (searchEditText != null) search(searchEditText);
         repository.refresh();
     }
 

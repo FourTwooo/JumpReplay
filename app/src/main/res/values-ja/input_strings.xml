@@ -1,0 +1,10 @@
+<resources>
+    <string name="input_display_source">引数の表示</string>
+    <string name="input_title_arg">タイトルに使う引数の番号</string>
+    <string name="input_data_arg">内容に使う引数の番号</string>
+    <string name="input_arg_index">引数の番号</string>
+    <string name="input_arg_hint">番号は0から始まります。オフの場合は既定の表示です。</string>
+    <string name="input_regex_on">正規表現オン</string>
+    <string name="input_regex_off">正規表現オフ</string>
+    <string name="input_regex_invalid">無効な正規表現です</string>
+</resources>

@@ -422,6 +422,11 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
             // 创建一个水平布局，用来包含 EditText 和删除按钮
             LinearLayout paramContainer = new LinearLayout(view.getContext());
             paramContainer.setOrientation(LinearLayout.HORIZONTAL);
+            paramContainer.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            rowParams.topMargin = AppDialogs.dp(this, 10);
+            paramContainer.setLayoutParams(rowParams);
 
             // 创建 EditText 参数输入框
             EditText paramInput = AppDialogs.input(this);
@@ -432,7 +437,11 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
             ImageButton deleteButton = new ImageButton(view.getContext());
             deleteButton.setBackground(null); // 移除默认背景
             deleteButton.setImageResource(R.drawable.baseline_delete_outline_24);
-            deleteButton.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(AppDialogs.dp(this, 48), AppDialogs.dp(this, 48));
+            deleteParams.setMarginStart(AppDialogs.dp(this, 8));
+            deleteButton.setLayoutParams(deleteParams);
+            deleteButton.setPadding(AppDialogs.dp(this, 12), AppDialogs.dp(this, 12), AppDialogs.dp(this, 12), AppDialogs.dp(this, 12));
+            deleteButton.setContentDescription(getString(R.string.delete));
             deleteButton.setOnClickListener(deleteView -> dynamicParamsContainer.removeView(paramContainer));
 
             // 将 EditText 和删除按钮添加到该容器

@@ -130,7 +130,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Select Title"
+            android:text="@string/input_display_source"
             android:textStyle="bold"
             android:paddingTop="16dp"
             android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
@@ -143,28 +143,26 @@
             android:orientation="horizontal">
             <CheckBox
                 android:id="@+id/checkbox_title_args"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="Args"
+                android:text="@string/input_title_arg"
                 android:minHeight="48dp" />
             <EditText
                 android:id="@+id/input_title_args_index"
-                android:layout_width="72dp"
+                android:layout_width="48dp"
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:textAlignment="center"
                 android:hint="0"
+                android:padding="4dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:singleLine="true"
+                android:contentDescription="@string/input_arg_index"
                 style="@style/Widget.HookIntent.DialogInput"
-                android:minHeight="48dp" />
+                android:minHeight="36dp" />
         </LinearLayout>
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Select Data"
-            android:textStyle="bold"
-            android:paddingTop="16dp"
-            android:textAppearance="@style/TextAppearance.HookIntent.DialogBody"
-            android:textColor="@color/dialog_text" />
         <LinearLayout
             android:id="@+id/layout_data_args"
             android:layout_width="match_parent"
@@ -173,20 +171,29 @@
             android:orientation="horizontal">
             <CheckBox
                 android:id="@+id/checkbox_data_args"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="Args"
+                android:text="@string/input_data_arg"
                 android:minHeight="48dp" />
             <EditText
                 android:id="@+id/input_data_args_index"
-                android:layout_width="72dp"
+                android:layout_width="48dp"
                 android:layout_height="wrap_content"
                 android:inputType="number"
                 android:textAlignment="center"
                 android:hint="0"
+                android:padding="4dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:singleLine="true"
+                android:contentDescription="@string/input_arg_index"
                 style="@style/Widget.HookIntent.DialogInput"
-                android:minHeight="48dp" />
+                android:minHeight="36dp" />
         </LinearLayout>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:text="@string/input_arg_hint"
+            android:textSize="12sp" android:textColor="@color/dialog_secondary" />
         <Button
             android:id="@+id/button_confirm"
             android:layout_width="wrap_content"

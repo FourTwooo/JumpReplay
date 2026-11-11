@@ -77,6 +77,9 @@ public final class CaptureRepository {
     };
     private int visibleLimit = PAGE_SIZE;
     private String query = "";
+    private java.util.regex.Pattern searchPattern;
+    private boolean searchAborted;
+    private final java.util.concurrent.atomic.AtomicInteger searchGeneration = new java.util.concurrent.atomic.AtomicInteger();
 
     private CaptureRepository(Context context) {
         this.context = context;
@@ -160,10 +163,23 @@ public final class CaptureRepository {
     }
 
     public void setQuery(String value) {
-        final String next = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        setQuery(value, false);
+    }
+
+    public void setQuery(String value, boolean regex) {
+        final String next = value == null ? "" : value.trim();
+        final int generation = searchGeneration.incrementAndGet();
         worker.execute(() -> {
-            if (!query.equals(next)) visibleLimit = PAGE_SIZE;
+            if (generation != searchGeneration.get()) return;
+            java.util.regex.Pattern compiled;
+            try {
+                compiled = regex && !next.isEmpty() ? java.util.regex.Pattern.compile(next,
+                        java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE) : null;
+            } catch (java.util.regex.PatternSyntaxException error) { fail(error, null); return; }
+            if (!query.equals(next) || (searchPattern != null) != (compiled != null)) visibleLimit = PAGE_SIZE;
             query = next;
+            searchPattern = compiled;
+            searchAborted = false;
             publishSnapshot();
         });
     }
@@ -296,27 +312,39 @@ public final class CaptureRepository {
     }
 
     private void publishSnapshot() {
+        if (searchAborted) return;
         try {
             SQLiteDatabase db = store.getReadableDatabase();
-            String selection = query.isEmpty() ? null : "search LIKE ? ESCAPE '\\'";
-            String escaped = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-            String[] args = query.isEmpty() ? null : new String[]{"%" + escaped + "%"};
+            boolean regex = searchPattern != null;
+            String selection = query.isEmpty() || regex ? null : "search LIKE ? ESCAPE '\\'";
+            String escaped = query.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+            String[] args = selection == null ? null : new String[]{"%" + escaped + "%"};
             List<ItemData> page = new ArrayList<>();
-            boolean more;
+            boolean more = false;
+            int generation = searchGeneration.get();
             try (Cursor cursor = db.query("captures", new String[]{"id", "data"}, selection, args,
-                    null, null, "id DESC", Integer.toString(visibleLimit + 1))) {
-                more = cursor.getCount() > visibleLimit;
-                while (cursor.moveToNext() && page.size() < visibleLimit) {
+                    null, null, "id DESC", regex ? null : Integer.toString(visibleLimit + 1))) {
+                while (cursor.moveToNext()) {
+                    if (generation != searchGeneration.get()) return;
+                    if (!regex && page.size() == visibleLimit) { more = true; break; }
                     try {
                         ItemData item = decode(readArchive(cursor.getString(1)));
+                        if (regex && !SearchMatch.find(searchPattern, item.getAppName() + "\n"
+                                + item.getItem_from() + "\n" + item.getItem_data(),
+                                System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(200))) continue;
+                        if (page.size() == visibleLimit) { more = true; break; }
                         item.setCaptureId(cursor.getLong(0));
                         page.add(item);
-                    } catch (Exception badRecord) { fail(badRecord, null); }
+                    } catch (SearchMatch.TooSlow error) { throw error; }
+                    catch (Exception badRecord) { fail(badRecord, null); }
                 }
             }
             Collections.reverse(page);
             items.postValue(Collections.unmodifiableList(page));
             hasMore.postValue(more);
+        } catch (SearchMatch.TooSlow error) {
+            searchAborted = true;
+            fail(error, null);
         } catch (Exception e) { fail(e, null); }
     }
 

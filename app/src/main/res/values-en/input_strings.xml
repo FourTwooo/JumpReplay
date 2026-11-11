@@ -1,0 +1,10 @@
+<resources>
+    <string name="input_display_source">Displayed arguments</string>
+    <string name="input_title_arg">Title from argument, index</string>
+    <string name="input_data_arg">Content from argument, index</string>
+    <string name="input_arg_index">Argument index</string>
+    <string name="input_arg_hint">Indices start at 0. Unchecked uses the default display.</string>
+    <string name="input_regex_on">Regex matching on</string>
+    <string name="input_regex_off">Regex matching off</string>
+    <string name="input_regex_invalid">Invalid regular expression</string>
+</resources>

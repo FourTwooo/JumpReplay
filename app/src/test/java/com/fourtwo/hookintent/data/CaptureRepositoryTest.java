@@ -122,6 +122,16 @@ public class CaptureRepositoryTest {
         assertEquals(Boolean.TRUE, repository.getHasMore().getValue());
         repository.setQuery("old-needle"); idle();
         assertEquals(1, repository.getItems().getValue().size());
+        repository.setQuery("OLD-(needle|other)", true); idle();
+        assertEquals(1, repository.getItems().getValue().size());
+        repository.setQuery("entry\\d+", true); idle();
+        assertEquals(200, repository.getItems().getValue().size());
+        assertEquals(Boolean.TRUE, repository.getHasMore().getValue());
+        repository.loadMore(); idle();
+        assertEquals(204, repository.getItems().getValue().size());
+        assertEquals(Boolean.FALSE, repository.getHasMore().getValue());
+        repository.setQuery("[", true); idle();
+        assertEquals(204, repository.getItems().getValue().size());
         repository.setQuery("entry%"); idle();
         assertTrue(repository.getItems().getValue().isEmpty());
         repository.setQuery(""); repository.loadMore(); idle();

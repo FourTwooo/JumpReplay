@@ -1,0 +1,10 @@
+<resources>
+    <string name="input_display_source">参数显示</string>
+    <string name="input_title_arg">标题取自参数，下标</string>
+    <string name="input_data_arg">内容取自参数，下标</string>
+    <string name="input_arg_index">参数下标</string>
+    <string name="input_arg_hint">下标从 0 开始；不勾选时沿用默认显示。</string>
+    <string name="input_regex_on">正则匹配已开启</string>
+    <string name="input_regex_off">正则匹配已关闭</string>
+    <string name="input_regex_invalid">正则表达式无效</string>
+</resources>

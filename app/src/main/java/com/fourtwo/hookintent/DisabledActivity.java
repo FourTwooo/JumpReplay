@@ -129,21 +129,17 @@ public class DisabledActivity extends AppCompatActivity {
         final boolean[] isRegex = {false};
 
         LinearLayout root = AppDialogs.content(this);
-        LinearLayout inputRow = new LinearLayout(root.getContext());
-        inputRow.setOrientation(LinearLayout.HORIZONTAL);
-        inputRow.setGravity(android.view.Gravity.CENTER_VERTICAL);
-
-        final EditText input = AppDialogs.input(this);
-        input.setHint("输入 Scheme 或正则");
+        com.google.android.material.textfield.TextInputLayout inputBox =
+                new com.google.android.material.textfield.TextInputLayout(root.getContext());
+        inputBox.setBoxBackgroundMode(com.google.android.material.textfield.TextInputLayout.BOX_BACKGROUND_OUTLINE);
+        inputBox.setHint("Scheme 或正则表达式");
+        inputBox.setEndIconMode(com.google.android.material.textfield.TextInputLayout.END_ICON_CUSTOM);
+        inputBox.setEndIconDrawable(R.drawable.regex);
+        inputBox.setEndIconCheckable(true);
+        final EditText input = new com.google.android.material.textfield.TextInputEditText(inputBox.getContext());
         input.setSingleLine(true);
-        inputRow.addView(input, new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        ImageView regexToggle = new ImageView(root.getContext());
-        regexToggle.setPadding(dp(12), dp(12), dp(12), dp(12));
-        regexToggle.setContentDescription("切换正则匹配");
-        inputRow.addView(regexToggle, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        root.addView(inputRow, new LinearLayout.LayoutParams(
+        inputBox.addView(input, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(inputBox, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView modeText = new TextView(root.getContext());
@@ -153,11 +149,16 @@ public class DisabledActivity extends AppCompatActivity {
         modeLp.topMargin = dp(8);
         root.addView(modeText, modeLp);
 
-        updateRegexToggle(regexToggle, modeText, isRegex[0]);
+        modeText.setText(R.string.input_regex_off);
+        inputBox.setEndIconContentDescription(R.string.input_regex_off);
+        inputBox.setEndIconTintList(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.dialog_secondary)));
 
-        regexToggle.setOnClickListener(v -> {
+        inputBox.setEndIconOnClickListener(v -> {
             isRegex[0] = !isRegex[0];
-            updateRegexToggle(regexToggle, modeText, isRegex[0]);
+            inputBox.setEndIconContentDescription(isRegex[0] ? R.string.input_regex_on : R.string.input_regex_off);
+            inputBox.setEndIconTintList(android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this,
+                    isRegex[0] ? R.color.dialog_accent : R.color.dialog_secondary)));
+            modeText.setText(isRegex[0] ? R.string.input_regex_on : R.string.input_regex_off);
         });
 
         AlertDialog dialog = AppDialogs.builder(this)

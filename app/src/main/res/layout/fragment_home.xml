@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:focusableInTouchMode="true"
     tools:context=".ui.home.HomeFragment">
 
     <TextView
@@ -20,23 +21,30 @@
         app:layout_constraintTop_toTopOf="parent" />
 
 
-    <EditText
-        android:id="@+id/searchEditText"
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/home_search_box"
         android:layout_width="0dp"
-        android:layout_height="40dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="5dp"
         android:layout_marginTop="5dp"
         android:layout_marginEnd="10dp"
-        android:autofillHints=""
         android:background="@drawable/edit_text_background"
-        android:drawableStart="@drawable/ic_search"
-        android:drawablePadding="8dp"
-        android:hint="@string/search"
-        android:inputType="text"
-        android:textStyle="bold"
+        app:hintEnabled="false"
+        app:boxBackgroundMode="none"
+        app:startIconDrawable="@drawable/ic_search"
+        app:endIconMode="custom"
+        app:endIconDrawable="@drawable/regex"
+        app:endIconCheckable="true"
+        app:endIconContentDescription="@string/input_regex_off"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent">
+        <EditText android:id="@+id/searchEditText" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:minHeight="48dp"
+            android:background="@null" android:paddingTop="8dp" android:paddingBottom="8dp"
+            android:autofillHints="" android:hint="@string/search" android:inputType="text"
+            android:singleLine="true" android:textSize="14sp" android:imeOptions="actionSearch" />
+    </com.google.android.material.textfield.TextInputLayout>
 
 
     <androidx.recyclerview.widget.RecyclerView
@@ -49,7 +57,7 @@
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/searchEditText"
+        app:layout_constraintTop_toBottomOf="@id/home_search_box"
         app:layout_constraintVertical_bias="0.0"
         tools:listitem="@layout/fragment_item_list"
         tools:itemCount="2"

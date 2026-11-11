@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            versionNameSuffix "-dialogs.1"
+            versionNameSuffix "-inputs.1"
         }
         release {
             minifyEnabled false

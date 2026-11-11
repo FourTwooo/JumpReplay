@@ -416,6 +416,10 @@ public class SettingsFragment extends Fragment {
         EditText inputDataArgsIndex = dialogView.findViewById(R.id.input_data_args_index);
         CheckBox checkboxTitleArgs = dialogView.findViewById(R.id.checkbox_title_args);
         CheckBox checkboxDataArgs = dialogView.findViewById(R.id.checkbox_data_args);
+        checkboxTitleArgs.setOnCheckedChangeListener((button, checked) -> inputTitleArgsIndex.setEnabled(checked));
+        checkboxDataArgs.setOnCheckedChangeListener((button, checked) -> inputDataArgsIndex.setEnabled(checked));
+        inputTitleArgsIndex.setEnabled(checkboxTitleArgs.isChecked());
+        inputDataArgsIndex.setEnabled(checkboxDataArgs.isChecked());
         Button buttonConfirm = dialogView.findViewById(R.id.button_confirm);
         Button buttonPickColor = dialogView.findViewById(R.id.button_pick_color);
 
