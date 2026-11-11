@@ -108,7 +108,16 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         View headerView = binding.navView.getHeaderView(0);
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(headerView, (header, insets) -> {
+            int topInset = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.statusBars()).top;
+            header.setPadding(dpToPx(20), topInset + dpToPx(12), dpToPx(20), dpToPx(8));
+            return insets;
+        });
+        androidx.core.view.ViewCompat.requestApplyInsets(headerView);
         versionTextView = headerView.findViewById(R.id.version);
+        String currentVersion = getAppVersionName(this);
+        versionTextView.setText(getString(R.string.version_current_latest, currentVersion, getString(R.string.version_not_available)));
+        headerView.findViewById(R.id.github_link).setOnClickListener(view -> openWebPage(getString(R.string.nav_header_subtitle)));
 
         AppBarMainBinding appbarMain = AppBarMainBinding.bind(binding.getRoot().findViewById(R.id.app_bar_main));
         setSupportActionBar(appbarMain.toolbar);

@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            versionNameSuffix "-inputs.1"
+            versionNameSuffix "-header.1"
         }
         release {
             minifyEnabled false
