@@ -30,6 +30,11 @@ import com.fourtwo.hookintent.service.MessengerClient;
 import com.fourtwo.hookintent.service.MessengerService;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.fourtwo.hookintent.xposed.RecordXposedBridge;
+import com.fourtwo.hookintent.xposed.DurableCaptureOutbox;
+import com.fourtwo.hookintent.xposed.IntentJournal;
+import com.fourtwo.hookintent.xposed.HookConfigCache;
+import android.os.Handler;
+import android.os.Looper;
 import com.fourtwo.hookintent.xposed.ui.FloatWindow;
 import com.fourtwo.hookintent.xposed.ui.FloatWindowView;
 
@@ -66,38 +71,80 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private MessengerClient client = null;
     private Context applicationContext = null;
     private String packageName;
-    private Boolean isHook = false;
-    private Boolean isService = false;
+    private volatile boolean isHook = false;
+    private volatile boolean isService = false;
+    private volatile boolean hookStateKnown;
+    private Boolean localHookOverride;
+    private final Object stateLock = new Object();
+    private Handler mainHandler;
+    private final Map<Activity, FloatWindow> floatWindows = new java.util.WeakHashMap<>();
+    private DurableCaptureOutbox outbox;
+    private IntentJournal intentJournal, pendingJournal;
+    private final java.util.concurrent.ExecutorService journalWorker = Executors.newSingleThreadExecutor();
+    private HookConfigCache systemConfig;
+    private volatile boolean storageErrorShown;
+    private final ThreadLocal<Boolean> captureInProgress = new ThreadLocal<Boolean>() {
+        @Override protected Boolean initialValue() { return false; }
+    };
+    private final java.util.concurrent.atomic.AtomicBoolean floatingRefreshPending = new java.util.concurrent.atomic.AtomicBoolean();
+
+    private void refreshFloatingViews() {
+        if (!floatingRefreshPending.compareAndSet(false, true)) return;
+        mainHandler.post(() -> {
+            floatingRefreshPending.set(false);
+            for (FloatWindow window : new ArrayList<>(floatWindows.values()))
+                if (window.floatWindowView != null) window.floatWindowView.refreshJournal();
+        });
+    }
     private Boolean isHostApp = false;
 
-    private FloatWindow floatWindow = null;
+
     public static final String myAppPackage = "com.fourtwo.hookintent";
     private final String myAppClass = "com.fourtwo.hookintent.IntentIntercept";
     private static final String ANDROID_PACKAGE = "android";
     private static final String MY_PROVIDER_CLASS = "com.fourtwo.hookintent.service.ConfigProvider";
     private static final String MY_MESSENGER_SERVICE_CLASS = "com.fourtwo.hookintent.service.MessengerService";
-    private final List<Intent> intentList = new ArrayList<>();
+
 
     private Boolean getIsHook() {
-//        XposedBridge.log("isHook: " + isHook)
-        if (client != null && !isService) {
-            client.sendMessageAsync(MessengerService.MSG_IS_HOOK, null, true, new MessengerClient.ResultCallback() {
-                @Override
-                public void onResult(Bundle result) {
-                    int resultCode = result.getInt("resultCode");
-                    isHook = (resultCode == 1);
-                    isService = true;
-//                    XposedBridge.log(isHook + " Client Async Result: resultCode=" + resultCode + ", resultData=" + resultData);
-                }
+        // Buffer startup events until the first handshake instead of dropping the first onResume.
+        return !captureInProgress.get() && (!hookStateKnown || isHook);
+    }
 
-                @Override
-                public void onError(Exception e) {
-                    XposedBridge.log("Client Error during async call" + e);
-                }
-            });
-            return isHook;
+    private void applyHookState(boolean enabled, boolean snapshot) {
+        synchronized (stateLock) {
+            if (!snapshot) localHookOverride = null; // an explicit main-app toggle affects every process
+            isHook = localHookOverride == null ? enabled : localHookOverride;
+            hookStateKnown = true;
+            try {
+                if (outbox != null) outbox.resolveInitialState(isHook);
+                final boolean capturePending = isHook;
+                journalWorker.execute(() -> {
+                    try {
+                        if (pendingJournal != null && intentJournal != null) {
+                            if (capturePending) for (long offset = 0; offset < pendingJournal.count(); offset += 100)
+                                for (Intent intent : pendingJournal.page(offset, 100)) intentJournal.append(intent);
+                            pendingJournal.clear();
+                        }
+                    } catch (Exception error) { reportCaptureError(error); }
+                    refreshFloatingViews();
+                });
+            } catch (Exception error) { reportCaptureError(error); }
         }
-        return isHook;
+        mainHandler.post(() -> {
+            for (FloatWindow window : new ArrayList<>(floatWindows.values())) if (window.floatWindowView != null) {
+                window.floatWindowView.setHookState(isHook); window.floatWindowView.refreshJournal();
+            }
+        });
+    }
+
+    private void reportCaptureError(Throwable error) {
+        XposedBridge.log("JumpReplay capture storage/transport: " + error);
+        if (!storageErrorShown && applicationContext != null) {
+            storageErrorShown = true;
+            mainHandler.post(() -> android.widget.Toast.makeText(applicationContext,
+                    "JumpReplay 无法保存捕获数据，请检查存储空间。" + error.getMessage(), android.widget.Toast.LENGTH_LONG).show());
+        }
     }
 
     private String getStackTraceString() {
@@ -113,10 +160,6 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     @SuppressLint("SimpleDateFormat")
     private void sendBroadcastSafely(Bundle bundle) {
-        if (!isService) {
-            return;
-        }
-
         Context appContext = getAppContext();
         if (appContext == null) return;
         if (!bundle.containsKey("from")) {
@@ -133,36 +176,55 @@ public class IntentCapture implements IXposedHookLoadPackage {
     }
 
     private void filterScheme(String scheme_raw_url, String FunctionCall) {
-        if (scheme_raw_url == null) {
-            return;
-        }
-        Bundle bundle = new Bundle();
-        bundle.putString("FunctionCall", FunctionCall);
-        bundle.putString("category", "Scheme");
-        bundle.putString("scheme_raw_url", scheme_raw_url);
-        sendBroadcastSafely(bundle);
+        if (captureInProgress.get()) return;
+        captureInProgress.set(true);
+        try {
+            if (scheme_raw_url == null) {
+                return;
+            }
+            Bundle bundle = new Bundle();
+            bundle.putString("FunctionCall", FunctionCall);
+            bundle.putString("category", "Scheme");
+            bundle.putString("scheme_raw_url", scheme_raw_url);
+            sendBroadcastSafely(bundle);
+        } finally { captureInProgress.set(false); }
     }
 
     private void filterIntent(Intent intent, String FunctionCall, String from) {
-        if (floatWindow != null) {
-            intentList.add(intent);
-            if (floatWindow.floatWindowView != null) {
-                floatWindow.floatWindowView.updateListView(intentList);
+        if (captureInProgress.get()) return;
+        captureInProgress.set(true);
+        try {
+            if (intent == null) return;
+            Intent snapshot = new Intent(intent);
+            synchronized (stateLock) {
+                if (hookStateKnown && !isHook) return;
+                try {
+                    IntentJournal journal = hookStateKnown ? intentJournal : pendingJournal;
+                    if (journal != null) {
+                        byte[] frozen = IntentJournal.snapshot(snapshot);
+                        journalWorker.execute(() -> {
+                            try { journal.append(frozen); }
+                            catch (Exception error) { reportCaptureError(error); }
+                            refreshFloatingViews();
+                        });
+                    }
+                } catch (Exception error) { reportCaptureError(error); }
             }
-        }
-
-        String uri = null;
-        uri = intent.toUri(Intent.URI_INTENT_SCHEME);
-        Bundle bundle = DataConverter.convertIntentToBundle(intent);
-        bundle.putString("FunctionCall", FunctionCall);
-        bundle.putString("category", "Intent");
-        bundle.putString("uri", uri);
-        bundle.putString("from", from);
-        sendBroadcastSafely(bundle);
+            Bundle bundle = DataConverter.convertIntentToBundle(snapshot);
+            bundle.putString("FunctionCall", FunctionCall);
+            bundle.putString("category", "Intent");
+            bundle.putString("uri", snapshot.toUri(Intent.URI_INTENT_SCHEME));
+            bundle.putString("from", from);
+            sendBroadcastSafely(bundle);
+        } finally { captureInProgress.set(false); }
     }
 
     private void filterCustomize(Bundle bundle) {
-        sendBroadcastSafely(bundle);
+        if (captureInProgress.get()) return;
+        captureInProgress.set(true);
+        try {
+            sendBroadcastSafely(bundle);
+        } finally { captureInProgress.set(false); }
     }
 
     private Context getAppContext() {
@@ -492,7 +554,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     private ResolveInfo buildMyChooserResolveInfo(Context context, ResolveInfo templateResolveInfo, Intent sourceIntent) {
         try {
-            ActivityInfo myActivityInfo = findMyInterceptActivityInfo(context);
+            ActivityInfo myActivityInfo = systemConfig == null ? null : systemConfig.getActivity();
             if (myActivityInfo == null) {
                 XposedBridge.log("buildMyChooserResolveInfo: myActivityInfo == null");
                 return null;
@@ -533,6 +595,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     public void hookSystemMethods(Context applicationContext) {
         ClassLoader classLoader = applicationContext.getClassLoader();
+        if (systemConfig == null) systemConfig = new HookConfigCache(applicationContext);
 
         // 只修复 Android 11+ 上的 Provider / MessengerService 可见性
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -549,7 +612,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
             XposedBridge.hookAllMethods(hookClass, "queryIntentActivitiesInternal", new XC_MethodHook() {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                    Intent intent = (Intent) param.args[0];
+                    Intent intent = findIntentArg(param.args);
+                    if (intent == null || param.hasThrowable()) return;
                     // 如果是自己的 Intent，不再处理，直接返回
                     if (myAppPackage.equals(intent.getPackage())) {
                         return;
@@ -561,75 +625,16 @@ public class IntentCapture implements IXposedHookLoadPackage {
                     XposedBridge.log("queryIntentActivitiesInternal Scheme: " + intent.getDataString());
 
                     // 获取原始返回值
-                    @SuppressWarnings("unchecked") List<ResolveInfo> originalResult = (List<ResolveInfo>) param.getResult();
-                    boolean hasHookIntent = false; // 用于标记是否存在目标 ResolveInfo
-
-                    // 遍历 originalResult
-                    for (ResolveInfo resolveInfo : originalResult) {
-                        if (resolveInfo.activityInfo != null && myAppPackage.equals(resolveInfo.activityInfo.packageName)) {
-                            hasHookIntent = true; // 找到目标 ResolveInfo
-                            break; // 提前结束循环
-                        }
+                    List<ResolveInfo> originalResult = extractResolveInfoList(param.getResult());
+                    if (originalResult == null) return;
+                    // Rules also apply when HTTP/HTTPS already resolves to this module.
+                    if (systemConfig.isDisabled(intent.getScheme(), intent.getDataString())) {
+                        param.setResult(rebuildResolveInfoResult(param.getResult(), new ArrayList<>())); return;
                     }
-
-                    if (hasHookIntent || originalResult.isEmpty()) {
-                        return;
-                    }
-
-                    String disabledScheme = null;
-                    long token = Binder.clearCallingIdentity();
-                    try {
-                        Map<String, String> HooksConfig = getConfig(Constants.SCHEME_URI);
-                        disabledScheme = HooksConfig.get(Constants.DISABLED_SCHEME);
-                    } catch (Exception ignored) {
-                    } finally {
-                        Binder.restoreCallingIdentity(token);
-                    }
-
-                    if (disabledScheme != null) {
-                        List<Map<String, Object>> disabledSchemeList = JsonHandler.deserializeHookedRecords(disabledScheme);
-
-                        for (Map<String, Object> disabledSchemeObj : disabledSchemeList) {
-                            Boolean re = (Boolean) disabledSchemeObj.get("re");
-                            Boolean open = (Boolean) disabledSchemeObj.get("open");
-                            String text = (String) disabledSchemeObj.get("text");
-
-                            // 如果不开启，则跳过
-                            if (!Boolean.TRUE.equals(open)) {
-                                continue;
-                            }
-
-                            // 正则匹配逻辑
-                            if (Boolean.TRUE.equals(re)) {
-                                if (text == null) {
-                                    continue;
-                                }
-
-                                Pattern pattern;
-                                try {
-                                    pattern = Pattern.compile(text);
-                                } catch (PatternSyntaxException e) {
-                                    System.out.println("正则表达式语法错误：" + e.getMessage());
-                                    continue;
-                                }
-
-                                Matcher matcher = pattern.matcher(intent.getDataString());
-                                if (matcher.find()) {
-                                    param.setResult(new ArrayList<>());
-                                    return;
-                                }
-                            } else {
-                                // 非正则匹配逻辑
-                                if (Objects.equals(text, intent.getScheme())) {
-                                    param.setResult(new ArrayList<>());
-                                    return;
-                                }
-                            }
-                        }
-                    }
+                    if (containsMyResolveInfo(originalResult)) return;
 
                     // 直接手工构造自己的 ResolveInfo，不再递归 queryIntentActivitiesInternal
-                    ResolveInfo clAppResolveInfo = originalResult.get(0);
+                    ResolveInfo clAppResolveInfo = originalResult.isEmpty() ? null : originalResult.get(0);
                     ResolveInfo myAppResolveInfo = buildMyChooserResolveInfo(
                             applicationContext,
                             clAppResolveInfo,
@@ -644,114 +649,99 @@ public class IntentCapture implements IXposedHookLoadPackage {
                     }
 
                     // 将修改后的结果设置回返回值
-                    param.setResult(originalResult);
+                    param.setResult(rebuildResolveInfoResult(param.getResult(), originalResult));
                 }
             });
         } catch (XposedHelpers.ClassNotFoundError ignored) {
         }
 
-        Class<?> PackageParserClass = XposedHelpers.findClass("android.content.pm.PackageParser", classLoader);
-        XposedBridge.hookAllMethods(PackageParserClass, "parseUsesPermission",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                        super.beforeHookedMethod(param);
-                    }
-
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                        super.afterHookedMethod(param);
-                        Object pp_Package = param.args[0];
-                        XposedBridge.log("pp_Package " + pp_Package);
-//                        ArrayList<String> requestedPermissions = (ArrayList<String>) getObjectField(pp_Package, "requestedPermissions");
-//                        if (-1 == requestedPermissions.indexOf(permission)) {
-//                            requestedPermissions.add(permission);
-//                        }
-                        //setObjectField(pp_Package,"requestedPermissions",requestedPermissions);
-                    }
-                }
-        );
     }
 
     public void SetFloatWindowUi(Context applicationContext) {
         try {
-            Class<?> declared = XposedHelpers.findClass(Activity.class.getName(), applicationContext.getClassLoader());
-            XposedBridge.hookMethod(declared.getDeclaredMethod("onResume"), new XC_MethodHook() {
-
-                @Override
-                protected void afterHookedMethod(MethodHookParam methodHookParam) {
-                    Activity activity = (Activity) methodHookParam.thisObject;
-                    floatWindow = new FloatWindow(applicationContext, activity);
-                    FloatWindowView floatWindowView = new FloatWindowView(applicationContext);
-                    // 设置回调监听器
-                    floatWindowView.setOnClearViewClickListener(x -> {
-                        intentList.clear();
-                        floatWindow.floatWindowView.updateListView(intentList);
-                        XposedBridge.log("悬浮窗数据已删除: " + isHook);
+            Class<?> activityClass = Activity.class;
+            XposedBridge.hookMethod(activityClass.getDeclaredMethod("onResume"), new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    Activity activity = (Activity) param.thisObject;
+                    FloatWindow previous = floatWindows.remove(activity);
+                    if (previous != null) previous.removeView();
+                    FloatWindow window = new FloatWindow(activity, activity);
+                    FloatWindowView view = new FloatWindowView(activity);
+                    view.setJournal(intentJournal);
+                    view.setOnClearViewClickListener(unused -> {
+                        synchronized (stateLock) {
+                            journalWorker.execute(() -> {
+                                try { if (intentJournal != null) intentJournal.clear(); if (pendingJournal != null) pendingJournal.clear(); }
+                                catch (Exception error) { reportCaptureError(error); }
+                                refreshFloatingViews();
+                            });
+                        }
                     });
-                    floatWindowView.setOnOpenViewClickListener(onIsHook -> {
-                        isHook = onIsHook;
-                        XposedBridge.log("isHook 已更新: " + isHook);
+                    view.setOnOpenViewClickListener(enabled -> {
+                        synchronized (stateLock) { localHookOverride = enabled; }
+                        applyHookState(enabled, true); // process-local override: never send a SET_HOOK message
                     });
-//                    floatWindowView.updateListView(intentList);
-                    floatWindow.setFloatWindowView(floatWindowView.createView(isHook));
-                    floatWindow.initialize();
-
-                    floatWindow.floatWindowView.updateListView(intentList);
+                    window.setFloatWindowView(view.createView(isHook));
+                    floatWindows.put(activity, window); window.initialize();
                 }
             });
-
-            XposedBridge.hookMethod(declared.getDeclaredMethod("onPause"), new XC_MethodHook() {
-                @Override
-                protected void afterHookedMethod(MethodHookParam methodHookParam) {
-                    if (floatWindow != null) {
-                        floatWindow.setIsOnPause(true);
-                        floatWindow.removeView();
-                    }
+            XC_MethodHook remove = new XC_MethodHook() {
+                @Override protected void afterHookedMethod(MethodHookParam param) {
+                    FloatWindow window = floatWindows.remove((Activity) param.thisObject);
+                    if (window != null) window.removeView();
                 }
-            });
-
-        } catch (NoSuchMethodException ignored) {
-        } catch (java.lang.AssertionError e) {
-            XposedBridge.log("悬浮窗加载失败 =>" + e);
-        }
+            };
+            XposedBridge.hookMethod(activityClass.getDeclaredMethod("onPause"), remove);
+            XposedBridge.hookMethod(activityClass.getDeclaredMethod("onDestroy"), remove);
+        } catch (NoSuchMethodException error) { XposedBridge.log("JumpReplay floating window: " + error); }
     }
 
 
     // 确保整个进程只会Hook一次
     public void HookStart(XC_LoadPackage.LoadPackageParam loadPackageParam) {
-        if (loadPackageParam.appInfo == null || (loadPackageParam.appInfo.flags & (ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP)) == 1) {
+        mainHandler = new Handler(Looper.getMainLooper());
+        if (ANDROID_PACKAGE.equals(loadPackageParam.packageName) && ("android".equals(loadPackageParam.processName) || "system_server".equals(loadPackageParam.processName))) {
             hookSystemMethods(applicationContext);
             return;
         }
 
-        if (!isHostApp) {
-            if (client == null) {
-                client = new MessengerClient(applicationContext);
-                client.registerPassiveCallback(data -> {
-                    isHook = data.getBoolean("isHook");
-                    XposedBridge.log("Client Received hook state: " + isHook);
-                });
-            }
-            // 启动定时分流检测
+        if (!isHostApp && client == null) {
+            client = new MessengerClient(applicationContext);
+            try { outbox = new DurableCaptureOutbox(applicationContext, client, error -> XposedBridge.log("JumpReplay transport retry: " + error)); }
+            catch (Exception error) { reportCaptureError(error); }
+            client.setConnectionCallback(new MessengerClient.ConnectionCallback() {
+                @Override public void onConnected() {
+                    isService = true;
+                    if (outbox != null) outbox.setConnected(true);
+                    client.sendMessageAsync(MessengerService.MSG_IS_HOOK, null, true, new MessengerClient.ResultCallback() {
+                        @Override public void onResult(Bundle result) { applyHookState(result.getInt("resultCode") == 1, true); }
+                        @Override public void onError(Exception error) { XposedBridge.log("JumpReplay state query: " + error); }
+                    });
+                }
+                @Override public void onDisconnected() { isService = false; if (outbox != null) outbox.setConnected(false); }
+            });
+            client.registerPassiveCallback(data -> applyHookState(data.getBoolean("isHook"), data.getBoolean("stateSnapshot", false)));
             startBatchSender();
         }
 
-        Map<String, Boolean> FloatWindowConfig = Map.of(
-                "my_float_window", false,
-                "float_window", true
-        );
+        Map<String, Boolean> FloatWindowConfig = new HashMap<>();
+        FloatWindowConfig.put("my_float_window", false);
+        FloatWindowConfig.put("float_window", true);
 
         try {
             Map<String, String> HooksConfig = getConfig(Constants.CONFIG_URI);
             hookMethods(applicationContext, HooksConfig);
-            FloatWindowConfig = JsonHandler.strToBoolean(JsonHandler.jsonToMap(HooksConfig.get(Constants.FLOAT_WINDOW_CONFIG)));
-        } catch (java.lang.IllegalArgumentException e) {
+            FloatWindowConfig.putAll(JsonHandler.strToBoolean(JsonHandler.jsonToMap(HooksConfig.get(Constants.FLOAT_WINDOW_CONFIG))));
+        } catch (RuntimeException e) {
             XposedBridge.log("写入失败, 服务端未连接 APP未持有权限 => " + e);
         }
 
         XposedBridge.log("FloatWindowConfig: " + FloatWindowConfig);
         if (Boolean.TRUE.equals(FloatWindowConfig.get("float_window"))) {
+            try {
+                intentJournal = new IntentJournal(applicationContext);
+                pendingJournal = new IntentJournal(applicationContext, "pending-floating-history");
+            } catch (Exception error) { reportCaptureError(error); }
             if (isHostApp) {
                 if (Boolean.TRUE.equals(FloatWindowConfig.get("my_float_window"))) {
                     SetFloatWindowUi(applicationContext);
@@ -800,19 +790,18 @@ public class IntentCapture implements IXposedHookLoadPackage {
     }
 
     private Map<String, String> getConfig(Uri uri) {
-        Cursor cursor = applicationContext.getContentResolver().query(uri, null, null, null, null);
-
-        Map<String, String> mapConfig = new HashMap<>();
-        if (cursor != null) {
-            while (cursor.moveToNext()) {
-                @SuppressLint("Range") String key = cursor.getString(cursor.getColumnIndex("key"));
-                @SuppressLint("Range") String value = cursor.getString(cursor.getColumnIndex("value"));
-                mapConfig.put(key, value);
-                XposedBridge.log("Config => " + key + ": " + value);
-            }
-            cursor.close();
+        Map<String, String> result = new HashMap<>();
+        try (Cursor cursor = applicationContext.getContentResolver().query(uri, null, null, null, null)) {
+            if (cursor != null) while (cursor.moveToNext())
+                result.put(cursor.getString(cursor.getColumnIndexOrThrow("key")), cursor.getString(cursor.getColumnIndexOrThrow("value")));
         }
-        return mapConfig;
+        return result;
+    }
+
+    private Class<?> requireHookClass(String name, ClassLoader loader) {
+        Class<?> result = XposedHelpers.findClassIfExists(name, loader);
+        if (result == null) throw new IllegalArgumentException("Hook class not found: " + name);
+        return result;
     }
 
     private void hookMethods(Context applicationContext, Map<String, String> HooksConfig) {
@@ -873,6 +862,14 @@ public class IntentCapture implements IXposedHookLoadPackage {
             }
         });
 
+        RecordXposedBridge.hookAllMethods("Intent", activityClass, "onNewIntent", new XC_MethodHook() {
+            @Override protected void beforeHookedMethod(MethodHookParam param) {
+                if (!getIsHook()) return;
+                Intent incoming = findIntentArg(param.args);
+                if (incoming != null) filterIntent(incoming, "Activity.onNewIntent", param.thisObject.getClass().getName());
+            }
+        });
+
         RecordXposedBridge.hookAllMethods("Scheme", XposedHelpers.findClass("android.net.Uri", classLoader), "parse", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
@@ -894,7 +891,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
             }
         });
 
-        if (internalHooksConfig == null) {
+        if (internalHooksConfig == null || isHostApp) {
             String HookedRecords = JsonHandler.serializeHookedRecords(RecordXposedBridge.getHookedRecords());
             XposedBridge.log("hookAllMethods: " + HookedRecords);
             if (isHostApp) {
@@ -913,24 +910,29 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
         //  用户自定义HOOK
         String externalHooksConfig = HooksConfig.get(Constants.EXTERNAL_HOOKS_CONFIG);
-        if (internalHooksConfig != null && !internalHooksConfig.trim().isEmpty() && !internalHooksConfig.equals("\"null\"") && !internalHooksConfig.equals("null")) {
+        if (externalHooksConfig != null && !externalHooksConfig.trim().isEmpty() && !externalHooksConfig.equals("\"null\"") && !externalHooksConfig.equals("null")) {
             List<Map<String, Object>> externalHooks;
             externalHooks = JsonHandler.deserializeHookedRecords(externalHooksConfig);
 
             for (Map<String, Object> externalHook : externalHooks) {
                 XposedBridge.log("externalHook => " + externalHook);
-                Boolean open = (Boolean) externalHook.get("open");
-                String hookPackageName = (String) externalHook.get("packageName");
+                Object enabledValue = externalHook.get("open");
+                Boolean open = enabledValue instanceof Boolean ? (Boolean) enabledValue : false;
+                Object packageValue = externalHook.get("packageName");
+                String hookPackageName = packageValue instanceof String ? (String) packageValue : null;
 
                 if (!("ALL".equals(hookPackageName) || packageName.equals(hookPackageName)) || !Boolean.TRUE.equals(open)) {
                     continue;
                 }
 
-                String className = (String) externalHook.get("className");
-                String methodName = (String) externalHook.get("methodName");
+                Object classValue = externalHook.get("className"), methodValue = externalHook.get("methodName");
+                if (!(classValue instanceof String) || !(methodValue instanceof String)) {
+                    XposedBridge.log("Invalid JumpReplay custom Hook: " + externalHook); continue;
+                }
+                String className = (String) classValue, methodName = (String) methodValue;
                 try {
                     XposedBridge.hookAllMethods(
-                            XposedHelpers.findClass(className, classLoader),
+                            requireHookClass(className, classLoader),
                             methodName,
                             new XC_MethodHook() {
                                 @SuppressLint("DefaultLocale")
@@ -963,8 +965,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
                                 }
                             }
                     );
-                } catch (Exception e) {
-                    XposedBridge.log("自定义HOOK报错: " + e);
+                } catch (RuntimeException | LinkageError e) {
+                    XposedBridge.log("自定义HOOK报错: " + className + "#" + methodName + " " + e);
                 }
             }
         }
@@ -1103,38 +1105,39 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     // 将数据添加到队列中
     public void addMessage(Bundle bundle) {
-        try {
-            // 将数据放入队列，线程安全
-            messageQueue.put(bundle);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            XposedBridge.log("Error adding message to queue: " + e);
+        synchronized (stateLock) {
+            if (hookStateKnown && !isHook) return;
+            try {
+                if (outbox == null) throw new java.io.IOException("Capture outbox unavailable");
+                outbox.add(bundle, !hookStateKnown);
+            } catch (Exception error) {
+                // Keep the full record until disk storage recovers; never drain-and-forget it.
+                Bundle pending = new Bundle(bundle); pending.putBoolean("_jumpReplayPendingState", !hookStateKnown);
+                messageQueue.add(pending); reportCaptureError(error);
+            }
         }
     }
 
     // 定时任务，批量发送消息
     private void startBatchSender() {
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-        // 每隔固定时间执行一次
-        scheduler.scheduleAtFixedRate(() -> {
-            try {
-                // 批量取出队列中的数据
-                List<Bundle> batch = new ArrayList<>();
-                messageQueue.drainTo(batch); // 将队列中的所有数据取出
-
-                // 如果有数据，则发送
-                if (!batch.isEmpty()) {
-                    String batchDataJson = JsonHandler.toJson(batch);
-                    Bundle batchBundle = new Bundle();
-                    batchBundle.putString("batch_data_binder", batchDataJson);
-
-                    // 使用 MessengerClient 发送数据
-                    client.sendMessageAsync(MessengerService.MSG_SEND_DATA, batchBundle, false, null);
-                }
-            } catch (Exception e) {
-                XposedBridge.log("Error sending batch data: " + e);
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        scheduler.scheduleWithFixedDelay(() -> {
+            synchronized (stateLock) {
+                try {
+                    if (outbox == null) {
+                        outbox = new DurableCaptureOutbox(applicationContext, client, error -> XposedBridge.log("JumpReplay transport retry: " + error));
+                        outbox.setConnected(isService);
+                    }
+                    Bundle record;
+                    while ((record = messageQueue.peek()) != null) {
+                        boolean pending = record.getBoolean("_jumpReplayPendingState", false);
+                        Bundle copy = new Bundle(record); copy.remove("_jumpReplayPendingState");
+                        if (!pending || !hookStateKnown || isHook) outbox.add(copy, pending && !hookStateKnown);
+                        messageQueue.remove(record);
+                    }
+                    if (hookStateKnown) outbox.resolveInitialState(isHook);
+                } catch (Exception error) { reportCaptureError(error); }
             }
-        }, 0, 1000, TimeUnit.MILLISECONDS); // 初始延迟为0，每隔500ms执行一次
+        }, 0, 1, TimeUnit.SECONDS);
     }
 }

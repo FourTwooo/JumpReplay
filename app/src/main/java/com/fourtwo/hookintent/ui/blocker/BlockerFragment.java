@@ -1,7 +1,10 @@
 package com.fourtwo.hookintent.ui.blocker;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -44,6 +47,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 
 public class BlockerFragment extends Fragment {
 
@@ -58,6 +63,12 @@ public class BlockerFragment extends Fragment {
 
     private final List<BlockerGroup> groups = new ArrayList<>();
     private BlockerExpandableAdapter adapter;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private ExecutorService worker;
+    private Future<?> scanTask;
+    private Future<?> buildTask;
+    private int viewGeneration;
+    private final List<AlertDialog> dialogs = new ArrayList<>();
 
     private LinearLayout createDialogRoot() {
         LinearLayout root = new LinearLayout(requireContext());
@@ -143,6 +154,7 @@ public class BlockerFragment extends Fragment {
     }
 
     private void applyDialogWindow(AlertDialog dialog) {
+        trackDialog(dialog);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(
                     new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
@@ -154,14 +166,19 @@ public class BlockerFragment extends Fragment {
         }
     }
 
+    private void trackDialog(AlertDialog dialog) {
+        dialogs.add(dialog);
+        dialog.setOnDismissListener(d -> dialogs.remove(dialog));
+    }
+
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
-    private String diagnoseBuiltApk(File apkFile) {
+    private static String diagnoseBuiltApk(Context context, File apkFile) {
         StringBuilder sb = new StringBuilder();
 
         try {
-            PackageManager pm = requireContext().getPackageManager();
+            PackageManager pm = context.getPackageManager();
             PackageInfo info = pm.getPackageArchiveInfo(
                     apkFile.getAbsolutePath(),
                     PackageManager.GET_ACTIVITIES
@@ -207,6 +224,8 @@ public class BlockerFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+        viewGeneration++;
+        worker = Executors.newSingleThreadExecutor();
 
         recyclerView = view.findViewById(R.id.recycler_blocker);
         progressBar = view.findViewById(R.id.blocker_progress);
@@ -215,7 +234,7 @@ public class BlockerFragment extends Fragment {
 
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
-        adapter = new BlockerExpandableAdapter(this::updateEmptyState);
+        adapter = new BlockerExpandableAdapter(this::onRulesChanged);
         recyclerView.setAdapter(adapter);
 
         buildButton.setOnClickListener(v -> buildBlocker());
@@ -245,34 +264,91 @@ public class BlockerFragment extends Fragment {
     }
 
     private void scanRules() {
+        buildButton.setEnabled(false);
         progressBar.setVisibility(View.VISIBLE);
         emptyView.setVisibility(View.VISIBLE);
         emptyView.setText(getString(R.string.blocker_loading));
 
-        Executors.newSingleThreadExecutor().execute(() -> {
-            List<BlockerGroup> scannedGroups = ManifestRuleScanner.scan(requireContext());
-            List<DeepLinkRule> customRules = loadCustomRules();
+        Context context = requireContext().getApplicationContext();
+        String customLabel = getString(R.string.blocker_custom_group);
+        View owner = getView();
+        int generation = viewGeneration;
+        scanTask = worker.submit(() -> {
+            try {
+                List<BlockerGroup> scannedGroups = ManifestRuleScanner.scan(context);
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                BlockerGroup customGroup = new BlockerGroup(CUSTOM_GROUP_PACKAGE,
+                        customLabel, true, loadCustomRules(context, customLabel));
+                customGroup.toggleExpanded();
 
-            BlockerGroup customGroup = new BlockerGroup(
-                    CUSTOM_GROUP_PACKAGE,
-                    getString(R.string.blocker_custom_group),
-                    true,
-                    customRules
-            );
-            customGroup.toggleExpanded();
-
-            List<BlockerGroup> all = new ArrayList<>();
-            all.add(customGroup);
-            all.addAll(scannedGroups);
-
-            requireActivity().runOnUiThread(() -> {
-                progressBar.setVisibility(View.GONE);
-                groups.clear();
-                groups.addAll(all);
-                adapter.submit(groups);
-                updateEmptyState();
-            });
+                List<BlockerGroup> all = new ArrayList<>();
+                all.add(customGroup);
+                all.addAll(scannedGroups);
+                postToView(owner, generation, () -> {
+                    progressBar.setVisibility(View.GONE);
+                    buildButton.setEnabled(true);
+                    groups.clear();
+                    groups.addAll(all);
+                    adapter.submit(groups);
+                });
+            } catch (Exception e) {
+                postToView(owner, generation, () -> {
+                    progressBar.setVisibility(View.GONE);
+                    buildButton.setEnabled(true);
+                    updateEmptyState();
+                    Toast.makeText(context, e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
         });
+    }
+
+    private void postToView(View owner, int generation, Runnable action) {
+        mainHandler.post(() -> {
+            if (isAdded() && getView() == owner && generation == viewGeneration) {
+                action.run();
+            }
+        });
+    }
+
+    @Override
+    public void onDestroyView() {
+        viewGeneration++;
+        if (scanTask != null) {
+            scanTask.cancel(true);
+            scanTask = null;
+        }
+        if (buildTask != null) {
+            buildTask.cancel(true);
+            buildTask = null;
+        }
+        if (worker != null) {
+            worker.shutdownNow();
+            worker = null;
+        }
+        mainHandler.removeCallbacksAndMessages(null);
+        for (AlertDialog dialog : new ArrayList<>(dialogs)) {
+            dialog.dismiss();
+        }
+        dialogs.clear();
+        if (recyclerView != null) {
+            recyclerView.setAdapter(null);
+        }
+        recyclerView = null;
+        progressBar = null;
+        emptyView = null;
+        buildButton = null;
+        adapter = null;
+        super.onDestroyView();
+    }
+
+    private void onRulesChanged() {
+        updateEmptyState();
+        BlockerGroup customGroup = findCustomGroup();
+        if (customGroup != null) {
+            saveCustomRules(customGroup.getRules());
+        }
     }
 
     private void updateEmptyState() {
@@ -525,9 +601,12 @@ public class BlockerFragment extends Fragment {
         buildButton.setEnabled(false);
 
         JSONObject finalSpec = spec;
-        Executors.newSingleThreadExecutor().execute(() -> {
+        Context context = requireContext().getApplicationContext();
+        View owner = getView();
+        int generation = viewGeneration;
+        buildTask = worker.submit(() -> {
             try {
-                File blockerDir = new File(requireContext().getFilesDir(), "blocker");
+                File blockerDir = new File(context.getFilesDir(), "blocker");
                 if (!blockerDir.exists()) {
                     blockerDir.mkdirs();
                 }
@@ -535,16 +614,18 @@ public class BlockerFragment extends Fragment {
                 File specFile = new File(blockerDir, Constants.BLOCKER_SPEC_FILE_NAME);
                 writeString(specFile, finalSpec.toString(2));
 
-                File signedApk = BlockerApkBuilder.build(requireContext(), finalSpec);
+                File signedApk = BlockerApkBuilder.build(context, finalSpec);
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                String diagnose = diagnoseBuiltApk(context, signedApk);
 
-                requireActivity().runOnUiThread(() -> {
+                postToView(owner, generation, () -> {
                     progressBar.setVisibility(View.GONE);
                     buildButton.setEnabled(true);
                     emptyView.setVisibility(View.GONE);
 
-                    String diagnose = diagnoseBuiltApk(signedApk);
-
-                    new AlertDialog.Builder(requireContext())
+                    AlertDialog resultDialog = new AlertDialog.Builder(requireContext())
                             .setTitle("构建结果")
                             .setMessage(
                                     getString(R.string.blocker_build_done) + "\n"
@@ -560,14 +641,15 @@ public class BlockerFragment extends Fragment {
                             })
                             .setNegativeButton(R.string.cancel, null)
                             .show();
+                    trackDialog(resultDialog);
                 });
 
             } catch (Exception e) {
-                requireActivity().runOnUiThread(() -> {
+                postToView(owner, generation, () -> {
                     progressBar.setVisibility(View.GONE);
                     buildButton.setEnabled(true);
                     updateEmptyState();
-                    Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(context, e.getMessage(), Toast.LENGTH_LONG).show();
                 });
             }
         });
@@ -621,9 +703,9 @@ public class BlockerFragment extends Fragment {
         return null;
     }
 
-    private List<DeepLinkRule> loadCustomRules() {
+    private static List<DeepLinkRule> loadCustomRules(Context context, String customLabel) {
         List<DeepLinkRule> result = new ArrayList<>();
-        String json = SharedPreferencesUtils.getStr(requireContext(), Constants.BLOCKER_CUSTOM_RULES);
+        String json = SharedPreferencesUtils.getStr(context, Constants.BLOCKER_CUSTOM_RULES);
         if (TextUtils.isEmpty(json)) {
             return result;
         }
@@ -634,7 +716,7 @@ public class BlockerFragment extends Fragment {
                 JSONObject obj = array.getJSONObject(i);
                 DeepLinkRule rule = new DeepLinkRule(
                         CUSTOM_GROUP_PACKAGE,
-                        getString(R.string.blocker_custom_group),
+                        customLabel,
                         "",
                         obj.optString("scheme", ""),
                         "",
@@ -653,6 +735,10 @@ public class BlockerFragment extends Fragment {
     }
 
     private void saveCustomRules(List<DeepLinkRule> rules) {
+        Context context = getContext();
+        if (context == null) {
+            return;
+        }
         try {
             JSONArray array = new JSONArray();
             for (DeepLinkRule rule : rules) {
@@ -661,7 +747,7 @@ public class BlockerFragment extends Fragment {
                 obj.put("selected", rule.isSelected());
                 array.put(obj);
             }
-            SharedPreferencesUtils.putStr(requireContext(), Constants.BLOCKER_CUSTOM_RULES, array.toString());
+            SharedPreferencesUtils.putStr(context, Constants.BLOCKER_CUSTOM_RULES, array.toString());
         } catch (Exception ignored) {
         }
     }

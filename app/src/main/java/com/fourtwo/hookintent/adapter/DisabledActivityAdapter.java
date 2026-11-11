@@ -42,7 +42,8 @@ public class DisabledActivityAdapter extends RecyclerView.Adapter<DisabledActivi
 
         // 设置文本和状态
         holder.textView.setText((String) item.get("text"));
-        holder.checkBox.setChecked((boolean) item.get("open"));
+        holder.checkBox.setOnCheckedChangeListener(null);
+        holder.checkBox.setChecked(Boolean.TRUE.equals(item.get("open")));
 
         // 设置复选框点击事件
         holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -54,9 +55,10 @@ public class DisabledActivityAdapter extends RecyclerView.Adapter<DisabledActivi
         // 设置删除按钮点击事件
         holder.deleteButton.setOnClickListener(v -> {
             // 删除对应项
-            dataList.remove(position);
-            notifyItemRemoved(position);
-            notifyItemRangeChanged(position, dataList.size());
+            int current = holder.getBindingAdapterPosition();
+            if (current == RecyclerView.NO_POSITION) return;
+            dataList.remove(current);
+            notifyItemRemoved(current);
         });
     }
 

@@ -39,6 +39,8 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fourtwo.hookintent.IntentIntercept;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
+import com.fourtwo.hookintent.base.IntentPayloadCodec;
+import com.fourtwo.hookintent.base.DetailPayloadStore;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.base.LocalDatabaseManager;
 import com.fourtwo.hookintent.data.Constants;
@@ -69,12 +71,13 @@ public class DetailFragment extends Fragment {
     private LocalDatabaseManager dbManager;
     private JSONObject jsonObject;
     private ItemData itemData = null;
+    private String payloadToken;
     @Override
     public void onResume() {
         super.onResume();
 
         // 初始化数据库管理类
-        dbManager = new LocalDatabaseManager(requireContext());
+        if (dbManager == null) dbManager = new LocalDatabaseManager(requireContext());
         // 打开数据库
         dbManager.openDatabase(Constants.STAR_DB_NAME);
         // 触发菜单重新创建
@@ -97,10 +100,7 @@ public class DetailFragment extends Fragment {
         tabLayout.addTab(tabLayout.newTab().setText("Text"));
         tabLayout.addTab(tabLayout.newTab().setText("StackTrace"));
 
-        // 从 Arguments 获取 ItemData
-        if (getArguments() != null) {
-            itemData = getArguments().getParcelable(ARG_ITEM_DATA);
-        }
+        loadItemData();
 
         // 设置选项卡选择监听器
         ItemData finalItemData = itemData; // 确保 finalItemData 被正确初始化
@@ -162,7 +162,7 @@ public class DetailFragment extends Fragment {
 
             dataList.add(new Pair<>("separator", ""));
 
-            List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data", "componentClassName");
+            List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data", "componentClassName", IntentPayloadCodec.KEY);
 
             for (Map.Entry<String, String> entry : dataMap.entrySet()) {
                 if (no_print_keys.contains(entry.getKey())) {
@@ -203,8 +203,6 @@ public class DetailFragment extends Fragment {
         // 初始化数据库管理类
         dbManager = new LocalDatabaseManager(requireContext());
 
-        // 打开数据库
-        dbManager.openDatabase(Constants.STAR_DB_NAME);
     }
 
     @Override
@@ -213,10 +211,7 @@ public class DetailFragment extends Fragment {
 
         DetailViewModel viewModel = new ViewModelProvider(this).get(DetailViewModel.class);
 
-        if (viewModel.getItemData().getValue() == null && getArguments() != null) {
-            ItemData itemData = getArguments().getParcelable(ARG_ITEM_DATA); // 使用 getParcelable
-            viewModel.setItemData(itemData);
-        }
+        if (viewModel.getItemData().getValue() == null) viewModel.setItemData(itemData);
 
         viewModel.getItemData().observe(getViewLifecycleOwner(), itemData -> {
             if (itemData != null) {
@@ -289,7 +284,10 @@ public class DetailFragment extends Fragment {
                             }
                         } else {
                             // 如果未收藏，执行收藏操作
-                            dbManager.insertOrUpdateData(Constants.STAR_TABLE_NAME, jsonObject);
+                            if (!dbManager.insertOrUpdateData(Constants.STAR_TABLE_NAME, jsonObject)) {
+                                Toast.makeText(requireContext(), "收藏保存失败，请检查存储空间", Toast.LENGTH_LONG).show();
+                                return true;
+                            }
                             isStarred = true;
                             menuItem.setIcon(R.drawable.star_filled); // 更新图标为已收藏
                             Toast.makeText(requireContext(), "收藏成功", Toast.LENGTH_SHORT).show();
@@ -307,12 +305,6 @@ public class DetailFragment extends Fragment {
     }
 
     private void showOptionsDialog(View anchorView) {
-        // 获取 Arguments 中的 itemData
-        ItemData itemData = null;
-        if (getArguments() != null) {
-            itemData = getArguments().getParcelable(ARG_ITEM_DATA); // 使用 getParcelable
-        }
-
         // 如果 itemData 为空，直接返回
         if (itemData == null) {
             Toast.makeText(requireContext(), "错误：数据未加载", Toast.LENGTH_SHORT).show();
@@ -325,18 +317,9 @@ public class DetailFragment extends Fragment {
         List<Runnable> actions = new ArrayList<>();
 
         if (Category.equals("Intent")) {
-            ArrayList<?> intentExtras = bundle.getStringArrayList("intentExtras");
-            boolean hasError = false;
-            String activityTemplate = "am start -n %s %s";
-            String packageName = bundle.getString("componentClassName");
-            String buildAmCommand = "";
-            if (intentExtras != null) {
-                AmCommandBuilder.CommandResult result = AmCommandBuilder.buildAmCommand((List<Map<String, Object>>) intentExtras);
-                buildAmCommand = result.command;
-                hasError = result.hasError;
-                Log.d(TAG, "buildAmCommand:" + buildAmCommand);
-            }
-            String activityCommand = String.format(activityTemplate, packageName, buildAmCommand);
+            AmCommandBuilder.CommandResult command = AmCommandBuilder.buildIntentCommand(bundle);
+            boolean hasError = command.hasError;
+            String activityCommand = command.command;
 
             options.add("am命令");
             boolean finalHasError = hasError;
@@ -349,11 +332,7 @@ public class DetailFragment extends Fragment {
             actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri"));
 
             options.add("转到 意图拦截器");
-            actions.add(() -> {
-                Intent intent = new Intent(requireContext(), IntentIntercept.class);
-                intent.putExtra("DetailData", uriCommand);
-                requireContext().startActivity(intent);
-            });
+            actions.add(this::openInterceptor);
 
         } else if (Category.equals("Scheme")) {
             String uriCommand = itemData.getAppBundle().getString("scheme_raw_url");
@@ -363,11 +342,7 @@ public class DetailFragment extends Fragment {
             actions.add(() -> showAmCommandDialog(uriCommand, false, "schemeUri"));
 
             options.add("转到 意图拦截器");
-            actions.add(() -> {
-                Intent intent = new Intent(requireContext(), IntentIntercept.class);
-                intent.putExtra("DetailData", uriCommand);
-                requireContext().startActivity(intent);
-            });
+            actions.add(this::openInterceptor);
         }
 
         // 改用 PopupMenu
@@ -387,6 +362,38 @@ public class DetailFragment extends Fragment {
         popupMenu.show();
     }
 
+    private void loadItemData() {
+        if (itemData != null) return;
+        Bundle arguments = getArguments();
+        if (arguments == null) return;
+        try {
+            payloadToken = arguments.getString(DetailPayloadStore.ARG_TOKEN);
+            itemData = payloadToken == null ? arguments.getParcelable(ARG_ITEM_DATA)
+                    : DetailPayloadStore.load(requireContext(), payloadToken);
+            // Legacy callers may still pass a Parcelable. Future state uses only its small token.
+            if (itemData != null && payloadToken == null) {
+                payloadToken = DetailPayloadStore.save(requireContext(), itemData);
+                arguments.putString(DetailPayloadStore.ARG_TOKEN, payloadToken);
+                arguments.remove(ARG_ITEM_DATA);
+            }
+        } catch (Exception error) {
+            Log.e(TAG, "Cannot load detail record", error);
+            Toast.makeText(requireContext(), "详情读取失败：" + error.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void openInterceptor() {
+        if (itemData == null) return;
+        try {
+            if (payloadToken == null) payloadToken = DetailPayloadStore.save(requireContext(), itemData);
+            Intent intent = new Intent(requireContext(), IntentIntercept.class);
+            intent.putExtra(DetailPayloadStore.EXTRA_TOKEN, payloadToken);
+            startActivity(intent);
+        } catch (Exception error) {
+            Toast.makeText(requireContext(), "无法打开拦截器：" + error.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
     /**
      * @param amCommand  命令
      * @param hasError   命令是否异常
@@ -394,6 +401,7 @@ public class DetailFragment extends Fragment {
      */
     @SuppressLint("SetTextI18n")
     private void showAmCommandDialog(String amCommand, boolean hasError, String optionName) {
+        final String originalText = amCommand;
         // 使用 LayoutInflater 加载自定义视图
         LayoutInflater inflater = LayoutInflater.from(requireContext());
         View dialogView = inflater.inflate(R.layout.dialog_custom_view, null);
@@ -415,10 +423,6 @@ public class DetailFragment extends Fragment {
             SharedPreferencesUtils.putBoolean(requireContext(), "detailIsRoot", isChecked1);
         });
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            amCommand = URLDecoder.decode(amCommand, StandardCharsets.UTF_8);
-        }
-
         commandTextView.setText(amCommand); // 确保文本足够长以测试滚动
         commandTextView.setMovementMethod(new ScrollingMovementMethod());
 
@@ -430,12 +434,15 @@ public class DetailFragment extends Fragment {
         suCodeButton.setOnClickListener(v -> {
             if (!Objects.equals(optionName, "am命令")) {
                 try {
-                    Intent newIntent = Intent.parseUri(String.valueOf(commandTextView.getText()), 0);
+                    String text = commandTextView.getText().toString();
+                    Intent newIntent = "intentUri".equals(optionName) && Objects.equals(text, originalText)
+                            ? IntentPayloadCodec.decode(itemData.getAppBundle())
+                            : Intent.parseUri(text, Intent.URI_INTENT_SCHEME);
 
                     String SelectedItem = dropdownSpinner.getSelectedItem().toString();
                     PermissionManager.startActivity(requireContext(), newIntent, enableFeatureCheckbox.isChecked(), SelectedItem);
                 } catch (Exception e) {
-                    throw new RuntimeException(e);
+                    Toast.makeText(requireContext(), "启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             } else {
                 PermissionManager.executeCommand(String.valueOf(commandTextView.getText()), enableFeatureCheckbox.isChecked(), requireContext());

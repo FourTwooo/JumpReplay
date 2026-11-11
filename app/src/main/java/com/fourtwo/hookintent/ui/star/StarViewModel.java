@@ -23,6 +23,7 @@ public class StarViewModel extends ViewModel {
     public LiveData<List<ItemData>> getIntentDataList() {
         return intentDataList;
     }
+    public void setIntentData(List<ItemData> data) { intentDataList.setValue(new ArrayList<>(data)); }
 
     public void clearIntentDataList() {
         List<ItemData> emptyList = new ArrayList<>();

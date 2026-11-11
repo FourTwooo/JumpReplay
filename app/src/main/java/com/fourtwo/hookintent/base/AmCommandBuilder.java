@@ -1,133 +1,109 @@
 package com.fourtwo.hookintent.base;
 
-import android.util.Log;
-
+import android.os.Bundle;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class AmCommandBuilder {
+/** Builds shell text only for values which am can represent without losing their type. */
+public final class AmCommandBuilder {
+    private AmCommandBuilder() {}
 
     public static class CommandResult {
-        public String command;
-        public boolean hasError;
-
+        public final String command;
+        public final boolean hasError;
         public CommandResult(String command, boolean hasError) {
             this.command = command;
             this.hasError = hasError;
         }
     }
 
+    public static String shellQuote(String value) {
+        return "'" + (value == null ? "" : value).replace("'", "'\\''") + "'";
+    }
+
+    public static CommandResult buildIntentCommand(Bundle record) {
+        StringBuilder command = new StringBuilder("am start");
+        String component = record.getString("componentClassName");
+        if (component != null && !component.isEmpty() && !"null".equals(component)) {
+            option(command, "-n", component);
+        }
+        option(command, "-a", record.getString("action"));
+        option(command, "-d", record.getString("dataString"));
+        option(command, "-t", record.getString("type"));
+        option(command, "-p", record.getString("package"));
+        Object categories = record.get("categories");
+        if (categories instanceof Iterable) {
+            for (Object category : (Iterable<?>) categories) option(command, "-c", String.valueOf(category));
+        }
+        Object flags = record.get("flags");
+        if (flags instanceof Number && ((Number) flags).intValue() != 0) {
+            option(command, "-f", String.valueOf(((Number) flags).intValue()));
+        }
+        List<Map<String, Object>> extras = JsonHandler.getFilterValueJson(record.get("intentExtras"));
+        CommandResult result = buildAmCommand(extras);
+        command.append(result.command);
+        return new CommandResult(command.toString(), result.hasError);
+    }
+
+    private static void option(StringBuilder command, String flag, String value) {
+        if (value != null && !"null".equals(value)) command.append(' ').append(flag).append(' ').append(shellQuote(value));
+    }
+
     public static CommandResult buildAmCommand(List<Map<String, Object>> extras) {
         StringBuilder command = new StringBuilder();
-        boolean hasError = false;
-
-        for (Map<String, Object> map : extras) {
-            String key = (String) map.get("key");
-            String className = (String) map.get("class");
-            Object value = map.get("value");
-
-            if (key != null && className != null) {
-
-                if (className.equals("null")) {
-                    className = "java.lang.String";
-                    value = null;
-                }
-
-                switch (className) {
-                    case "java.lang.String":
-                        if (value != null) {
-                            command.append(" --es ").append(key).append(" ").append("\"").append(value).append("\"");
-                        } else {
-                            command.append(" --esn ").append(key);
-                        }
-                        break;
-                    case "java.lang.Integer":
-                        command.append(" --ei ").append(key).append(" ").append(value);
-                        break;
-                    case "java.lang.Boolean":
-                        command.append(" --ez ").append(key).append(" ").append(value);
-                        break;
-                    case "java.lang.Long":
-                        command.append(" --el ").append(key).append(" ").append(value);
-                        break;
-                    case "java.lang.Float":
-                        command.append(" --ef ").append(key).append(" ").append(value);
-                        break;
-                    case "android.net.Uri":
-                        command.append(" --eu ").append(key).append(" ").append(value);
-                        break;
-                    case "android.content.ComponentName":
-                        command.append(" --ecn ").append(key).append(" ").append(value);
-                        break;
-                    case "[I": // Integer array
-                        command.append(" --eia ").append(key).append(" ").append(arrayToString((int[]) value));
-                        break;
-                    case "[J": // Long array
-                        command.append(" --ela ").append(key).append(" ").append(arrayToString((long[]) value));
-                        break;
-                    case "[F": // Float array
-                        command.append(" --efa ").append(key).append(" ").append(arrayToString((float[]) value));
-                        break;
-                    default:
-                        Log.d("buildAmCommand", String.format("class: %s key: %s value: %s", className, key, value));
-                        hasError = true;
-                        break;
-                }
+        boolean error = false;
+        if (extras == null) return new CommandResult("", false);
+        for (Map<String, Object> extra : extras) {
+            String key = String.valueOf(extra.get("key"));
+            String type = String.valueOf(extra.get("class"));
+            Object value = extra.get("value");
+            String flag;
+            switch (type) {
+                case "null": flag = "--esn"; break;
+                case "java.lang.String": flag = value == null ? "--esn" : "--es"; break;
+                case "java.lang.Integer": flag = "--ei"; break;
+                case "java.lang.Boolean": flag = "--ez"; break;
+                case "java.lang.Long": flag = "--el"; break;
+                case "java.lang.Float": flag = "--ef"; break;
+                case "android.content.ComponentName": flag = "--ecn"; break;
+                case "[I": flag = "--eia"; break;
+                case "[J": flag = "--ela"; break;
+                case "[F": flag = "--efa"; break;
+                case "[Ljava.lang.String;": flag = "--esa"; break;
+                default:
+                    if (type.startsWith("android.net.Uri")) flag = "--eu";
+                    else { error = true; continue; }
             }
+            String text = value == null ? "" : String.valueOf(value);
+            if (type.startsWith("[")) {
+                text = arrayText(value, "[Ljava.lang.String;".equals(type));
+                // Old captures stored array identity strings, so their contents cannot be reconstructed.
+                if (text == null) { error = true; continue; }
+            }
+            command.append(' ').append(flag).append(' ').append(shellQuote(key));
+            if (!"--esn".equals(flag)) command.append(' ').append(shellQuote(text));
         }
-
-        return new CommandResult(command.toString(), hasError);
+        return new CommandResult(command.toString(), error);
     }
 
-    private static String arrayToString(int[] array) {
-        StringBuilder result = new StringBuilder();
-        if (array != null) {
-            for (int i = 0; i < array.length; i++) {
-                result.append(array[i]);
-                if (i < array.length - 1) {
-                    result.append(",");
-                }
-            }
+    private static String arrayText(Object value, boolean strings) {
+        List<Object> values = new ArrayList<>();
+        if (value instanceof Iterable) {
+            for (Object entry : (Iterable<?>) value) values.add(entry);
+        } else if (value != null && value.getClass().isArray()) {
+            for (int i = 0; i < Array.getLength(value); i++) values.add(Array.get(value, i));
+        } else return null;
+        StringBuilder text = new StringBuilder();
+        for (Object entry : values) {
+            if (entry == null) return null; // am cannot distinguish a null element.
+            if (text.length() > 0) text.append(',');
+            String token = String.valueOf(entry);
+            if (strings) token = token.replace("\\", "\\\\").replace(",", "\\,");
+            text.append(token);
         }
-        return result.toString();
-    }
-
-    private static String arrayToString(long[] array) {
-        StringBuilder result = new StringBuilder();
-        if (array != null) {
-            for (int i = 0; i < array.length; i++) {
-                result.append(array[i]);
-                if (i < array.length - 1) {
-                    result.append(",");
-                }
-            }
-        }
-        return result.toString();
-    }
-
-    private static String arrayToString(float[] array) {
-        StringBuilder result = new StringBuilder();
-        if (array != null) {
-            for (int i = 0; i < array.length; i++) {
-                result.append(array[i]);
-                if (i < array.length - 1) {
-                    result.append(",");
-                }
-            }
-        }
-        return result.toString();
-    }
-
-    private static String arrayToString(String[] array) {
-        StringBuilder result = new StringBuilder();
-        if (array != null) {
-            for (int i = 0; i < array.length; i++) {
-                result.append("\"").append(array[i]).append("\"");
-                if (i < array.length - 1) {
-                    result.append(",");
-                }
-            }
-        }
-        return result.toString();
+        // am parses an empty token as an element instead of an empty array.
+        return values.isEmpty() ? null : text.toString();
     }
 }

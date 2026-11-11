@@ -2,10 +2,12 @@
 .gradle
 /local.properties
 /.idea
-/hiddenapi
 .DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
+
+# Local test deliveries are kept outside source control.
+/audit-artifacts/

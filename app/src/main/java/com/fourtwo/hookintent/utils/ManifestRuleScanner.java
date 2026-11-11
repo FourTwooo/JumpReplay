@@ -4,7 +4,9 @@ import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
+import android.util.Log;
 
 import com.fourtwo.hookintent.ui.blocker.BlockerGroup;
 import com.fourtwo.hookintent.ui.blocker.DeepLinkRule;
@@ -13,155 +15,161 @@ import org.xmlpull.v1.XmlPullParser;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 public class ManifestRuleScanner {
-
+    private static final String TAG = "ManifestRuleScanner";
     private static final String ANDROID_NS = "http://schemas.android.com/apk/res/android";
 
     public static List<BlockerGroup> scan(Context context) {
         List<BlockerGroup> result = new ArrayList<>();
         PackageManager pm = context.getPackageManager();
-
         List<ApplicationInfo> applications = pm.getInstalledApplications(PackageManager.GET_META_DATA);
         for (ApplicationInfo appInfo : applications) {
-            List<DeepLinkRule> rules = parseRulesFromApk(context, appInfo);
-            if (!rules.isEmpty()) {
+            if (Thread.currentThread().isInterrupted()) {
+                break;
+            }
+            try {
                 String appName = String.valueOf(pm.getApplicationLabel(appInfo));
-                result.add(new BlockerGroup(appInfo.packageName, appName, false, rules));
+                List<DeepLinkRule> rules = parseRulesFromApk(context, appInfo, appName);
+                if (!rules.isEmpty()) {
+                    result.add(new BlockerGroup(appInfo.packageName, appName, false, rules));
+                }
+            } catch (RuntimeException e) {
+                // An application can be removed while the scan is in progress.
+                Log.w(TAG, "Cannot scan package " + appInfo.packageName, e);
             }
         }
-
         result.sort(Comparator.comparing(BlockerGroup::getAppName, String.CASE_INSENSITIVE_ORDER));
         return result;
     }
 
-    private static List<DeepLinkRule> parseRulesFromApk(Context context, ApplicationInfo appInfo) {
+    private static List<DeepLinkRule> parseRulesFromApk(Context context, ApplicationInfo appInfo,
+                                                       String appName) {
         List<DeepLinkRule> rules = new ArrayList<>();
         Set<String> dedupe = new HashSet<>();
-
+        Set<String> apkPaths = new LinkedHashSet<>();
+        if (appInfo.sourceDir != null) {
+            apkPaths.add(appInfo.sourceDir);
+        }
+        if (appInfo.splitSourceDirs != null) {
+            apkPaths.addAll(Arrays.asList(appInfo.splitSourceDirs));
+        }
         try {
-            AssetManager assetManager = AssetManager.class.getDeclaredConstructor().newInstance();
+            Resources resources = context.getPackageManager().getResourcesForApplication(appInfo);
+            for (String apkPath : apkPaths) {
+                if (Thread.currentThread().isInterrupted()) {
+                    break;
+                }
+                parseManifest(apkPath, appInfo.packageName, appName, resources, rules, dedupe);
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            Log.w(TAG, "Package disappeared during scan: " + appInfo.packageName);
+        }
+        return rules;
+    }
+
+    private static void parseManifest(String apkPath, String packageName, String appName,
+                                      Resources resources, List<DeepLinkRule> rules,
+                                      Set<String> dedupe) {
+        AssetManager assetManager = null;
+        XmlResourceParser parser = null;
+        try {
+            assetManager = AssetManager.class.getDeclaredConstructor().newInstance();
             Method addAssetPath = AssetManager.class.getMethod("addAssetPath", String.class);
-            int cookie = (int) addAssetPath.invoke(assetManager, appInfo.sourceDir);
-
+            int cookie = (int) addAssetPath.invoke(assetManager, apkPath);
+            if (cookie == 0) {
+                return;
+            }
             Method openXml = AssetManager.class.getMethod("openXmlResourceParser", int.class, String.class);
-            XmlResourceParser parser = (XmlResourceParser) openXml.invoke(assetManager, cookie, "AndroidManifest.xml");
-
+            parser = (XmlResourceParser) openXml.invoke(assetManager, cookie, "AndroidManifest.xml");
             String currentActivity = null;
-            boolean inIntentFilter = false;
+            int filterDepth = -1;
             boolean hasView = false;
             boolean hasBrowsable = false;
-            List<DataTag> dataTags = new ArrayList<>();
+            ManifestFilterData filterData = null;
 
-            int eventType = parser.getEventType();
-            while (eventType != XmlPullParser.END_DOCUMENT) {
-                String tagName = parser.getName();
-
-                if (eventType == XmlPullParser.START_TAG) {
-                    if ("activity".equals(tagName) || "activity-alias".equals(tagName)) {
-                        currentActivity = normalizeClassName(appInfo.packageName,
-                                parser.getAttributeValue(ANDROID_NS, "name"));
-                    } else if ("intent-filter".equals(tagName)) {
-                        inIntentFilter = true;
+            for (int event = parser.getEventType(); event != XmlPullParser.END_DOCUMENT;
+                 event = parser.next()) {
+                if (Thread.currentThread().isInterrupted()) {
+                    return;
+                }
+                String tag = parser.getName();
+                if (event == XmlPullParser.START_TAG) {
+                    if ("activity".equals(tag) || "activity-alias".equals(tag)) {
+                        currentActivity = normalizeClassName(packageName, value(parser, resources, "name"));
+                    } else if ("intent-filter".equals(tag)) {
+                        filterDepth = parser.getDepth();
                         hasView = false;
                         hasBrowsable = false;
-                        dataTags.clear();
-                    } else if (inIntentFilter && "action".equals(tagName)) {
-                        String action = parser.getAttributeValue(ANDROID_NS, "name");
-                        if ("android.intent.action.VIEW".equals(action)) {
-                            hasView = true;
-                        }
-                    } else if (inIntentFilter && "category".equals(tagName)) {
-                        String category = parser.getAttributeValue(ANDROID_NS, "name");
-                        if ("android.intent.category.BROWSABLE".equals(category)) {
-                            hasBrowsable = true;
-                        }
-                    } else if (inIntentFilter && "data".equals(tagName)) {
-                        DataTag dataTag = new DataTag();
-                        dataTag.scheme = value(parser, "scheme");
-                        dataTag.host = value(parser, "host");
-                        dataTag.port = value(parser, "port");
-                        dataTag.path = value(parser, "path");
-                        dataTag.pathPrefix = value(parser, "pathPrefix");
-                        dataTag.pathPattern = value(parser, "pathPattern");
-                        if (!dataTag.scheme.isEmpty()) {
-                            dataTags.add(dataTag);
+                        filterData = new ManifestFilterData();
+                    } else if (filterDepth >= 0 && parser.getDepth() == filterDepth + 1) {
+                        if ("action".equals(tag)) {
+                            hasView |= "android.intent.action.VIEW".equals(value(parser, resources, "name"));
+                        } else if ("category".equals(tag)) {
+                            hasBrowsable |= "android.intent.category.BROWSABLE".equals(value(parser, resources, "name"));
+                        } else if ("data".equals(tag)) {
+                            filterData.add(value(parser, resources, "scheme"),
+                                    value(parser, resources, "host"), value(parser, resources, "port"),
+                                    value(parser, resources, "path"), value(parser, resources, "pathPrefix"),
+                                    value(parser, resources, "pathPattern"));
                         }
                     }
-                } else if (eventType == XmlPullParser.END_TAG) {
-                    if ("intent-filter".equals(tagName)) {
-                        if (currentActivity != null && hasView && hasBrowsable) {
-                            String appName = String.valueOf(context.getPackageManager().getApplicationLabel(appInfo));
-                            for (DataTag dataTag : dataTags) {
-                                DeepLinkRule rule = new DeepLinkRule(
-                                        appInfo.packageName,
-                                        appName,
-                                        currentActivity,
-                                        dataTag.scheme,
-                                        dataTag.host,
-                                        dataTag.port,
-                                        dataTag.path,
-                                        dataTag.pathPrefix,
-                                        dataTag.pathPattern
-                                );
-
-                                String key = rule.getPackageName() + "|" + rule.getActivityName() + "|" +
-                                        rule.getScheme() + "|" + rule.getHost() + "|" + rule.getPort() + "|" +
-                                        rule.getPath() + "|" + rule.getPathPrefix() + "|" + rule.getPathPattern();
-
-                                if (!dedupe.contains(key)) {
-                                    dedupe.add(key);
+                } else if (event == XmlPullParser.END_TAG) {
+                    if ("intent-filter".equals(tag) && parser.getDepth() == filterDepth) {
+                        if (currentActivity != null && !currentActivity.isEmpty() && hasView && hasBrowsable) {
+                            for (DeepLinkRule rule : filterData.toRules(packageName, appName, currentActivity)) {
+                                String key = rule.toJson().toString();
+                                if (dedupe.add(key)) {
                                     rules.add(rule);
                                 }
                             }
                         }
-                        inIntentFilter = false;
-                        hasView = false;
-                        hasBrowsable = false;
-                        dataTags.clear();
-                    } else if ("activity".equals(tagName) || "activity-alias".equals(tagName)) {
+                        filterDepth = -1;
+                        filterData = null;
+                    } else if ("activity".equals(tag) || "activity-alias".equals(tag)) {
                         currentActivity = null;
                     }
                 }
-
-                eventType = parser.next();
             }
-
-            parser.close();
-        } catch (Throwable ignored) {
+        } catch (Exception e) {
+            // Keep the other splits usable if one archive cannot be read.
+            Log.w(TAG, "Cannot read manifest for " + packageName, e);
+        } finally {
+            if (parser != null) {
+                parser.close();
+            }
+            if (assetManager != null) {
+                assetManager.close();
+            }
         }
-
-        return rules;
     }
 
     private static String normalizeClassName(String packageName, String rawName) {
-        if (rawName == null || rawName.trim().isEmpty()) {
+        if (rawName.isEmpty()) {
             return "";
         }
         if (rawName.startsWith(".")) {
             return packageName + rawName;
         }
-        if (!rawName.contains(".")) {
-            return packageName + "." + rawName;
-        }
-        return rawName;
+        return rawName.contains(".") ? rawName : packageName + "." + rawName;
     }
 
-    private static String value(XmlResourceParser parser, String attr) {
+    private static String value(XmlResourceParser parser, Resources resources, String attr) {
+        int resourceId = parser.getAttributeResourceValue(ANDROID_NS, attr, 0);
+        if (resourceId != 0) {
+            try {
+                return resources.getString(resourceId);
+            } catch (Resources.NotFoundException ignored) {
+                return "";
+            }
+        }
         String value = parser.getAttributeValue(ANDROID_NS, attr);
         return value == null ? "" : value;
-    }
-
-    private static class DataTag {
-        String scheme = "";
-        String host = "";
-        String port = "";
-        String path = "";
-        String pathPrefix = "";
-        String pathPattern = "";
     }
 }

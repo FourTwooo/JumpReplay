@@ -4,6 +4,8 @@ import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class BinaryXmlStringPoolPatcher {
 
@@ -73,6 +75,7 @@ public final class BinaryXmlStringPoolPatcher {
 
         int offsetsBase = chunkOffset + headerSize;
         List<String> strings = new ArrayList<>(stringCount);
+        Set<String> missingReplacements = new HashSet<>(replacements.keySet());
 
         for (int i = 0; i < stringCount; i++) {
             int stringOffset = readU32(xmlBytes, offsetsBase + i * 4);
@@ -80,9 +83,14 @@ public final class BinaryXmlStringPoolPatcher {
             String value = utf8 ? readUtf8String(xmlBytes, absolute) : readUtf16String(xmlBytes, absolute);
 
             if (replacements.containsKey(value)) {
+                missingReplacements.remove(value);
                 value = replacements.get(value);
             }
             strings.add(value);
+        }
+
+        if (!missingReplacements.isEmpty()) {
+            throw new IllegalStateException("模板 Manifest 缺少占位符: " + missingReplacements);
         }
 
         byte[] styleData = new byte[0];
@@ -150,7 +158,7 @@ public final class BinaryXmlStringPoolPatcher {
         IntWithSize byteLen = readUtf8Length(bytes, offset + charLen.size);
         int strStart = offset + charLen.size + byteLen.size;
         int len = byteLen.value;
-        return new String(bytes, strStart, len);
+        return new String(bytes, strStart, len, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private static String readUtf16String(byte[] bytes, int offset) {

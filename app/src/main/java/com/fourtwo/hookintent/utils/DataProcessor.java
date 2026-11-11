@@ -5,303 +5,165 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-
 import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.ItemData;
-
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
+/** Converts each capture independently; one malformed capture never discards its batch. */
 public class DataProcessor {
     private static final String TAG = "DataProcessor";
-
     private final Context context;
-    private final IntentDuplicateChecker intentDuplicateChecker;
-    private final IntentDuplicateChecker schemeDuplicateChecker;
-    private Map<String, Object> JsonData = new HashMap<>();
+    private Map<String, Object> jsonData = new HashMap<>();
+    private final IntentDuplicateChecker intentDuplicates = new IntentDuplicateChecker();
+    private final IntentDuplicateChecker schemeDuplicates = new IntentDuplicateChecker();
+    private String lastError;
 
-    public DataProcessor(Context context) {
-        this.context = context;
-        this.intentDuplicateChecker = new IntentDuplicateChecker();
-        this.schemeDuplicateChecker = new IntentDuplicateChecker();
+    public DataProcessor(Context context) { this.context = context.getApplicationContext(); }
+    public interface DataProcessedCallback { void onDataProcessed(ItemData itemData); }
+    public void setJsonData(Map<String, Object> data) { jsonData = data == null ? new HashMap<>() : data; }
+    public String getLastError() { return lastError; }
+    private static final class DeduplicationCheckpoint {
+        final String intent, scheme;
+        DeduplicationCheckpoint(String intent, String scheme) { this.intent = intent; this.scheme = scheme; }
+    }
+    public Object checkpointDeduplication() {
+        return new DeduplicationCheckpoint(intentDuplicates.checkpoint(), schemeDuplicates.checkpoint());
+    }
+    public void restoreDeduplication(Object checkpoint) {
+        if (!(checkpoint instanceof DeduplicationCheckpoint)) throw new IllegalArgumentException("Invalid deduplication checkpoint");
+        DeduplicationCheckpoint state = (DeduplicationCheckpoint) checkpoint;
+        intentDuplicates.restore(state.intent);
+        schemeDuplicates.restore(state.scheme);
     }
 
-    public interface DataProcessedCallback {
-        void onDataProcessed(ItemData itemData);
-    }
-
-    // 新增方法：设置 JsonData
-    public void setJsonData(Map<String, Object> jsonData) {
-        this.JsonData = jsonData != null ? jsonData : new HashMap<>();
-    }
     public void processBundle(Bundle bundle, DataProcessedCallback callback) {
-        String category = bundle.getString("category");
-        String stackTrace = bundle.getString("stack_trace");
-        String uri = bundle.getString("uri");
-        String time = Extract.extractTime(bundle.getString("time"));
-        if (!JsonData.isEmpty()) {
-            if (filterData(category, bundle)) {
-                return;
-            }
-        }
-        Log.d(TAG, "processBundle1: " + bundle.getString("time"));
-        String dataSize = Extract.calculateBundleDataSize(bundle);
-        String packageName;
+        if (bundle == null) return;
+        String category = bundle.getString("category", "Unknown");
+        if (filterData(category, bundle)) return;
         String component;
+        String targetPackage;
         String dataString = "";
-
         if ("Intent".equals(category)) {
-            if (!JsonData.isEmpty()) {
-                if (handleIntentBase(bundle)) return;
+            if (!jsonData.isEmpty() && intentDuplicates.isDuplicate(bundle)) return;
+            component = present(bundle.getString("componentClassName"));
+            targetPackage = present(bundle.getString("package"));
+            if (component != null) targetPackage = component;
+            String dataUri = present(bundle.getString("dataString"));
+            if (component == null) {
+                component = dataUri != null ? dataUri : bundle.getString("action", "");
+                if (targetPackage == null && dataUri != null) targetPackage = SchemeResolver.findAppByUri(context, dataUri);
             }
-            component = bundle.getString("component");
-            packageName = component;
-            ArrayList<?> intentExtras = (ArrayList<?>) bundle.getSerializable("intentExtras");
-            if (intentExtras != null) {
-                dataString = Extract.extractIntentExtrasString(intentExtras);
-            }
-            if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("dataString"), "null")) {
-                packageName = SchemeResolver.findAppByUri(context, bundle.getString("dataString"));
-                component = bundle.getString("dataString");
-            }
-            if (Objects.equals(component, "null") && !Objects.equals(bundle.getString("action"), "null")) {
-                packageName = SchemeResolver.findAppByUri(context, bundle.getString("action"));
-                component = bundle.getString("action");
-            }
+            Object extras = bundle.get("intentExtras");
+            if (extras instanceof ArrayList) dataString = Extract.extractIntentExtrasString((ArrayList<?>) extras);
         } else if ("Scheme".equals(category)) {
-            if (!JsonData.isEmpty()) {
-                if (handleSchemeBase(bundle)) return;
-            }
-            String schemeRawUrl = bundle.getString("scheme_raw_url");
-            packageName = SchemeResolver.findAppByUri(context, schemeRawUrl);
-            Bundle bundle1 = DataConverter.convertUriToBundle(Uri.parse(schemeRawUrl));
-            bundle.putAll(bundle1);
-
-            if (schemeRawUrl.startsWith("#Intent;") || bundle.getString("authority").equals("null")) {
-                component = schemeRawUrl;
-                packageName = Extract.getIntentSchemeValue(schemeRawUrl, "component");
-                if (packageName == null) {
-                    packageName = Extract.getIntentSchemeValue(schemeRawUrl, "action");
-                }
-            } else {
-                component = bundle.getString("scheme") + "://" + bundle.getString("authority") + bundle.getString("path");
-            }
-            dataString = bundle.getString("query");
-            if ("null".equals(dataString)) {
-                dataString = "";
-            }
+            if (!jsonData.isEmpty() && schemeDuplicates.isDuplicate(bundle)) return;
+            String raw = bundle.getString("scheme_raw_url");
+            if (raw == null) throw new IllegalArgumentException("Scheme记录缺少原始URL");
+            Uri uri = Uri.parse(raw);
+            bundle.putAll(DataConverter.convertUriToBundle(uri));
+            targetPackage = SchemeResolver.findAppByUri(context, raw);
+            // Opaque schemes (tel/mailto/urn), relative paths and intent: all retain their original form.
+            component = uri.getAuthority() == null || uri.getScheme() == null ? raw
+                    : uri.getScheme() + "://" + uri.getAuthority() + (uri.getPath() == null ? "" : uri.getPath());
+            dataString = uri.getQuery();
         } else {
-            packageName = bundle.getString("packageName");
+            targetPackage = bundle.getString("packageName");
             component = bundle.getString("title");
             dataString = bundle.getString("data");
         }
-
-        AppInfoHelper.AppInfo appInfo = AppInfoHelper.getAppInfo(context, packageName);
-        String appName = appInfo.getAppName();
-        Drawable appIcon = appInfo.getAppIcon();
-
-        Log.d(TAG, "processBundle end: " + category);
-        ItemData itemData = new ItemData(
-                appIcon,
-                appName,
-                component,
-                dataString,
-                time,
-                String.format("%s B", dataSize),
-                bundle,
-                category,
-                stackTrace,
-                uri
-        );
-
-        if (callback != null) {
-            callback.onDataProcessed(itemData);
-        }
+        AppInfoHelper.AppInfo appInfo = AppInfoHelper.getAppInfo(context, targetPackage);
+        Drawable icon = appInfo.getAppIcon();
+        ItemData item = new ItemData(icon, appInfo.getAppName(), component, dataString,
+                Extract.extractTime(bundle.getString("time")), Extract.calculateBundleDataSize(bundle) + " B",
+                bundle, category, bundle.getString("stack_trace"), bundle.getString("uri"));
+        if (callback != null) callback.onDataProcessed(item);
     }
+
+    private static String present(String value) { return value == null || "null".equals(value) || value.isEmpty() ? null : value; }
 
     public void processReceivedData(Bundle data, DataProcessedCallback callback) {
+        lastError = null;
+        final JSONArray records;
         try {
-            if (data == null) {
-                return;
+            String payload = data == null ? null : data.getString("batch_data_binder");
+            if (payload == null || payload.trim().isEmpty()) throw new IllegalArgumentException("捕获批次缺少内容");
+            records = new JSONArray(payload);
+        } catch (JSONException | RuntimeException error) {
+            lastError = "捕获批次格式错误: " + error.getClass().getSimpleName();
+            Log.e(TAG, lastError, error);
+            return;
+        }
+        for (int index = 0; index < records.length(); index++) {
+            Object checkpoint = checkpointDeduplication();
+            try {
+                JSONObject record = records.optJSONObject(index);
+                if (record == null) throw new IllegalArgumentException("捕获记录不是JSON对象");
+                processBundle(JsonHandler.toBundle(record), callback);
+            } catch (RuntimeException error) {
+                // Failed conversion must not make an unsaved record look like an accepted duplicate.
+                restoreDeduplication(checkpoint);
+                lastError = "第" + (index + 1) + "条捕获记录处理失败: " + error.getClass().getSimpleName();
+                Log.e(TAG, lastError, error);
             }
-
-            String batchDataJson = data.getString("batch_data_binder");
-
-            List<Bundle> bundles = JsonHandler.fromJson(batchDataJson);
-            Log.d(TAG, "processReceivedData: " + bundles.size());
-
-            for (Bundle bundle : bundles) {
-                processBundle(bundle, callback);
-            }
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error processing data", e);
         }
     }
 
-    private boolean handleIntentBase(Bundle bundle) {
-//        Log.d(TAG, "Removing duplicate Intent bundle: " + bundle);
-        return intentDuplicateChecker.isDuplicate(bundle);
-    }
-
-    private boolean handleSchemeBase(Bundle bundle) {
-//        Log.d(TAG, "Removing duplicate Scheme bundle: " + bundle);
-        return schemeDuplicateChecker.isDuplicate(bundle);
-    }
-
-
-    public boolean isFilterMatched(Map<String, Object> groupData, String key, String valueToMatch) {
-        if (valueToMatch == null) {
-            return false;
-        }
-
-        List<Map<String, Object>> itemList = JsonHandler.getFilterValueJson(groupData.get(key));
-        if (itemList == null) {
-            return false;
-        }
-
-        for (Map<String, Object> item : itemList) {
-            Object type = item.get("type");
-            Object text = item.get("text");
-
-            if (Boolean.TRUE.equals(type) && text != null
-                    && valueToMatch.equalsIgnoreCase(String.valueOf(text))) {
-                return true;
-            }
+    public boolean isFilterMatched(Map<String, Object> group, String key, String value) {
+        if (value == null) return false;
+        List<Map<String, Object>> rules = JsonHandler.getFilterValueJson(group.get(key));
+        if (rules == null) return false;
+        for (Map<String, Object> rule : rules) {
+            if (Boolean.TRUE.equals(rule.get("type")) && rule.get("text") != null
+                    && value.equalsIgnoreCase(String.valueOf(rule.get("text")))) return true;
         }
         return false;
     }
 
-    private boolean filterData(String base, Bundle bundle) {
-        if (JsonData == null || JsonData.isEmpty() || base == null) {
-            return false;
-        }
-
-        // 保留旧逻辑：无效 Scheme 直接丢弃，避免后续解析异常
-        if ("Scheme".equals(base)) {
-            String schemeRawUrl = bundle.getString("scheme_raw_url");
-            if (schemeRawUrl == null) {
-                return true;
-            }
-
-            String scheme = Uri.parse(schemeRawUrl).getScheme();
-            if (scheme == null) {
-                return true;
-            }
-        }
-
-        Map<String, Object> groupData = resolveFilterGroup(base);
-        if (groupData == null || groupData.isEmpty()) {
-            return false;
-        }
-
-        for (String key : groupData.keySet()) {
-            String valueToMatch = resolveBundleValue(base, bundle, key);
-            if (valueToMatch == null || valueToMatch.trim().isEmpty()) {
-                continue;
-            }
-
-            if (isFilterMatched(groupData, key, valueToMatch)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private Map<String, Object> resolveFilterGroup(String category) {
-        if (JsonData == null || JsonData.isEmpty() || category == null) {
-            return null;
-        }
-
-        Object directGroup = JsonData.get(category);
-        if (directGroup != null) {
-            return JsonHandler.getFilterKeyJson(directGroup);
-        }
-
-        if ("Intent".equalsIgnoreCase(category)) {
-            Object legacyIntentGroup = JsonData.get("intent");
-            if (legacyIntentGroup != null) {
-                return JsonHandler.getFilterKeyJson(legacyIntentGroup);
-            }
-        }
-
-        if ("Scheme".equalsIgnoreCase(category)) {
-            Object legacySchemeGroup = JsonData.get("scheme");
-            if (legacySchemeGroup != null) {
-                return JsonHandler.getFilterKeyJson(legacySchemeGroup);
-            }
-        }
-
-        Object lowerCaseGroup = JsonData.get(category.toLowerCase(Locale.ROOT));
-        if (lowerCaseGroup != null) {
-            return JsonHandler.getFilterKeyJson(lowerCaseGroup);
-        }
-
-        return null;
-    }
-
-    private String resolveBundleValue(String category, Bundle bundle, String key) {
-        Object directValue = bundle.get(key);
-        if (directValue != null) {
-            return String.valueOf(directValue);
-        }
-
+    private boolean filterData(String category, Bundle bundle) {
+        if (category == null || jsonData.isEmpty()) return false;
+        // Keep the existing Scheme noise filter while accepting opaque and serialized Intent URIs.
         if ("Scheme".equals(category)) {
-            return resolveSchemeValue(bundle, key);
+            String raw = bundle.getString("scheme_raw_url");
+            if (raw != null && Uri.parse(raw).getScheme() == null && !raw.startsWith("#Intent;")) return true;
         }
-
-        return null;
+        Object value = jsonData.get(category);
+        if (value == null) value = jsonData.get(category.toLowerCase(Locale.ROOT));
+        Map<String, Object> group = JsonHandler.getFilterKeyJson(value);
+        if (group == null) return false;
+        for (String key : group.keySet()) {
+            Object field = bundle.get(key);
+            if (field == null && "Scheme".equalsIgnoreCase(category)) field = schemeField(bundle.getString("scheme_raw_url"), key);
+            if (field != null && isFilterMatched(group, key, String.valueOf(field))) return true;
+        }
+        return false;
     }
 
-    private String resolveSchemeValue(Bundle bundle, String key) {
-        String schemeRawUrl = bundle.getString("scheme_raw_url");
-        if (schemeRawUrl == null) {
-            return null;
-        }
-
-        if ("scheme_raw_url".equals(key)) {
-            return schemeRawUrl;
-        }
-
-        Uri uri;
-        try {
-            uri = Uri.parse(schemeRawUrl);
-        } catch (Exception e) {
-            return null;
-        }
-
+    private Object schemeField(String raw, String key) {
+        if (raw == null) return null;
+        Uri uri = Uri.parse(raw);
         switch (key) {
-            case "scheme":
-                return uri.getScheme();
-            case "schemeSpecificPart":
-                return uri.getSchemeSpecificPart();
-            case "authority":
-                return uri.getAuthority();
-            case "userInfo":
-                return uri.getUserInfo();
-            case "host":
-                return uri.getHost();
-            case "port":
-                return String.valueOf(uri.getPort());
-            case "path":
-                return uri.getPath();
-            case "query":
-                return uri.getQuery();
-            case "fragment":
-                return uri.getFragment();
-            case "lastPathSegment":
-                return uri.getLastPathSegment();
-            case "pathSegments":
-                return String.valueOf(uri.getPathSegments());
-            default:
-                return null;
+            case "scheme_raw_url": return raw;
+            case "scheme": return uri.getScheme();
+            case "schemeSpecificPart": return uri.getSchemeSpecificPart();
+            case "authority": return uri.getAuthority();
+            case "userInfo": return uri.getUserInfo();
+            case "host": return uri.getHost();
+            case "port": return uri.getPort();
+            case "path": return uri.getPath();
+            case "query": return uri.getQuery();
+            case "fragment": return uri.getFragment();
+            case "lastPathSegment": return uri.getLastPathSegment();
+            case "pathSegments": return uri.getPathSegments();
+            default: return null;
         }
     }
 }

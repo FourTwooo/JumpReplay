@@ -1,6 +1,5 @@
 package com.fourtwo.hookintent.service;
 
-import android.annotation.SuppressLint;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -13,201 +12,170 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
-
 import androidx.annotation.Nullable;
-
 import com.fourtwo.hookintent.base.DataConverter;
-
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/** One connection per injected process; requests complete or report a timeout. */
 public class MessengerClient {
-    private static final String TAG = "MessengerClient";
-
+    private static final long REQUEST_TIMEOUT_MS = 15000;
     private final Context context;
-    private Messenger serviceMessenger;
-    private boolean isBound = false;
-
-    private final AtomicInteger requestIdGenerator = new AtomicInteger(0);
-    private final Messenger clientMessenger = new Messenger(new IncomingHandler());
-    private final ConcurrentHashMap<Integer, CompletableFuture<Bundle>> pendingRequests = new ConcurrentHashMap<>();
-
-
-    // 回调接口
-    public interface ResultCallback {
-        void onResult(Bundle result);
-
-        void onError(Exception e);
-    }
-
-    public interface PassiveCallback {
-        void onMessageReceived(Bundle data);
-    }
-
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private final AtomicInteger ids = new AtomicInteger();
+    private final Map<Integer, Request> requests = new HashMap<>();
+    private Messenger service;
+    private boolean binding;
+    private boolean closed;
     private PassiveCallback passiveCallback;
-
-    // 客户端消息接收 Handler
-    @SuppressLint("HandlerLeak")
-    private class IncomingHandler extends Handler {
-        public IncomingHandler() {
-            super(Looper.getMainLooper());
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
+    private ConnectionCallback connectionCallback;
+    private final Messenger incoming = new Messenger(new Handler(Looper.getMainLooper()) {
+        @Override public void handleMessage(Message msg) {
             if (msg.what == MessengerService.MSG_REPLY) {
-                Bundle bundle = msg.getData();
-                int requestId = bundle.getInt("requestId");
-
-                Log.d(TAG, "Received reply for requestId=" + requestId);
-
-                CompletableFuture<Bundle> future = pendingRequests.remove(requestId);
-                if (future != null) {
-                    future.complete(bundle);
-                }
-            } else if (msg.what == MessengerService.MSG_NOTIFY_HOOK_STATE) {
-                if (passiveCallback != null) {
-                    passiveCallback.onMessageReceived(msg.getData());
-                }
-            } else {
-                super.handleMessage(msg);
+                Request request = requests.remove(msg.getData().getInt("requestId"));
+                if (request != null && request.callback != null) request.callback.onResult(msg.getData());
+            } else if (msg.what == MessengerService.MSG_NOTIFY_HOOK_STATE && passiveCallback != null) {
+                passiveCallback.onMessageReceived(msg.getData());
             }
         }
+    });
+    public interface ResultCallback { void onResult(Bundle result); void onError(Exception error); }
+    public interface PassiveCallback { void onMessageReceived(Bundle data); }
+    public interface ConnectionCallback { void onConnected(); void onDisconnected(); }
+    private static final class Request {
+        final int id, type;
+        final Bundle data;
+        final boolean needReply;
+        final ResultCallback callback;
+        boolean sent;
+        Request(int id, int type, Bundle data, boolean needReply, ResultCallback callback) {
+            this.id = id; this.type = type; this.data = data;
+            this.needReply = needReply; this.callback = callback;
+        }
     }
-
-    public MessengerClient(Context context) {
-        this.context = context;
-    }
-
-    // 注册被动回调
-    public void registerPassiveCallback(PassiveCallback callback) {
-        this.passiveCallback = callback;
-        bindService(); // 绑定服务并注册客户端
-    }
-
-    // 同步绑定服务（内部使用）
-    private void bindService() {
-        Intent intent = new Intent();
-        intent.setClassName("com.fourtwo.hookintent", "com.fourtwo.hookintent.service.MessengerService");
-
-        context.bindService(intent, new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder binder) {
-                serviceMessenger = new Messenger(binder);
-                isBound = true;
-
-                // 注册客户端
-                try {
-                    Message msg = Message.obtain(null, MessengerService.MSG_REGISTER_CLIENT);
-                    msg.replyTo = clientMessenger;
-
-                    Bundle bundle = new Bundle();
-                    bundle.putString("packageName", context.getPackageName()); // 发送自己的包名
-                    bundle.putInt("uid", context.getApplicationInfo().uid);
-                    bundle.putString("className", context.getApplicationInfo().className);
-                    bundle.putString("processName", DataConverter.getCurrentProcessName(context));
-                    msg.setData(bundle);
-
-                    serviceMessenger.send(msg);
-                    Log.d(TAG, "Client registered with service");
-                } catch (RemoteException e) {
-                    Log.e(TAG, "Failed to register client with service", e);
-                }
-            }
-
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                serviceMessenger = null;
-                isBound = false;
-                Log.d(TAG, "Service disconnected");
-            }
-        }, Context.BIND_AUTO_CREATE);
-    }
-
-    // 解绑服务并取消注册客户端
-    public void unbindService() {
-        if (isBound) {
+    private final ServiceConnection connection = new ServiceConnection() {
+        @Override public void onServiceConnected(ComponentName name, IBinder binder) {
+            if (closed) return;
+            service = new Messenger(binder);
+            binding = true;
             try {
-                Message msg = Message.obtain(null, MessengerService.MSG_UNREGISTER_CLIENT);
-                msg.replyTo = clientMessenger;
-                serviceMessenger.send(msg);
-                Log.d(TAG, "Client unregistered from service");
-            } catch (RemoteException e) {
-                Log.e(TAG, "Failed to unregister client from service", e);
+                Message register = Message.obtain(null, MessengerService.MSG_REGISTER_CLIENT);
+                register.replyTo = incoming;
+                Bundle info = new Bundle();
+                info.putString("packageName", context.getPackageName());
+                info.putInt("uid", context.getApplicationInfo().uid);
+                info.putString("className", context.getApplicationInfo().className);
+                info.putString("processName", DataConverter.getCurrentProcessName(context));
+                register.setData(info);
+                service.send(register);
+                if (connectionCallback != null) connectionCallback.onConnected();
+                flush();
+            } catch (Exception error) { disconnected(error); }
+        }
+        @Override public void onServiceDisconnected(ComponentName name) {
+            disconnected(new RemoteException("Capture service disconnected"));
+        }
+        @Override public void onBindingDied(ComponentName name) {
+            releaseConnection();
+            disconnected(new RemoteException("Capture binding died"));
+            main.postDelayed(MessengerClient.this::connect, 1000);
+        }
+        @Override public void onNullBinding(ComponentName name) {
+            releaseConnection();
+            disconnected(new RemoteException("Capture service returned a null binder"));
+            main.postDelayed(MessengerClient.this::connect, 1000);
+        }
+    };
+    public MessengerClient(Context context) { this.context = context; }
+    public void setConnectionCallback(ConnectionCallback callback) { main.post(() -> connectionCallback = callback); }
+    public void registerPassiveCallback(PassiveCallback callback) {
+        main.post(() -> { passiveCallback = callback; closed = false; connect(); });
+    }
+    private void connect() {
+        if (closed || binding) return;
+        Intent intent = new Intent().setClassName("com.fourtwo.hookintent", "com.fourtwo.hookintent.service.MessengerService");
+        try {
+            binding = context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+            if (!binding) {
+                releaseConnection();
+                disconnected(new IllegalStateException("Capture service is not available"));
+                main.postDelayed(this::connect, 1000);
             }
-
-            context.unbindService((ServiceConnection) serviceMessenger.getBinder());
-            isBound = false;
+        } catch (Exception error) {
+            releaseConnection();
+            disconnected(error);
+            main.postDelayed(this::connect, 1000);
         }
     }
-
-    // 异步发送消息
-    public void sendMessageAsync(int messageType, Bundle data, boolean needCallback, @Nullable ResultCallback callback) {
-        // 提供现有的异步调用方式，保持原有功能不变
-        Intent intent = new Intent();
-        intent.setClassName("com.fourtwo.hookintent", "com.fourtwo.hookintent.service.MessengerService");
-
-        context.bindService(intent, new ServiceConnection() {
-            @Override
-            public void onServiceConnected(ComponentName name, IBinder binder) {
-                serviceMessenger = new Messenger(binder);
-
-                // 如果需要回调，生成 requestId 和 Future
-                int requestId = 0;
-                CompletableFuture<Bundle> future = null;
-                if (needCallback) {
-                    requestId = requestIdGenerator.incrementAndGet();
-                    future = new CompletableFuture<>();
-                    pendingRequests.put(requestId, future);
-                }
-
-                Message msg = Message.obtain(null, messageType);
-                if (needCallback) {
-                    msg.arg1 = requestId; // 如果需要回调，设置 requestId
-                }
-                if (data != null) {
-                    msg.setData(data);
-                }
-                msg.replyTo = needCallback ? clientMessenger : null; // 如果不需要回调，不设置 replyTo
-
-                try {
-                    serviceMessenger.send(msg);
-                } catch (RemoteException e) {
-                    if (needCallback) {
-                        pendingRequests.remove(requestId);
-                    }
-                    if (callback != null) {
-                        callback.onError(new RuntimeException("Failed to send message to service", e));
-                    }
-                }
-
-                if (needCallback) {
-                    future.whenComplete((result, throwable) -> {
-                        if (throwable != null) {
-                            if (callback != null) {
-                                callback.onError(new RuntimeException("Failed to get reply from service", throwable));
-                            }
-                        } else {
-                            if (callback != null) {
-                                callback.onResult(result);
-                            }
-                        }
-                    });
-                }
-
-                try {
-                    context.unbindService(this);
-                } catch (java.lang.IllegalArgumentException e) {
-                    Log.d(TAG, "onServiceConnected: 服务端app未开启");
-                }
+    private void disconnected(Exception error) {
+        service = null;
+        for (Request request : new ArrayList<>(requests.values())) {
+            if (request.sent) {
+                requests.remove(request.id);
+                if (request.callback != null) request.callback.onError(error);
             }
-
-            @Override
-            public void onServiceDisconnected(ComponentName name) {
-                serviceMessenger = null;
-            }
-        }, Context.BIND_AUTO_CREATE);
+        }
+        if (connectionCallback != null) connectionCallback.onDisconnected();
+        Log.w("MessengerClient", error.getMessage());
     }
-
+    private void releaseConnection() {
+        try { context.unbindService(connection); } catch (IllegalArgumentException ignored) { }
+        binding = false;
+    }
+    public void unbindService() {
+        main.post(() -> {
+            closed = true;
+            if (service != null) {
+                try {
+                    Message unregister = Message.obtain(null, MessengerService.MSG_UNREGISTER_CLIENT);
+                    unregister.replyTo = incoming;
+                    service.send(unregister);
+                } catch (RemoteException ignored) { }
+            }
+            releaseConnection();
+            disconnected(new IllegalStateException("Capture client closed"));
+            for (Request request : new ArrayList<>(requests.values())) {
+                requests.remove(request.id);
+                if (request.callback != null) request.callback.onError(new IllegalStateException("Capture client closed"));
+            }
+        });
+    }
+    public void sendMessageAsync(int type, Bundle data, boolean needReply, @Nullable ResultCallback callback) {
+        main.post(() -> {
+            if (closed) { if (callback != null) callback.onError(new IllegalStateException("Capture client closed")); return; }
+            int id = ids.incrementAndGet();
+            Request request = new Request(id, type, data == null ? null : new Bundle(data), needReply, callback);
+            requests.put(id, request);
+            main.postDelayed(() -> {
+                Request pending = requests.remove(id);
+                if (pending != null && pending.callback != null)
+                    pending.callback.onError(new java.util.concurrent.TimeoutException("Capture request timed out"));
+            }, REQUEST_TIMEOUT_MS);
+            if (service == null) connect(); else flush();
+        });
+    }
+    private void flush() {
+        if (service == null) return;
+        for (Request request : new ArrayList<>(requests.values())) {
+            if (request.sent || service == null) continue;
+            Message message = Message.obtain(null, request.type);
+            message.arg1 = request.id;
+            message.replyTo = request.needReply ? incoming : null;
+            if (request.data != null) message.setData(request.data);
+            try {
+                request.sent = true;
+                service.send(message);
+                if (!request.needReply) {
+                    requests.remove(request.id);
+                    if (request.callback != null) request.callback.onResult(new Bundle());
+                }
+            } catch (Exception error) {
+                requests.remove(request.id);
+                if (request.callback != null) request.callback.onError(error);
+                Log.w("MessengerClient", "Capture send failed", error);
+            }
+        }
+    }
 }

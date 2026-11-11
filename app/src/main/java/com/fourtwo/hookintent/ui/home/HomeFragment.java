@@ -36,6 +36,8 @@ import com.fourtwo.hookintent.MainActivity;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.data.CaptureRepository;
+import android.widget.Toast;
 import com.fourtwo.hookintent.manager.HookStatusManager;
 import com.fourtwo.hookintent.service.MessengerService;
 import com.fourtwo.hookintent.utils.DataProcessor;
@@ -57,23 +59,23 @@ public class HomeFragment extends Fragment {
     private HomeAdapter adapter;
     private MainViewModel viewModel;
 
-    private DataProcessor dataProcessor;
+    private CaptureRepository repository;
+    private boolean hasMore;
+    private boolean loadingMore;
 
     private FloatingActionButton fab;
     private static boolean isHook = false; // 保留 isHook 状态
 
     private Map<String, Object> JsonData = new HashMap<>();
 
-    private boolean getIsHook() {
+    private void notifyGlobalHook(boolean enabled) {
         // 调用 MessengerService 的 notifyClients 方法
         MessengerService service = MessengerService.getInstance();
         if (service != null) {
             Bundle bundle = new Bundle();
-            bundle.putBoolean("isHook", isHook);
+            bundle.putBoolean("isHook", enabled);
             service.notifyClients(bundle);
         }
-
-        return isHook;
     }
 
     @SuppressLint("UseCompatLoadingForDrawables")
@@ -103,9 +105,7 @@ public class HomeFragment extends Fragment {
                 int itemId = menuItem.getItemId();
                 if (itemId == R.id.remove_list) {
                     // 清空RecyclerView的数据
-                    adapter.clearData();
-                    // 如果需要，也可以在ViewModel中清空数据
-                    viewModel.clearIntentDataList();
+                    repository.clear();
                     return true;
                 } else if (itemId == R.id.action_filter) {
                     // 使用 NavController 进行导航
@@ -173,7 +173,9 @@ public class HomeFragment extends Fragment {
 
         // Initialize ViewModel and observe LiveData
         viewModel = new ViewModelProvider(requireActivity()).get(MainViewModel.class);
-        viewModel.getIntentDataList().observe(getViewLifecycleOwner(), itemDataList -> {
+        repository = CaptureRepository.get(requireContext());
+        repository.getItems().observe(getViewLifecycleOwner(), itemDataList -> {
+            loadingMore = false;
             adapter.setData(itemDataList);
             toggleEmptyView(itemDataList);
         });
@@ -187,7 +189,7 @@ public class HomeFragment extends Fragment {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                adapter.getFilter().filter(s);
+                repository.setQuery(s.toString());
             }
 
             @Override
@@ -206,6 +208,7 @@ public class HomeFragment extends Fragment {
             // Toggle the isHook state
             boolean newIsHook = !isHook;
             viewModel.setIsHook(newIsHook);
+            notifyGlobalHook(newIsHook);
         });
 
         updateFabAppearance();
@@ -225,15 +228,8 @@ public class HomeFragment extends Fragment {
                     // 从适配器获取要删除的 ItemData
                     ItemData item = adapter.getFilteredData().get(position);
 
-                    // 从 ViewModel 中删除数据
-                    int originalPosition = adapter.getData().indexOf(item);
-                    Log.d(TAG, "originalPosition: " + originalPosition);
-                    if (originalPosition != -1) {
-                        viewModel.removeIntentData(originalPosition);
-                    }
-
-                    // 从适配器中删除数据
-                    adapter.removeItem(position);
+                    repository.remove(item);
+                    adapter.notifyItemChanged(position);
                 } else {
                     // 如果位置无效，刷新适配器以避免崩溃
                     adapter.notifyDataSetChanged();
@@ -258,34 +254,26 @@ public class HomeFragment extends Fragment {
         ItemTouchHelper itemTouchHelper = new ItemTouchHelper(simpleItemTouchCallback);
         itemTouchHelper.attachToRecyclerView(recyclerView);
 
-        JsonData = new JsonHandler().readJsonFromFile(requireContext());
-        if (JsonData == null) {
-            JsonData = new HashMap<>();
-        }
-
-        // 初始化 DataProcessor
-        dataProcessor = new DataProcessor(requireContext());
-        dataProcessor.setJsonData(JsonData);
-
-        Log.d(TAG, "onViewCreated: MessengerService");
-        // 观察 MessengerService 的 liveDataTrigger
-        MessengerService.liveDataTrigger.observe(getViewLifecycleOwner(), trigger -> {
-            if (trigger != null && trigger) {
-                // 逐条处理队列中的数据
-                MessengerService Instance = MessengerService.getInstance();
-                Log.d(TAG, "onViewCreated: " + Instance);
-                if (Instance == null) {
-                    return;
-                }
-                ConcurrentLinkedQueue<Bundle> queue = Instance.getDataQueue();
-                while (!queue.isEmpty()) {
-                    Bundle data = queue.poll(); // 从队列中取出数据
-                    if (data != null) {
-                        dataProcessor.processReceivedData(data, itemData -> viewModel.addIntentData(itemData)); // 使用 DataProcessor 处理数据
-                    }
-                }
+        repository.getErrors().observe(getViewLifecycleOwner(), error -> {
+            if (error != null && !error.isEmpty()) Toast.makeText(requireContext(), error, Toast.LENGTH_LONG).show();
+        });
+        repository.getHasMore().observe(getViewLifecycleOwner(), more -> hasMore = Boolean.TRUE.equals(more));
+        recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override public void onScrolled(@NonNull RecyclerView view, int dx, int dy) {
+                LinearLayoutManager layout = (LinearLayoutManager) view.getLayoutManager();
+                if (dy < 0 && layout != null && layout.findFirstVisibleItemPosition() <= 3) requestOlderCaptures();
+            }
+            @Override public void onScrollStateChanged(@NonNull RecyclerView view, int state) {
+                if (state == RecyclerView.SCROLL_STATE_DRAGGING && !view.canScrollVertically(-1)) requestOlderCaptures();
             }
         });
+    }
+
+    private void requestOlderCaptures() {
+        if (hasMore && !loadingMore) {
+            loadingMore = true;
+            repository.loadMore();
+        }
     }
 
     private void updateFabAppearance() {
@@ -299,7 +287,7 @@ public class HomeFragment extends Fragment {
             fab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#CE1A7EAC")));
         }
         HookStatusManager.setHook(isHook);
-        Log.d(TAG, "isHook" + ": " + getIsHook());
+        Log.d(TAG, "isHook: " + isHook);
     }
 
     @SuppressLint("SetTextI18n")
@@ -357,23 +345,8 @@ public class HomeFragment extends Fragment {
         EditText searchEditText = requireView().findViewById(R.id.searchEditText);
         String currentSearchText = searchEditText != null ? searchEditText.getText().toString().trim() : "";
 
-        // 根据搜索框内容重新过滤数据
-        adapter.getFilter().filter(currentSearchText);
-
-        // 确保显示正确的数据集
-        List<ItemData> allData = viewModel.getIntentDataList().getValue();
-        if (allData != null && currentSearchText.isEmpty()) {
-            adapter.setData(allData);
-        }
-
-        JsonData = new JsonHandler().readJsonFromFile(requireContext());
-        if (JsonData == null) {
-            JsonData = new HashMap<>();
-        }
-        Log.d(TAG, "onResume: " + JsonData);
-
-        dataProcessor.setJsonData(JsonData);
-
+        repository.setQuery(currentSearchText);
+        repository.refresh();
     }
 
     @Override

@@ -55,6 +55,7 @@ public class FilterFragment extends Fragment {
     private Map<String, Object> jsonData = new HashMap<>();
 
     private String currentProtocol;
+    private boolean dataReady;
 
     @Nullable
     @Override
@@ -103,7 +104,7 @@ public class FilterFragment extends Fragment {
     }
 
     private void reloadAndRender() {
-        loadFilterData();
+        if (!loadFilterData()) return;
 
         boolean changed = syncFilterGroups();
 
@@ -120,13 +121,24 @@ public class FilterFragment extends Fragment {
         }
     }
 
-    private void loadFilterData() {
+    private boolean loadFilterData() {
         Map<String, Object> data = jsonHandler.readJsonFromFile(requireContext());
-        jsonData = data != null ? data : new HashMap<>();
+        if (data == null) {
+            dataReady = false;
+            Toast.makeText(requireContext(), "过滤规则读取失败，原文件已保留", Toast.LENGTH_LONG).show();
+            return false;
+        }
+        jsonData = data;
+        dataReady = true;
+        return true;
     }
 
     private void saveFilterData() {
-        jsonHandler.writeJsonToFile(requireContext(), jsonData);
+        try {
+            jsonHandler.writeJsonToFile(requireContext(), jsonData);
+        } catch (IllegalStateException e) {
+            Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 
     /**
@@ -149,21 +161,6 @@ public class FilterFragment extends Fragment {
                 continue;
             }
             changed |= ensureCustomGroup(groupKey);
-        }
-
-        List<String> staleGroups = new ArrayList<>();
-        for (String storedKey : jsonData.keySet()) {
-            if (isBuiltInGroup(storedKey)) {
-                continue;
-            }
-            if (!allowedGroups.contains(storedKey)) {
-                staleGroups.add(storedKey);
-            }
-        }
-
-        for (String staleGroup : staleGroups) {
-            jsonData.remove(staleGroup);
-            changed = true;
         }
 
         return changed;
@@ -350,6 +347,7 @@ public class FilterFragment extends Fragment {
 
     @SuppressLint("SetTextI18n")
     private void showAddKeyDialog() {
+        if (!dataReady) return;
         if (currentProtocol == null || currentProtocol.trim().isEmpty()) {
             Toast.makeText(requireContext(), getString(R.string.is_not_list), Toast.LENGTH_SHORT).show();
             return;
@@ -386,6 +384,7 @@ public class FilterFragment extends Fragment {
     }
 
     private void goSelect(String item) {
+        if (!dataReady) return;
         if (currentProtocol == null || currentProtocol.isEmpty()) {
             return;
         }

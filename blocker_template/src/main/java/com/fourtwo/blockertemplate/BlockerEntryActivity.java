@@ -29,6 +29,12 @@ public class BlockerEntryActivity extends Activity {
             return;
         }
 
+        if (ForwardingIntents.readHistory(intent).contains(getPackageName())) {
+            // An older blocker or another handler forwarded the same jump back.
+            finishSilently();
+            return;
+        }
+
         String uri = intent.getDataString();
         if (uri == null || uri.trim().isEmpty()) {
             try {
@@ -47,6 +53,7 @@ public class BlockerEntryActivity extends Activity {
 
         Intent decisionIntent = new Intent(this, DecisionActivity.class);
         decisionIntent.putExtra(EXTRA_ORIGINAL_INTENT, intent);
+        ForwardingIntents.carryUriGrants(intent, decisionIntent);
         decisionIntent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION);
         startActivity(decisionIntent);
         overridePendingTransition(R.anim.decision_enter, 0);

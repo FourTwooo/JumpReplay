@@ -46,12 +46,16 @@ public class SelectAdapter extends RecyclerView.Adapter<SelectAdapter.ViewHolder
         Map<String, Object> item = mData.get(position);
         holder.textView.setText((String) item.get("text"));
 
-        holder.checkBox.setChecked((Boolean) item.get("type"));
+        holder.checkBox.setOnCheckedChangeListener(null);
+        holder.checkBox.setChecked(Boolean.TRUE.equals(item.get("type")));
         holder.checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             item.put("type", isChecked);
         });
 
-        holder.deleteButton.setOnClickListener(v -> removeItem(position));
+        holder.deleteButton.setOnClickListener(v -> {
+            int current = holder.getBindingAdapterPosition();
+            if (current != RecyclerView.NO_POSITION) removeItem(current);
+        });
     }
 
     @Override

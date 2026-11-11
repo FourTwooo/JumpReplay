@@ -113,14 +113,10 @@ public class DecisionActivity extends Activity {
     }
 
     /**
-     * 参考主 app 的 IntentIntercept：把系统附加字段清掉，再做查询
+     * 清除入口组件限制，同时保留原始跳转的任务和 URI 授权标志。
      */
     private Intent stripUnwantedFields(Intent intent) {
-        intent.setComponent(null);
-        intent.setPackage(null);
-        intent.setSelector(null);
-        intent.setFlags(0);
-        return intent;
+        return ForwardingIntents.forQuery(intent);
     }
 
     /**
@@ -135,7 +131,7 @@ public class DecisionActivity extends Activity {
             queryIntent = new Intent(Intent.ACTION_VIEW);
         }
 
-        stripUnwantedFields(queryIntent);
+        queryIntent = stripUnwantedFields(queryIntent);
 
         if (queryIntent.getAction() == null || queryIntent.getAction().trim().isEmpty()) {
             queryIntent.setAction(Intent.ACTION_VIEW);
@@ -172,9 +168,12 @@ public class DecisionActivity extends Activity {
         PackageManager packageManager = getPackageManager();
         String currentPackageName = getPackageName();
 
-        List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+        List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(intent,
+                PackageManager.MATCH_DEFAULT_ONLY | PackageManager.GET_META_DATA);
         List<ResolveInfo> result = new ArrayList<>();
         Set<String> dedupe = new LinkedHashSet<>();
+        List<String> visited = ForwardingHistory.withVisit(
+                ForwardingIntents.readHistory(originalIntent), currentPackageName);
 
         for (ResolveInfo resolveInfo : resolveInfoList) {
             if (resolveInfo.activityInfo == null) {
@@ -182,6 +181,11 @@ public class DecisionActivity extends Activity {
             }
 
             if (currentPackageName.equals(resolveInfo.activityInfo.packageName)) {
+                continue;
+            }
+
+            if (ForwardingHistory.shouldExclude(ForwardingIntents.isBlockerEntry(resolveInfo),
+                    resolveInfo.activityInfo.packageName, visited)) {
                 continue;
             }
 
@@ -198,9 +202,7 @@ public class DecisionActivity extends Activity {
     }
 
     private Intent createLaunchIntent(Intent baseIntent, ResolveInfo resolveInfo) {
-        Intent launchIntent = new Intent(baseIntent);
-        launchIntent.setClassName(resolveInfo.activityInfo.packageName, resolveInfo.activityInfo.name);
-        return launchIntent;
+        return ForwardingIntents.forLaunch(baseIntent, originalIntent, resolveInfo, getPackageName());
     }
 
     private void allowForward() {

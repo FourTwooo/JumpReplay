@@ -1,148 +1,88 @@
 package com.fourtwo.hookintent.base;
 
-import android.annotation.SuppressLint;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-
+import android.util.Log;
 import com.fourtwo.hookintent.data.Constants;
-
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class LocalDatabaseManager {
-
     private final Context context;
-    private LocalDatabaseHelper dbHelper;
+    private LocalDatabaseHelper helper;
     private SQLiteDatabase database;
-
-    public LocalDatabaseManager(Context context) {
-        this.context = context;
+    public LocalDatabaseManager(Context context) { this.context = context.getApplicationContext(); }
+    public synchronized void openDatabase(String name) {
+        closeDatabase();
+        helper = new LocalDatabaseHelper(context, name + ".db");
+        database = helper.getWritableDatabase();
     }
-
-    /**
-     * 打开指定数据库
-     */
-    public void openDatabase(String dbName) {
-        dbHelper = new LocalDatabaseHelper(context, dbName + ".db");
-        database = dbHelper.getWritableDatabase();
+    public synchronized void closeDatabase() {
+        if (helper != null) helper.close();
+        helper = null;
+        database = null;
     }
-
-    /**
-     * 关闭数据库
-     */
-    public void closeDatabase() {
-        if (database != null) {
-            database.close();
-        }
+    private String table(String table) {
+        if (table == null || !table.matches("[A-Za-z_][A-Za-z0-9_]*")) throw new IllegalArgumentException("Invalid table name");
+        return table;
     }
-
-    /**
-     * 创建表
-     */
-    public void createTable(String tableName) {
-        dbHelper.createTable(tableName);
-    }
-
-    /**
-     * 插入数据
-     */
-    public void insertData(String tableName, JSONObject data) throws JSONException {
-        // 创建 ContentValues
+    public synchronized void createTable(String name) { helper.createTable(table(name)); }
+    private ContentValues values(JSONObject data) throws JSONException {
         ContentValues values = new ContentValues();
-        // 从 JSON 数据中提取 `_hash`，以字符串形式处理
-        String _hash = data.getString(Constants.SQL_HASH);
-        values.put(Constants.SQL_HASH, _hash);
+        values.put(Constants.SQL_HASH, data.getString(Constants.SQL_HASH));
         values.put(Constants.SQL_DATA, data.toString());
-        database.insert(tableName, null, values);
+        return values;
     }
-
-    /**
-     * 根据 _hash 删除指定数据
-     *
-     * @param tableName 表名
-     * @param _hash     要删除的数据的哈希值
-     * @return 删除是否成功
-     */
-    public boolean deleteData(String tableName, String _hash) {
-        try {
-            // 执行删除操作
-            int rowsAffected = database.delete(tableName, "_hash = ?", new String[]{_hash});
-            return rowsAffected > 0; // 如果受影响的行数大于0，则说明删除成功
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false; // 删除失败
+    public synchronized void insertData(String name, JSONObject data) throws JSONException {
+        database.insertOrThrow(table(name), null, values(data));
+    }
+    public synchronized boolean deleteData(String name, String hash) {
+        try { return database.delete(table(name), "_hash = ?", new String[]{hash}) > 0; }
+        catch (RuntimeException e) { Log.e("LocalDatabaseManager", "删除收藏失败", e); return false; }
+    }
+    public synchronized boolean is_exists(String name, String hash) {
+        try (Cursor cursor = database.query(table(name), new String[]{Constants.SQL_HASH}, "_hash = ?", new String[]{hash}, null, null, null)) {
+            return cursor.moveToFirst();
         }
     }
-
-    public boolean is_exists(String tableName, String _hash) {
-        // 检查是否已存在该 `_hash` 的记录
-        Cursor cursor = database.query(
-                tableName,
-                new String[]{Constants.SQL_HASH},
-                "_hash = ?",
-                new String[]{_hash},
-                null,
-                null,
-                null
-        );
-
-        boolean exists = cursor.getCount() > 0; // 判断记录是否存在
-        cursor.close();
-        return exists;
-    }
-
-    /**
-     * 插入或更新数据
-     * 根据 `_hash` 判断数据是否存在。
-     * 如果存在，则更新；如果不存在，则插入。
-     */
-    public void insertOrUpdateData(String tableName, JSONObject data) {
+    public synchronized boolean insertOrUpdateData(String name, JSONObject data) {
         try {
-            // 从 JSON 数据中提取 `_hash`，以字符串形式处理
-            String _hash = data.getString(Constants.SQL_HASH);
-
-            // 创建 ContentValues
-            ContentValues values = new ContentValues();
-            values.put(Constants.SQL_HASH, _hash);
-            values.put(Constants.SQL_DATA, data.toString());
-            boolean exists = is_exists(tableName, _hash);
-
-            if (exists) {
-                // 如果记录存在，执行更新操作
-                database.update(tableName, values, "_hash = ?", new String[]{_hash});
-            } else {
-                // 如果记录不存在，执行插入操作
-                database.insert(tableName, null, values);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+            return database.insertWithOnConflict(table(name), null, values(data), SQLiteDatabase.CONFLICT_REPLACE) != -1;
+        } catch (RuntimeException | JSONException e) {
+            Log.e("LocalDatabaseManager", "保存收藏失败", e);
+            return false;
         }
     }
-
-
-    /**
-     * 查询所有数据
-     */
-    public List<JSONObject> getAllData(String tableName) {
-        List<JSONObject> dataList = new ArrayList<>();
-        Cursor cursor = database.rawQuery("SELECT * FROM " + tableName, null);
-
-        if (cursor.moveToFirst()) {
-            do {
-                @SuppressLint("Range") String dataString = cursor.getString(cursor.getColumnIndex(Constants.SQL_DATA));
+    public synchronized List<JSONObject> getAllData(String name) {
+        List<JSONObject> result = new ArrayList<>();
+        String tableName = table(name);
+        // Query only small metadata through CursorWindow. Complete Intent snapshots can
+        // exceed its usual 2 MB row limit, so read the unchanged TEXT column in pieces.
+        try (Cursor cursor = database.query(tableName, new String[]{"rowid", "length(" + Constants.SQL_DATA + ")"},
+                null, null, null, null, "rowid ASC")) {
+            while (cursor.moveToNext()) {
                 try {
-                    dataList.add(new JSONObject(dataString));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            } while (cursor.moveToNext());
+                    long row = cursor.getLong(0);
+                    long characters = cursor.getLong(1);
+                    StringBuilder contents = new StringBuilder((int) Math.min(characters, 4096));
+                    final int chunkCharacters = 65536;
+                    // SQLite substr indexes Unicode code points, not Java UTF-16 units.
+                    for (long start = 1; start <= characters; start += chunkCharacters) {
+                        try (Cursor chunk = database.rawQuery("SELECT substr(" + Constants.SQL_DATA + ", ?, ?) FROM "
+                                + tableName + " WHERE rowid=?", new String[]{Long.toString(start),
+                                Integer.toString(chunkCharacters), Long.toString(row)})) {
+                            if (!chunk.moveToFirst() || chunk.isNull(0)) throw new JSONException("收藏记录内容不完整");
+                            contents.append(chunk.getString(0));
+                        }
+                    }
+                    result.add(new JSONObject(contents.toString()));
+                } catch (JSONException e) { Log.e("LocalDatabaseManager", "跳过损坏的收藏记录", e); }
+            }
         }
-        cursor.close();
-        return dataList;
+        return result;
     }
 }

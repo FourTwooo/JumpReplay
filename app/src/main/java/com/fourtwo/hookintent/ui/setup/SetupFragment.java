@@ -273,6 +273,9 @@ public class SetupFragment extends Fragment {
         if (tag.startsWith("en")) {
             return "en";
         }
+        if (tag.startsWith("ja")) {
+            return "ja";
+        }
         return LANGUAGE_SYSTEM;
     }
 

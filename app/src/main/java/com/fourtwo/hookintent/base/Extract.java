@@ -37,15 +37,12 @@ public class Extract {
     public static String calculateBundleDataSize(Bundle bundle) {
         // 使用 Parcel 将 Bundle 序列化
         Parcel parcel = Parcel.obtain();
-        bundle.writeToParcel(parcel, 0);
-
-        // 获取序列化后的字节数组大小
-        int dataSize = parcel.dataSize();
-
-        // 回收 Parcel 对象
-        parcel.recycle();
-
-        return String.valueOf(dataSize);
+        try {
+            bundle.writeToParcel(parcel, 0);
+            return String.valueOf(parcel.dataSize());
+        } finally {
+            parcel.recycle();
+        }
     }
     public static String extractIntentExtrasString(ArrayList<?> dataList) {
         StringBuilder result = new StringBuilder();
@@ -54,7 +51,7 @@ public class Extract {
             if (obj instanceof Map) {
                 Map<String, Object> map = (Map<String, Object>) obj;
                 String key = (String) map.get("key");
-                String value = Objects.requireNonNull(map.get("value")).toString();
+                String value = String.valueOf(map.get("value"));
 
                 result.append(key).append("=").append(value).append(";");
             }

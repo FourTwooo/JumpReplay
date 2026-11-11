@@ -87,10 +87,11 @@ public class MeFragment extends Fragment {
     }
 
     private void fetchMarkdownFile(String url, TextView textView) {
+        final FragmentMeBinding expectedBinding = binding;
         new NetworkClient().getReadMe(url, new NetworkClient.ReadMeCallback() {
             @Override
             public void onSuccess(String data) {
-                if (isAdded()) {
+                if (isAdded() && binding != null && binding == expectedBinding) {
                     requireActivity().runOnUiThread(() -> {
                         markwon.setMarkdown(textView, data); // 渲染 Markdown
                         binding.progressBar.setVisibility(View.GONE);
@@ -102,7 +103,7 @@ public class MeFragment extends Fragment {
 
             @Override
             public void onFailure(String errorMessage) {
-                if (isAdded()) {
+                if (isAdded() && binding != null && binding == expectedBinding) {
                     requireActivity().runOnUiThread(() -> {
                         textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
                         textView.setText(errorMessage);

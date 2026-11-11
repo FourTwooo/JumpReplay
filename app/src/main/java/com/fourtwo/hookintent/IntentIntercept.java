@@ -43,6 +43,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.fourtwo.hookintent.adapter.IntentInterceptAdapter;
+import com.fourtwo.hookintent.base.DetailPayloadStore;
+import com.fourtwo.hookintent.base.IntentPayloadCodec;
+import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.data.IntentMatchItem;
 import com.fourtwo.hookintent.databinding.ActivityIntentInterceptBinding;
 import com.fourtwo.hookintent.databinding.ContentInterceptMainBinding;
@@ -55,14 +58,16 @@ import com.google.android.material.textfield.TextInputEditText;
 import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.net.URISyntaxException;
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import android.net.Uri;
+import com.fourtwo.hookintent.utils.IntentReplay;
+import com.fourtwo.hookintent.utils.ShortcutParameterReplacer;
 import java.util.concurrent.Executors;
 
 public class IntentIntercept extends AppCompatActivity implements IntentInterceptAdapter.OnIntentMatchClickListener {
@@ -70,6 +75,11 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
     private ActivityIntentInterceptBinding binding; // 主布局绑定
     private ContentInterceptMainBinding contentBinding; // 子布局绑定
+    private Intent originalTarget;
+    private final ExecutorService iconExecutor = Executors.newSingleThreadExecutor();
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private Future<?> iconTask;
+    private LoadingOverlay iconLoadingOverlay;
     private String originalUrlText; // 用于存储初始 URL 内容
 
     private IntentInterceptAdapter adapter;
@@ -113,20 +123,8 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
             SharedPreferencesUtils.putBoolean(this, "interceptIsRoot", isChecked1);
         });
 
-        // 处理传入的 Intent 数据
-        Intent originalIntent = stripUnwantedFields(getIntent());
-        originalUrlText = extractUrlFromIntent(originalIntent);
-        contentBinding.urlTextView.setText(originalUrlText);
-
-        // 设置重置按钮初始状态为隐藏
+        handleIncomingIntent(getIntent());
         binding.resetButton.setVisibility(View.GONE);
-
-        // 动态加载初始的应用列表
-        try {
-            loadMatchingApps(Intent.parseUri(originalUrlText, 0));
-        } catch (URISyntaxException e) {
-            loadMatchingApps(getIntent());
-        }
         contentBinding.urlTextView.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -151,17 +149,22 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         filePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.GetContent(),
                 uri -> {
-                    if (uri != null) {
-                        try {
-                            InputStream inputStream = getContentResolver().openInputStream(uri);
-                            Bitmap bitmap = BitmapFactory.decodeStream(inputStream);
-                            currentIconPreview.setImageBitmap(bitmap); // 更新图标预览
-                            if (iconSelectionDialog != null) {
-                                iconSelectionDialog.dismiss(); // 关闭图标选择对话框
+                    if (uri != null && currentIconPreview != null) {
+                        ImageView preview = currentIconPreview;
+                        iconExecutor.execute(() -> {
+                            try {
+                                Bitmap bitmap = decodeIcon(uri);
+                                uiHandler.post(() -> {
+                                    if (!isUiAlive() || currentIconPreview != preview) return;
+                                    preview.setImageBitmap(bitmap);
+                                    if (iconSelectionDialog != null) iconSelectionDialog.dismiss();
+                                });
+                            } catch (Exception | OutOfMemoryError error) {
+                                uiHandler.post(() -> {
+                                    if (isUiAlive()) Toast.makeText(this, "无法读取图片：" + error.getMessage(), Toast.LENGTH_LONG).show();
+                                });
                             }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                        });
                     }
                 }
         );
@@ -170,15 +173,64 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        Log.d(TAG, "onNewIntent: " + intent);
-
-        // 更新当前 Intent
         setIntent(intent);
-        originalUrlText = extractUrlFromIntent(intent);
-        contentBinding.urlTextView.setText(originalUrlText);
+        handleIncomingIntent(intent);
+    }
 
-        // 加载符合的应用列表
-        loadMatchingApps(intent);
+    private boolean isUiAlive() { return !isFinishing() && !isDestroyed(); }
+
+    private Bitmap decodeIcon(Uri uri) throws Exception {
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        try (InputStream stream = getContentResolver().openInputStream(uri)) {
+            BitmapFactory.decodeStream(stream, null, options);
+        }
+        if (options.outWidth <= 0 || options.outHeight <= 0) throw new IllegalArgumentException("不是有效图片");
+        options.inSampleSize = 1;
+        while (options.outWidth / options.inSampleSize > 512 || options.outHeight / options.inSampleSize > 512) {
+            options.inSampleSize *= 2;
+        }
+        options.inJustDecodeBounds = false;
+        try (InputStream stream = getContentResolver().openInputStream(uri)) {
+            Bitmap bitmap = BitmapFactory.decodeStream(stream, null, options);
+            if (bitmap == null) throw new IllegalArgumentException("图片解码失败");
+            return bitmap;
+        }
+    }
+
+    private void handleIncomingIntent(Intent incoming) {
+        try {
+            Intent detail = incoming.getParcelableExtra("DetailIntent");
+            String detailText = incoming.getStringExtra("DetailData");
+            String token = incoming.getStringExtra(DetailPayloadStore.EXTRA_TOKEN);
+            if (token != null) {
+                ItemData saved = DetailPayloadStore.load(this, token);
+                detail = IntentPayloadCodec.decode(saved.getAppBundle());
+                detailText = "Scheme".equals(saved.getCategory())
+                        ? saved.getAppBundle().getString("scheme_raw_url") : saved.getUri();
+                if (detailText == null || detailText.isEmpty()) detailText = extractUrlFromIntent(detail);
+            }
+            if (detail != null) originalTarget = new Intent(detail);
+            else if (detailText != null) originalTarget = Intent.parseUri(detailText, 0);
+            else {
+                originalTarget = new Intent(incoming);
+                if (originalTarget.getComponent() != null
+                        && getPackageName().equals(originalTarget.getComponent().getPackageName())
+                        && getClass().getName().equals(originalTarget.getComponent().getClassName())) {
+                    originalTarget.setComponent(null);
+                }
+            }
+            originalUrlText = detailText != null ? detailText : extractUrlFromIntent(originalTarget);
+            contentBinding.urlTextView.setText(originalUrlText);
+            loadMatchingApps(originalTarget);
+        } catch (Exception error) {
+            Log.e(TAG, "Cannot read incoming Intent", error);
+            Toast.makeText(this, "Intent 内容无效：" + error.getMessage(), Toast.LENGTH_LONG).show();
+            originalTarget = new Intent(Intent.ACTION_VIEW);
+            originalUrlText = "";
+            contentBinding.urlTextView.setText("");
+            loadMatchingApps(originalTarget);
+        }
     }
 
     @Override
@@ -199,7 +251,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         return true; // 返回 true 以显示菜单
     }
 
-    private void showAppIcons(GridView iconsGrid, ImageView iconPreview) {
+    private List<Drawable> loadAppIcons() {
         PackageManager packageManager = getPackageManager();
 
         List<ApplicationInfo> apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA);
@@ -213,6 +265,10 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
         List<Drawable> uniqueAppIcons = new ArrayList<>(appIcons); // 转为 List 以适配 Adapter
 
+        return uniqueAppIcons;
+    }
+
+    private void bindAppIcons(GridView iconsGrid, ImageView iconPreview, List<Drawable> uniqueAppIcons) {
         BaseAdapter adapter = new BaseAdapter() {
             @Override
             public int getCount() {
@@ -258,6 +314,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     private void showIconSelectionDialog(ImageView iconPreview) {
         // 创建加载进度
         LoadingOverlay loadingOverlay = new LoadingOverlay(this);
+        iconLoadingOverlay = loadingOverlay;
         loadingOverlay.setLoadingText("正在加载应用列表...");
         loadingOverlay.show();
 
@@ -279,18 +336,24 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         GridView iconsGrid = view.findViewById(R.id.icons_grid);
         ImageView customIconButton = view.findViewById(R.id.custom_icon_button);
 
-        // 使用 Executor 执行耗时任务
-        Executor executor = Executors.newSingleThreadExecutor();
-        executor.execute(() -> {
-            // 耗时操作：加载应用图标（这里会阻塞主线程）
-            showAppIcons(iconsGrid, iconPreview);
-
-            // 回到主线程更新 UI
-            new Handler(Looper.getMainLooper()).post(() -> {
-                // 隐藏加载层并显示对话框
-                loadingOverlay.hide();
-                iconSelectionDialog.show(); // 显示对话框
-            });
+        if (iconTask != null) iconTask.cancel(true);
+        AlertDialog targetDialog = iconSelectionDialog;
+        iconTask = iconExecutor.submit(() -> {
+            try {
+                List<Drawable> icons = loadAppIcons();
+                uiHandler.post(() -> {
+                    if (!isUiAlive() || iconSelectionDialog != targetDialog) return;
+                    bindAppIcons(iconsGrid, iconPreview, icons);
+                    loadingOverlay.hide();
+                    targetDialog.show();
+                });
+            } catch (Exception | OutOfMemoryError error) {
+                uiHandler.post(() -> {
+                    if (!isUiAlive()) return;
+                    loadingOverlay.hide();
+                    Toast.makeText(this, "无法加载图标：" + error.getMessage(), Toast.LENGTH_LONG).show();
+                });
+            }
         });
 
         // 自定义图标按钮点击事件
@@ -300,12 +363,14 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
     private Bitmap getBitmapFromImageView(ImageView imageView) {
         Drawable drawable = imageView.getDrawable();
-        if (drawable instanceof BitmapDrawable) {
+        if (drawable == null) drawable = getDrawable(R.drawable.ic_launcher_foreground);
+        if (drawable instanceof BitmapDrawable && !((BitmapDrawable) drawable).getBitmap().isRecycled()) {
             return ((BitmapDrawable) drawable).getBitmap();
         }
+        if (drawable == null) return Bitmap.createBitmap(96, 96, Bitmap.Config.ARGB_8888);
 
         // 如果是其他类型的 Drawable（例如 VectorDrawable），将其转换为 Bitmap
-        Bitmap bitmap = Bitmap.createBitmap(drawable.getIntrinsicWidth(), drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+        Bitmap bitmap = Bitmap.createBitmap(Math.max(1, Math.min(512, drawable.getIntrinsicWidth())), Math.max(1, Math.min(512, drawable.getIntrinsicHeight())), Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight());
         drawable.draw(canvas);
@@ -406,6 +471,14 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
                 dynamicParams.add(paramInput.getText().toString());
             }
 
+            Intent completeTarget;
+            try {
+                ShortcutParameterReplacer.validate(intent, dynamicParams.toArray(new String[0]));
+                completeTarget = IntentReplay.fromText(intent, originalTarget, originalUrlText);
+            } catch (Exception error) {
+                intentString.setError(error.getMessage());
+                return;
+            }
             Bitmap shortcutIcon = getBitmapFromImageView(iconPreview);
 
             ShortcutHelper.createShortcut(
@@ -418,6 +491,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
                     dropdownSpinner.getSelectedItem() == null
                             ? ""
                             : dropdownSpinner.getSelectedItem().toString(),
+                    completeTarget,
                     new ShortcutHelper.ShortcutCallback() {
                         @Override
                         public void onNotSupported() {
@@ -504,8 +578,9 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
         // 根据新的 URL 动态加载应用列表
         try {
-            loadMatchingApps(Intent.parseUri(updatedText, 0));
-        } catch (URISyntaxException | NumberFormatException ignored) {
+            loadMatchingApps(IntentReplay.fromText(updatedText, originalTarget, originalUrlText));
+        } catch (URISyntaxException | IllegalArgumentException ignored) {
+            loadMatchingApps(new Intent(Intent.ACTION_VIEW));
         }
     }
 
@@ -515,12 +590,11 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
      */
     private void handleReloadIntentClick() {
         try {
-            Intent newIntent = Intent.parseUri(Objects.requireNonNull(contentBinding.urlTextView.getText()).toString(), 0);
+            Intent newIntent = IntentReplay.fromText(Objects.requireNonNull(contentBinding.urlTextView.getText()).toString(), originalTarget, originalUrlText);
             PermissionManager.startActivity(this, newIntent, contentBinding.enableFeatureCheckbox.isChecked(), contentBinding.dropdownSpinner.getSelectedItem().toString());
-        } catch (Exception ignored) {
+        } catch (Exception error) {
+            Toast.makeText(this, "Intent 无法重放：" + error.getMessage(), Toast.LENGTH_LONG).show();
         }
-
-
     }
 
     /**
@@ -544,9 +618,6 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         if (urlText == null) {
             urlText = intent.toUri(Intent.URI_INTENT_SCHEME);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return URLDecoder.decode(urlText, StandardCharsets.UTF_8);
-        }
         return urlText;
     }
 
@@ -569,7 +640,10 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         String currentPackageName = getPackageName();
 
         // 查询符合的应用列表
-        List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+        Intent queryIntent = new Intent(intent);
+        queryIntent.setComponent(null);
+        queryIntent.setSelector(null);
+        List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(queryIntent, PackageManager.MATCH_DEFAULT_ONLY);
 
         // 转换为 IntentMatchItem 列表
         List<IntentMatchItem> items = new ArrayList<>();
@@ -602,6 +676,12 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
     @Override
     protected void onDestroy() {
+        if (iconTask != null) iconTask.cancel(true);
+        iconExecutor.shutdownNow();
+        uiHandler.removeCallbacksAndMessages(null);
+        if (iconSelectionDialog != null) iconSelectionDialog.dismiss();
+        if (iconLoadingOverlay != null) iconLoadingOverlay.hide();
+        currentIconPreview = null;
         super.onDestroy();
     }
 }

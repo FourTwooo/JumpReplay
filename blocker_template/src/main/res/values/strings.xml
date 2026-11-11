@@ -18,6 +18,7 @@
     <string name="rule_enabled">启用此规则</string>
     <string name="rule_regex">正则</string>
     <string name="rule_invalid">规则不能为空</string>
+    <string name="rule_regex_invalid">正则表达式无效：%1$s</string>
     <string name="rule_saved">规则已保存</string>
     <string name="rule_deleted">规则已删除</string>
 

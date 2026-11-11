@@ -183,12 +183,14 @@ public class MainActivity extends AppCompatActivity {
         networkClient.getVersion(Constants.GitHub_VERSION_URL, new NetworkClient.VersionCallback() {
             @Override
             public void onVersionReceived(String newVersion) {
+                if (!canUpdateUi()) return;
                 Log.d(TAG, "最新版本号: " + newVersion);
                 versionTextView.setText(getString(R.string.version_current_latest, currentVersion, newVersion));
             }
 
             @Override
             public void onFailure(String errorMessage) {
+                if (!canUpdateUi()) return;
                 Log.e(TAG, errorMessage);
                 versionTextView.setText(
                         getString(
@@ -247,6 +249,7 @@ public class MainActivity extends AppCompatActivity {
         networkClient.getReleasesCached(this, Constants.GitHub_RELEASES_URL, false, new NetworkClient.ReleaseListCallback() {
             @Override
             public void onSuccess(List<ReleaseInfo> releases) {
+                if (!canUpdateUi()) return;
                 ReleaseInfo latest = findLatestStableRelease(releases);
                 if (latest == null) {
                     return;
@@ -260,6 +263,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(String errorMessage) {
+                if (!canUpdateUi()) return;
                 Log.e(TAG, "checkForAppUpdate: " + errorMessage);
             }
         });
@@ -278,7 +282,12 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
+    private boolean canUpdateUi() {
+        return !isFinishing() && !isDestroyed();
+    }
+
     private void showUpdateDialog(@NonNull ReleaseInfo release) {
+        if (!canUpdateUi()) return;
         String currentVersion = getAppVersionName(this);
 
         ScrollView scrollView = new ScrollView(this);
@@ -325,12 +334,14 @@ public class MainActivity extends AppCompatActivity {
         networkClient.downloadFile(release.getDownloadUrl(), apkFile, new NetworkClient.DownloadFileCallback() {
             @Override
             public void onSuccess(File file) {
+                if (!canUpdateUi()) return;
                 Toast.makeText(MainActivity.this, R.string.update_download_done, Toast.LENGTH_SHORT).show();
                 installDownloadedApk(file);
             }
 
             @Override
             public void onFailure(String errorMessage) {
+                if (!canUpdateUi()) return;
                 Toast.makeText(
                         MainActivity.this,
                         getString(R.string.update_download_failed, errorMessage),

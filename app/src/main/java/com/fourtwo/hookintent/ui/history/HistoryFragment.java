@@ -53,6 +53,7 @@ public class HistoryFragment extends Fragment {
     }
 
     private void loadHistory() {
+        final View expectedView = getView();
         progressBar.setVisibility(View.VISIBLE);
         recyclerView.setVisibility(View.GONE);
         emptyView.setVisibility(View.VISIBLE);
@@ -61,6 +62,7 @@ public class HistoryFragment extends Fragment {
         networkClient.getReleasesCached(requireContext(), Constants.GitHub_RELEASES_URL, false, new NetworkClient.ReleaseListCallback() {
             @Override
             public void onSuccess(List<ReleaseInfo> releases) {
+                if (!isAdded() || getView() == null || getView() != expectedView) return;
                 progressBar.setVisibility(View.GONE);
 
                 if (releases == null || releases.isEmpty()) {
@@ -77,11 +79,20 @@ public class HistoryFragment extends Fragment {
 
             @Override
             public void onFailure(String errorMessage) {
+                if (!isAdded() || getView() == null || getView() != expectedView) return;
                 progressBar.setVisibility(View.GONE);
                 recyclerView.setVisibility(View.GONE);
                 emptyView.setVisibility(View.VISIBLE);
                 emptyView.setText(getString(R.string.history_error, errorMessage));
             }
         });
+    }
+
+    @Override public void onDestroyView() {
+        recyclerView = null;
+        progressBar = null;
+        emptyView = null;
+        adapter = null;
+        super.onDestroyView();
     }
 }

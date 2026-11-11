@@ -1,50 +1,41 @@
 package com.fourtwo.hookintent.utils;
 
 import android.os.Bundle;
-import android.util.Log;
+import com.fourtwo.hookintent.base.JsonHandler;
+import org.json.JSONObject;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.TreeMap;
 
+/** Preserves the original consecutive-event comparison without mutating captured data. */
 public class IntentDuplicateChecker {
     private String lastBundleString = "";
 
-    /**
-     * 检查新的 Bundle 是否与上一个相同
-     *
-     * @param newBundle 新收到的 Bundle
-     * @return 如果相同返回 true，不同返回 false
-     */
-    public boolean isDuplicate(Bundle newBundle) {
-        if (newBundle == null) {
-            return false;
+    synchronized String checkpoint() { return lastBundleString; }
+    synchronized void restore(String value) { lastBundleString = value; }
+
+    public synchronized boolean isDuplicate(Bundle bundle) {
+        if (bundle == null) return false;
+        Bundle comparable = new Bundle(bundle);
+        for (String key : new String[]{"stack_trace", "uri", "category", "time", "FunctionCall", "from"}) comparable.remove(key);
+        String fingerprint = new JSONObject((Map<?, ?>) stable(JsonHandler.toMap(comparable))).toString();
+        boolean duplicate = fingerprint.equals(lastBundleString);
+        lastBundleString = fingerprint;
+        return duplicate;
+    }
+
+    private Object stable(Object value) {
+        if (value instanceof Map) {
+            TreeMap<String, Object> map = new TreeMap<>();
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) map.put(String.valueOf(entry.getKey()), stable(entry.getValue()));
+            return map;
         }
-
-        String FunctionCall = newBundle.getString("FunctionCall");
-        String From = newBundle.getString("from");
-        String Category = newBundle.getString("category");
-        String stack_trace = newBundle.getString("stack_trace");
-        String uri = newBundle.getString("uri");
-        String time = newBundle.getString("time");
-
-        newBundle.remove("stack_trace");
-        newBundle.remove("uri");
-        newBundle.remove("category");
-        newBundle.remove("time");
-        newBundle.remove("FunctionCall");
-        newBundle.remove("from");
-
-        // 将当前 Bundle 转换为字符串
-        String newBundleString = newBundle.toString();
-        Log.d("newBundleString", newBundleString);
-        // 比较新 Bundle 字符串和上一个 Bundle 字符串
-        boolean isDuplicate = newBundleString.equals(lastBundleString);
-        // 更新 lastBundleString 为当前的新 Bundle 字符串
-        lastBundleString = newBundleString;
-
-        newBundle.putString("FunctionCall", FunctionCall);
-        newBundle.putString("from", From);
-        newBundle.putString("stack_trace", stack_trace);
-        newBundle.putString("uri", uri);
-        newBundle.putString("category", Category);
-        newBundle.putString("time", time);
-        return isDuplicate;
+        if (value instanceof List) {
+            ArrayList<Object> list = new ArrayList<>();
+            for (Object item : (List<?>) value) list.add(stable(item));
+            return list;
+        }
+        return value;
     }
 }

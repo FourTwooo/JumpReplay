@@ -16,6 +16,9 @@ public class ItemData implements Parcelable {
     private final Bundle bundle;
     private final String stack_trace;
     private final String uri;
+    // Repository-only identity. Keep it out of the legacy Parcelable wire format so
+    // saved navigation state remains compatible when upgrading or rolling back.
+    private long captureId;
 
     private static String safe(String value) {
         return value == null ? "" : value;
@@ -117,4 +120,7 @@ public class ItemData implements Parcelable {
     public String getUri() {
         return uri;
     }
+
+    public long getCaptureId() { return captureId; }
+    public void setCaptureId(long captureId) { this.captureId = captureId; }
 }

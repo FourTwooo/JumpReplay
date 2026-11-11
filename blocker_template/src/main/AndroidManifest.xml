@@ -24,6 +24,10 @@
             android:noHistory="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar">
 
+            <meta-data
+                android:name="com.fourtwo.hookintent.BLOCKER_ENTRY"
+                android:value="true" />
+
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -92,7 +96,7 @@
                 <data android:scheme="blockslot60" />
                 <data android:scheme="blockslot61" />
                 <data android:scheme="blockslot62" />
-                <data android:scheme="dewulink" />
+                <data android:scheme="blockslot63" />
             </intent-filter>
         </activity>
 

@@ -17,6 +17,8 @@ import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 public class ManageActivity extends Activity {
 
@@ -177,14 +179,27 @@ public class ManageActivity extends Activity {
             updateRegexButton(buttonRegex, regex[0]);
         });
 
-        new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(editIndex == null ? R.string.rule_dialog_title_add : R.string.rule_dialog_title_edit)
                 .setView(dialogView)
-                .setPositiveButton(android.R.string.ok, (dialog, which) -> {
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(shown -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
                     String pattern = safe(inputPattern.getText().toString());
                     if (pattern.isEmpty()) {
-                        Toast.makeText(this, R.string.rule_invalid, Toast.LENGTH_SHORT).show();
+                        inputPattern.setError(getString(R.string.rule_invalid));
                         return;
+                    }
+
+                    if (regex[0]) {
+                        try {
+                            Pattern.compile(pattern);
+                        } catch (PatternSyntaxException e) {
+                            inputPattern.setError(getString(R.string.rule_regex_invalid, e.getDescription()));
+                            return;
+                        }
                     }
 
                     if (editIndex != null && editIndex >= 0 && editIndex < rules.size()) {
@@ -199,9 +214,9 @@ public class ManageActivity extends Activity {
                     RuleStore.save(this, rules);
                     refreshRules();
                     Toast.makeText(this, R.string.rule_saved, Toast.LENGTH_SHORT).show();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                    dialog.dismiss();
+                }));
+        dialog.show();
     }
 
     private void updateRegexButton(ImageButton button, boolean enabled) {

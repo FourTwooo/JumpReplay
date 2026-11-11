@@ -1,101 +1,65 @@
 package com.fourtwo.hookintent.utils;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
-
+import android.util.LruCache;
 import androidx.core.content.ContextCompat;
-
 import com.fourtwo.hookintent.R;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-
 public class AppInfoHelper {
-
+    private static final LruCache<String, AppInfo> CACHE = new LruCache<>(128);
+    private final Context context;
     private final PackageManager packageManager;
-    private final Map<String, AppInfo> cache = new HashMap<>();
-
     public AppInfoHelper(Context context) {
-        this.packageManager = context.getPackageManager();
+        this.context = context.getApplicationContext();
+        packageManager = this.context.getPackageManager();
     }
-
     public AppInfo getAppInfo(String componentName) {
-        if (componentName == null) return null;
-
-        String packageName;
-        if (Objects.equals(componentName, "/")) {
-            packageName = componentName.split("/")[0];
-        } else {
-            packageName = componentName;
-        }
-
-//        Log.d("AppInfoHelper", "getAppInfo: " + packageName + " " + componentName);
-
-        // Check if the info is already cached
-        if (cache.containsKey(componentName)) {
-            return cache.get(componentName);
-        }
-
-        // Try to find the application info
-        AppInfo appInfo = findAppInfo(packageName);
-        if (appInfo != null) {
-            // Cache the result
-            cache.put(componentName, appInfo);
-        }
-        return appInfo;
-    }
-
-    private AppInfo findAppInfo(String packageName) {
-        while (!packageName.isEmpty()) {
+        String packageName = packageFromComponent(componentName);
+        if (packageName == null) return null;
+        AppInfo cached = CACHE.get(packageName);
+        if (cached != null) return cached;
+        String candidate = packageName;
+        while (!candidate.isEmpty()) {
             try {
-                ApplicationInfo appInfo = packageManager.getApplicationInfo(packageName, 0);
-                String appName = packageManager.getApplicationLabel(appInfo).toString();
-                Drawable appIcon = packageManager.getApplicationIcon(appInfo);
-                return new AppInfo(appName, appIcon);
+                ApplicationInfo info = packageManager.getApplicationInfo(candidate, 0);
+                AppInfo result = new AppInfo(packageManager.getApplicationLabel(info).toString(), packageManager.getApplicationIcon(info));
+                CACHE.put(packageName, result);
+                return result;
             } catch (PackageManager.NameNotFoundException e) {
-                // Remove the last segment of the package name and try again
-                int lastDotIndex = packageName.lastIndexOf('.');
-                if (lastDotIndex == -1) {
-                    return null; // No more segments to remove
-                }
-                packageName = packageName.substring(0, lastDotIndex);
+                // Legacy captures sometimes stored a fully-qualified class instead of package/component.
+                if (componentName.indexOf('/') >= 0) return null;
+                int lastDot = candidate.lastIndexOf('.');
+                if (lastDot < 0) return null;
+                candidate = candidate.substring(0, lastDot);
             }
         }
         return null;
     }
-
+    public static String packageFromComponent(String value) {
+        if (value == null || value.isEmpty() || "null".equals(value) || "/".equals(value)) return null;
+        String name = value;
+        int start = name.indexOf('{');
+        int end = name.lastIndexOf('}');
+        if (start >= 0 && end > start) name = name.substring(start + 1, end);
+        ComponentName component = ComponentName.unflattenFromString(name);
+        if (component != null) return component.getPackageName();
+        int slash = name.indexOf('/');
+        return slash > 0 ? name.substring(0, slash) : name;
+    }
     public static class AppInfo {
         private final String appName;
         private final Drawable appIcon;
-
-        public AppInfo(String appName, Drawable appIcon) {
-            this.appName = appName;
-            this.appIcon = appIcon;
-        }
-
-        public String getAppName() {
-            return appName;
-        }
-
-        public Drawable getAppIcon() {
-            return appIcon;
-        }
+        public AppInfo(String name, Drawable icon) { appName = name; appIcon = icon; }
+        public String getAppName() { return appName; }
+        public Drawable getAppIcon() { return appIcon; }
     }
-
-    public static AppInfoHelper.AppInfo getAppInfo(Context context, String packageName) {
-        AppInfoHelper appInfoHelper = new AppInfoHelper(context);
-        AppInfoHelper.AppInfo appInfo = appInfoHelper.getAppInfo(packageName);
-        if (appInfo != null) {
-            return appInfo;
-        }
-        return new AppInfoHelper.AppInfo(
-                "未知应用" + ("/".equals(packageName) || "null".equals(packageName) ? "" : String.format("(%s)", packageName)),
-                ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground)
-        );
+    public static AppInfo getAppInfo(Context context, String componentName) {
+        AppInfo info = new AppInfoHelper(context).getAppInfo(componentName);
+        String name = packageFromComponent(componentName);
+        return info != null ? info : new AppInfo("未知应用" + (name == null ? "" : "(" + name + ")"), ContextCompat.getDrawable(context, R.drawable.ic_launcher_foreground));
     }
-
 }
-

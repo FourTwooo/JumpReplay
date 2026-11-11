@@ -72,6 +72,8 @@ public class FloatWindow extends LinearLayout {
         return true;
     }
 
+    private android.view.ViewTreeObserver observer;
+    private android.view.ViewTreeObserver.OnGlobalLayoutListener layoutListener;
     public void initialize() {
         // 检查是否已经添加悬浮窗
         if (isViewAdded(viewGroup)) {
@@ -79,11 +81,13 @@ public class FloatWindow extends LinearLayout {
         }
 
         // 监听视图变化，确保悬浮窗持续显示
-        viewGroup.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+        observer = viewGroup.getViewTreeObserver();
+        layoutListener = () -> {
             if (isViewAdded(viewGroup) && !isOnPause) {
                  createView(applicationContext, viewGroup);
             }
-        });
+        };
+        observer.addOnGlobalLayoutListener(layoutListener);
     }
 
     public FloatWindowView floatWindowView;
@@ -119,6 +123,7 @@ public class FloatWindow extends LinearLayout {
             animateTextView(true);
             isTextViewVisible = false;
         } else {
+            if (floatWindowView != null) floatWindowView.refreshJournal();
             animateTextView(false);
             isTextViewVisible = true;
         }
@@ -140,16 +145,16 @@ public class FloatWindow extends LinearLayout {
     private ImageView imageView;
 
     public void removeView(){
-        for (int i = 0; i < viewGroup.getChildCount(); i++) {
-            View child = viewGroup.getChildAt(i);
-            if (child instanceof FloatWindow) {
-                viewGroup.removeView(child);
-                XposedBridge.log("删除悬浮窗成功");
-            }
-        }
+        isOnPause = true;
+        if (floatWindowView != null) floatWindowView.dispose();
+        if (observer != null && observer.isAlive() && layoutListener != null)
+            observer.removeOnGlobalLayoutListener(layoutListener);
+        observer = null; layoutListener = null;
+        if (getParent() instanceof ViewGroup) ((ViewGroup) getParent()).removeView(this);
     }
     @SuppressLint({"ClickableViewAccessibility", "ResourceType", "RtlHardcoded", "UseCompatLoadingForDrawables"})
     private void createView(Context context, ViewGroup viewGroup) {
+        removeAllViews();
         this.touchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop(); // 滑动距离阈值
 
         this.setOrientation(LinearLayout.HORIZONTAL);
@@ -194,20 +199,7 @@ public class FloatWindow extends LinearLayout {
                     case MotionEvent.ACTION_UP:
 //                        XposedBridge.log("点击");
                         if (Math.abs(event.getRawX() - downX) < touchSlop && Math.abs(event.getRawY() - downY) < touchSlop) {
-                            try {
-                                @SuppressLint({"DiscouragedPrivateApi", "PrivateApi"}) Field field = View.class.getDeclaredField("mListenerInfo");
-                                field.setAccessible(true);
-                                Object object = field.get(imageView);
-                                assert object != null;
-                                field = object.getClass().getDeclaredField("mOnClickListener");
-                                field.setAccessible(true);
-                                object = field.get(object);
-                                if (object instanceof OnClickListener) {
-                                    ((View.OnClickListener) object).onClick(imageView);
-                                }
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
+                            imageView.performClick();
                         }
                         break;
                 }

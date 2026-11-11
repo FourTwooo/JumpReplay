@@ -5,6 +5,9 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.util.Log;
 import android.widget.Toast;
+import android.os.Handler;
+import android.os.Looper;
+import com.fourtwo.hookintent.base.AmCommandBuilder;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.utils.RootServiceApi;
@@ -23,8 +26,8 @@ public class PermissionManager {
         } else {
             Log.d(TAG, "Binder received ");
         }
-        isBinderAvailable = true;
-        isShizukuPermissionGranted = Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
+        isBinderAvailable = Shizuku.pingBinder();
+        isShizukuPermissionGranted = !Shizuku.isPreV11() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
     };
 
     private static final Shizuku.OnBinderDeadListener BINDER_DEAD_LISTENER = () -> {
@@ -69,18 +72,19 @@ public class PermissionManager {
 
     public static void startActivity(Context context, Intent intent, Boolean isRoot, String SelectedItem) {
         try {
-            if (isRoot) {
-                String[] itemsArray = context.getResources().getStringArray(R.array.items_array);
-                if (SelectedItem.equals("root")) {
+            if (Boolean.TRUE.equals(isRoot)) {
+                if ("root".equals(SelectedItem)) {
                     // root
                     RootServiceApi.startActivityAsRoot(context, intent);
-                } else if (SelectedItem.equals("Shizuku - 系统助手")) {
+                } else if ("Shizuku - 系统助手".equals(SelectedItem)) {
                     // Shizuku - 系统助手
-                    ShizukuServerApi.launchAssistantWithTemporaryReplacement(context, intent);
-                } else if(SelectedItem.equals("Shizuku")){
+                    ShizukuServerApi.launchAssistantAsync(context, intent);
+                    return;
+                } else if("Shizuku".equals(SelectedItem)){
                     // Shizuku
-                    ShizukuServerApi.startActivityAsShizuku(context, intent, 0);
-                }
+                    int result = ShizukuServerApi.startActivityAsShizuku(context, intent, android.os.Process.myUid() / 100000);
+                    if (result < 0 || result >= 100) throw new IllegalStateException("Activity启动失败，代码: " + result);
+                } else throw new IllegalArgumentException("未知启动模式: " + SelectedItem);
             } else {
                 context.startActivity(intent);
             }
@@ -92,25 +96,13 @@ public class PermissionManager {
     }
 
     public static void executeCommand(String command, Boolean Root, Context context) {
-        if (isRootPermissionGranted) {
-            if (Root) {
-                Shell.cmd("su root", command).submit(result -> {
-                    if (result.isSuccess()) {
-                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            } else {
-                Shell.cmd("su shell", command).submit(result -> {
-                    if (result.isSuccess()) {
-                        Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
+        if (!isRootPermissionGranted) {
+            Toast.makeText(context, "Root服务不可用，无法执行am命令", Toast.LENGTH_SHORT).show();
+            return;
         }
-
+        Context app = context.getApplicationContext();
+        String job = Boolean.TRUE.equals(Root) ? command : "su shell -c " + AmCommandBuilder.shellQuote(command);
+        Shell.cmd(job).submit(result -> new Handler(Looper.getMainLooper()).post(() ->
+                Toast.makeText(app, result.isSuccess() ? "调用成功" : "调用失败", Toast.LENGTH_SHORT).show()));
     }
 }

@@ -11,6 +11,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -73,6 +74,10 @@ public class SelectFragment extends Fragment {
             public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
                 int itemId = menuItem.getItemId();
                 if (itemId == R.id.add_text) {
+                    if (adapter == null) {
+                        Toast.makeText(requireContext(), "过滤规则尚未成功读取，无法添加", Toast.LENGTH_LONG).show();
+                        return true;
+                    }
                     showAddTextDialog();
                     return true;
                 }
@@ -86,6 +91,7 @@ public class SelectFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        adapter = null;
         assert getArguments() != null;
 
         String name = getArguments().getString("NAME");
@@ -103,7 +109,8 @@ public class SelectFragment extends Fragment {
 
         if (jsonData == null) {
             Log.e(TAG, "JSON data is null");
-            return null; // 或适当地处理此情况
+            Toast.makeText(requireContext(), "过滤规则读取失败，原文件已保留", Toast.LENGTH_LONG).show();
+            return inflater.inflate(R.layout.fragment_select, container, false);
         }
         Log.d(TAG, "jsonData: " + jsonData);
 
@@ -119,7 +126,8 @@ public class SelectFragment extends Fragment {
         if (nameData == null) {
             nameData = new ArrayList<>();
             protocolData.put(name, nameData);
-            jsonHandler.writeJsonToFile(requireContext(), jsonData);
+            try { jsonHandler.writeJsonToFile(requireContext(), jsonData); }
+            catch (IllegalStateException e) { Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show(); }
         }
 
         Log.d(TAG, "onCreateView: " + name + " " + protocol + " " + nameData);
@@ -135,6 +143,7 @@ public class SelectFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
+        if (adapter == null) return;
         List<Map<String, Object>> dataWithCheckStates = adapter.getDataWithCheckStates();
 
         // Reading the JSON data again
@@ -155,7 +164,11 @@ public class SelectFragment extends Fragment {
 
         protocolData.put(name, dataWithCheckStates);
         Log.d(TAG, "onPause: " + jsonData);
-        jsonHandler.writeJsonToFile(requireContext(), jsonData);
+        try {
+            jsonHandler.writeJsonToFile(requireContext(), jsonData);
+        } catch (IllegalStateException e) {
+            Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show();
+        }
     }
 }
 

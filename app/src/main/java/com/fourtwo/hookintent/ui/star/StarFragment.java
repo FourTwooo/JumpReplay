@@ -84,16 +84,18 @@ public class StarFragment extends Fragment {
             binding.starEmptyView.setVisibility(View.VISIBLE);
         } else {
             binding.starEmptyView.setVisibility(View.GONE);
+            List<com.fourtwo.hookintent.data.ItemData> loaded = new ArrayList<>();
             for (JSONObject jsonObject : allStarData) {
                 try {
                     String jsonString = jsonObject.getString(Constants.SQL_DATA);
                     JSONObject jsonObjectFromSQL = new JSONObject(jsonString);
                     Bundle data = JsonHandler.toBundle(jsonObjectFromSQL);
-                    dataProcessor.processBundle(data, itemData -> viewModel.addIntentData(itemData));
-                } catch (JSONException e) {
-                    throw new RuntimeException(e);
+                    dataProcessor.processBundle(data, loaded::add);
+                } catch (JSONException | RuntimeException e) {
+                    Log.e(TAG, "一条收藏记录无法读取，其余记录继续加载", e);
                 }
             }
+            viewModel.setIntentData(loaded);
         }
         return root;
     }
@@ -102,5 +104,10 @@ public class StarFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         binding = null;
+    }
+
+    @Override public void onDestroy() {
+        if (dbManager != null) dbManager.closeDatabase();
+        super.onDestroy();
     }
 }

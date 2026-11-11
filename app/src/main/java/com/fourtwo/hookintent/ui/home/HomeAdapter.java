@@ -14,19 +14,21 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Filter;
-import android.widget.Filterable;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.DiffUtil;
+import java.util.Objects;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.base.DetailPayloadStore;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
@@ -36,14 +38,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> implements Filterable {
+public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
 
     private List<ItemData> mData;
     private List<ItemData> filteredData;
     private final int normalColor = Color.WHITE;
     private final int pressedColor = Color.LTGRAY;
 
-    private String currentQuery = "";
 
     public HomeAdapter(List<ItemData> data) {
         this.mData = data != null ? new ArrayList<>(data) : new ArrayList<>();
@@ -55,65 +56,6 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.fragment_item_list, parent, false);
         return new ViewHolder(view);
-    }
-
-    private final Filter homeFilter = new Filter() {
-        @Override
-        protected FilterResults performFiltering(CharSequence constraint) {
-            List<ItemData> source = mData != null ? new ArrayList<>(mData) : new ArrayList<>();
-            List<ItemData> filteredList = new ArrayList<>();
-
-            String filterPattern = constraint == null
-                    ? ""
-                    : constraint.toString().toLowerCase(Locale.ROOT).trim();
-
-            if (filterPattern.isEmpty()) {
-                filteredList.addAll(source);
-            } else {
-                for (ItemData item : source) {
-                    if (item == null) {
-                        continue;
-                    }
-
-                    String appName = safeLower(item.getAppName());
-                    String itemFrom = safeLower(item.getItem_from());
-                    String itemData = safeLower(item.getItem_data());
-
-                    if (appName.contains(filterPattern)
-                            || itemFrom.contains(filterPattern)
-                            || itemData.contains(filterPattern)) {
-                        filteredList.add(item);
-                    }
-                }
-            }
-
-            FilterResults results = new FilterResults();
-            results.values = filteredList;
-            results.count = filteredList.size();
-            return results;
-        }
-
-        @SuppressWarnings("unchecked")
-        @SuppressLint("NotifyDataSetChanged")
-        @Override
-        protected void publishResults(CharSequence constraint, FilterResults results) {
-            currentQuery = constraint == null ? "" : constraint.toString();
-
-            filteredData.clear();
-            if (results != null && results.values instanceof List) {
-                filteredData.addAll((List<ItemData>) results.values);
-            }
-            notifyDataSetChanged();
-        }
-    };
-
-    @Override
-    public Filter getFilter() {
-        return homeFilter;
-    }
-
-    private String safeLower(String value) {
-        return value == null ? "" : value.toLowerCase(Locale.ROOT);
     }
 
     @Override
@@ -142,22 +84,23 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
         Map<String, String> COLORS = JsonHandler.jsonToMap(COLORS_CONFIG);
 
         if (category != null && COLORS.containsKey(category)) {
-            background.setColor(Color.parseColor(COLORS.get(category)));
+            try { background.setColor(Color.parseColor(COLORS.get(category))); }
+            catch (IllegalArgumentException e) { background.setColor(Color.GRAY); }
         } else {
             background.setColor(Color.GRAY);
         }
         holder.category.setBackground(background);
 
         holder.itemView.setOnClickListener(v -> {
-            NavController navController = Navigation.findNavController(
-                    (Activity) v.getContext(),
-                    R.id.nav_host_fragment_content_main
-            );
-
-            Bundle bundle = new Bundle();
-            bundle.putParcelable("itemData", item);
-
-            navController.navigate(R.id.action_nav_home_to_nav_detail, bundle);
+            try {
+                NavController navController = Navigation.findNavController(
+                        (Activity) v.getContext(), R.id.nav_host_fragment_content_main);
+                Bundle bundle = new Bundle();
+                bundle.putString(DetailPayloadStore.ARG_TOKEN, DetailPayloadStore.save(v.getContext(), item));
+                navController.navigate(R.id.action_nav_home_to_nav_detail, bundle);
+            } catch (Exception error) {
+                Toast.makeText(v.getContext(), "无法打开详情：" + error.getMessage(), Toast.LENGTH_LONG).show();
+            }
         });
 
         holder.itemView.setOnLongClickListener(v -> {
@@ -213,7 +156,7 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
         if (position >= 0 && position < filteredData.size()) {
             ItemData item = filteredData.get(position);
             filteredData.remove(position);
-            mData.remove(item);
+            if (mData != filteredData) mData.remove(item);
             notifyItemRemoved(position);
         }
     }
@@ -227,16 +170,28 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
         return filteredData;
     }
 
-    @SuppressLint("NotifyDataSetChanged")
     public void setData(List<ItemData> newData) {
-        this.mData = newData != null ? new ArrayList<>(newData) : new ArrayList<>();
-
-        if (currentQuery == null || currentQuery.trim().isEmpty()) {
-            this.filteredData = new ArrayList<>(this.mData);
-            notifyDataSetChanged();
-        } else {
-            getFilter().filter(currentQuery);
-        }
+        List<ItemData> next = newData == null ? new ArrayList<>() : new ArrayList<>(newData);
+        List<ItemData> previous = filteredData;
+        DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
+            @Override public int getOldListSize() { return previous.size(); }
+            @Override public int getNewListSize() { return next.size(); }
+            @Override public boolean areItemsTheSame(int oldPosition, int newPosition) {
+                ItemData old = previous.get(oldPosition), item = next.get(newPosition);
+                return old.getCaptureId() > 0 ? old.getCaptureId() == item.getCaptureId() : old == item;
+            }
+            @Override public boolean areContentsTheSame(int oldPosition, int newPosition) {
+                ItemData old = previous.get(oldPosition), item = next.get(newPosition);
+                return Objects.equals(old.getAppName(), item.getAppName())
+                        && Objects.equals(old.getItem_from(), item.getItem_from())
+                        && Objects.equals(old.getItem_data(), item.getItem_data())
+                        && Objects.equals(old.getTimestamp(), item.getTimestamp())
+                        && Objects.equals(old.getCategory(), item.getCategory());
+            }
+        }, false);
+        mData = next;
+        filteredData = next;
+        diff.dispatchUpdatesTo(this);
     }
 
     public List<ItemData> getData() {
@@ -245,7 +200,6 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> im
 
     @SuppressLint("NotifyDataSetChanged")
     public void clearData() {
-        currentQuery = "";
         mData.clear();
         filteredData.clear();
         notifyDataSetChanged();

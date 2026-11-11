@@ -16,6 +16,7 @@ public class RootServiceApi {
 
     private static IRootActivityService rootService;
     public static boolean isServiceBound = false;
+    private static boolean binding;
 
     private RootServiceApi() {
         // 工具类不允许实例化
@@ -26,21 +27,29 @@ public class RootServiceApi {
         public void onServiceConnected(ComponentName name, IBinder service) {
             rootService = IRootActivityService.Stub.asInterface(service);
             isServiceBound = true;
+            binding = false;
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
             rootService = null;
             isServiceBound = false;
+            binding = false;
         }
     };
 
     // 绑定 RootService
     public static void bindRootService(Context context) {
-        if (isServiceBound) return;
+        if (isServiceBound || binding) return;
 
         Intent serviceIntent = new Intent(context, RootActivityService.class);
-        RootService.bind(serviceIntent, connection);
+        binding = true;
+        try {
+            RootService.bind(serviceIntent, connection);
+        } catch (RuntimeException e) {
+            binding = false;
+            throw e;
+        }
     }
 
     // 调用 RootService 启动 Activity
@@ -52,7 +61,7 @@ public class RootServiceApi {
 
         try {
             int result = rootService.startActivityAsRoot(intent, 0);
-            if (result != 0) {
+            if (result < 0 || result >= 100) {
                 Toast.makeText(context, "Failed to start activity as root. Code: " + result, Toast.LENGTH_SHORT).show();
                 throw new IllegalArgumentException();
             }
@@ -64,13 +73,15 @@ public class RootServiceApi {
 
     // 解绑 RootService
     public static void unbindRootService(Context context) {
-        if (isServiceBound) {
+        if (isServiceBound || binding) {
             try {
-                context.unbindService(connection);
+                RootService.unbind(connection);
             } catch (RuntimeException ignored) {
             }
 
             isServiceBound = false;
+            binding = false;
+            rootService = null;
         }
     }
 }

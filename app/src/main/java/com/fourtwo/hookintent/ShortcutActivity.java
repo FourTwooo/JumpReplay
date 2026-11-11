@@ -22,41 +22,61 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.fourtwo.hookintent.manager.PermissionManager;
 
 import java.net.URISyntaxException;
+import com.fourtwo.hookintent.utils.ShortcutParameterReplacer;
+import com.fourtwo.hookintent.utils.ShortcutPayloadStore;
+import com.fourtwo.hookintent.utils.IntentReplay;
 
 public class ShortcutActivity extends AppCompatActivity {
+
+    private AlertDialog parameterDialog;
+    private Intent originalTarget;
+    private String originalTargetText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // 设置透明背景
         getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        handleShortcut(getIntent());
+    }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (parameterDialog != null) {
+            parameterDialog.setOnDismissListener(null);
+            parameterDialog.dismiss();
+            parameterDialog = null;
+        }
+        handleShortcut(intent);
+    }
 
-        Log.d("showReplaceParamsDialog", "showReplaceParamsDialog: " + getIntent().toUri(Intent.URI_INTENT_SCHEME));
-
-        // 接收传递的参数
-        Bundle bundle = getIntent().getExtras();
-        if (bundle != null) {
+    private void handleShortcut(Intent incoming) {
+        try {
+            Bundle bundle = incoming == null ? null : incoming.getExtras();
+            if (bundle == null) { finish(); return; }
             String targetIntent = bundle.getString("target_intent");
             String[] replaceParams = bundle.getStringArray("replace_params");
             boolean isChecked = bundle.getBoolean("isChecked", false);
-            String SelectedItem = bundle.getString("SelectedItem");
-            if (targetIntent != null && replaceParams != null && replaceParams.length > 0) {
-                // 弹出输入框
-                showReplaceParamsDialog(targetIntent, replaceParams, isChecked, SelectedItem);
+            String selectedItem = bundle.getString("SelectedItem", "");
+            ShortcutPayloadStore.Payload payload = ShortcutPayloadStore.load(this, bundle.getString("target_payload_id"));
+            if (payload != null) {
+                targetIntent = payload.template;
+                replaceParams = payload.parameters;
+            }
+            ShortcutParameterReplacer.validate(targetIntent, replaceParams);
+            originalTargetText = targetIntent;
+            originalTarget = payload == null ? null : payload.target;
+            if (replaceParams != null && replaceParams.length > 0) {
+                showReplaceParamsDialog(targetIntent, replaceParams, isChecked, selectedItem);
             } else {
-                try {
-                    Intent newIntent = Intent.parseUri(targetIntent, 0);
-                    PermissionManager.startActivity(this, newIntent, isChecked, SelectedItem);
-                } catch (URISyntaxException e) {
-                    throw new RuntimeException(e);
-                }
-                // 没有参数，直接关闭
+                PermissionManager.startActivity(this,
+                        IntentReplay.fromText(targetIntent, originalTarget, originalTargetText), isChecked, selectedItem);
                 finish();
             }
-        } else {
-            // 没有传递数据，直接关闭
+        } catch (Exception error) {
+            Log.e("ShortcutActivity", "Cannot open shortcut", error);
+            Toast.makeText(this, "快捷方式内容无效：" + error.getMessage(), Toast.LENGTH_LONG).show();
             finish();
         }
     }
@@ -165,25 +185,27 @@ public class ShortcutActivity extends AppCompatActivity {
         cancelButton.setOnClickListener(v -> dialog.dismiss());
 
         confirmButton.setOnClickListener(v -> {
-            String finalTargetIntent = targetIntent;
-
-            for (int i = 0; i < replaceParams.length; i++) {
-                String userInput = editTexts[i].getText() == null ? "" : editTexts[i].getText().toString();
-                finalTargetIntent = finalTargetIntent.replace(replaceParams[i], userInput);
-            }
-
             try {
-                Intent newIntent = Intent.parseUri(finalTargetIntent, 0);
+                String[] replacements = new String[replaceParams.length];
+                for (int i = 0; i < replaceParams.length; i++) {
+                    replacements[i] = editTexts[i].getText() == null ? "" : editTexts[i].getText().toString();
+                }
+                String finalTargetIntent = ShortcutParameterReplacer.replace(targetIntent, replaceParams, replacements);
+                Intent newIntent = IntentReplay.fromText(finalTargetIntent, originalTarget, originalTargetText);
                 PermissionManager.startActivity(this, newIntent, isChecked, selectedItem);
                 Log.d("TransparentDialogActivity", "替换后启动的 Intent: " + finalTargetIntent);
                 dialog.dismiss();
-            } catch (URISyntaxException e) {
+            } catch (Exception e) {
                 Log.e("TransparentDialogActivity", "Intent URI 解析失败", e);
                 Toast.makeText(this, "Intent URI 解析失败", Toast.LENGTH_SHORT).show();
             }
         });
 
-        dialog.setOnDismissListener(dialogInterface -> finish());
+        parameterDialog = dialog;
+        dialog.setOnDismissListener(dialogInterface -> {
+            parameterDialog = null;
+            finish();
+        });
 
         dialog.show();
 
@@ -276,6 +298,11 @@ public class ShortcutActivity extends AppCompatActivity {
     }
     @Override
     protected void onDestroy() {
+        if (parameterDialog != null) {
+            parameterDialog.setOnDismissListener(null);
+            parameterDialog.dismiss();
+            parameterDialog = null;
+        }
         super.onDestroy();
     }
 }

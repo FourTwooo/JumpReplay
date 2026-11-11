@@ -16,7 +16,14 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
+
     buildTypes {
+        debug {
+            versionNameSuffix "-audit.1"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -35,9 +42,7 @@ android {
             aidl.srcDirs = ['src/main/aidl']
             res.srcDirs = ['src/main/res']
 
-            assets {
-                srcDirs 'src\\main\\assets'
-            }
+            assets.srcDirs = [layout.buildDirectory.dir('generated/appAssets').get().asFile]
         }
     }
     buildFeatures {
@@ -78,7 +83,10 @@ dependencies {
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     implementation 'androidx.preference:preference:1.2.0'
     implementation 'com.caverock:androidsvg:1.4'
-//    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.10.3'
+    androidTestImplementation 'androidx.test:runner:1.5.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
 //    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
 //    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 
@@ -94,3 +102,20 @@ dependencies {
     compileOnly fileTree(include: ['.jar'], dir: 'libs')
     compileOnly files('libs/XposedBridgeAPI-89.jar')
 }
+// Every app variant embeds the template built from the same checkout.
+def prepareAppAssets = tasks.register('prepareAppAssets', Sync) {
+    dependsOn ':blocker_template:assembleRelease'
+    into layout.buildDirectory.dir('generated/appAssets')
+    from('src/main/assets') {
+        exclude 'blocker/blocker_template.apk'
+    }
+    from(project(':blocker_template').layout.buildDirectory.file('outputs/apk/release/blocker_template-release-unsigned.apk')) {
+        into 'blocker'
+        rename { 'blocker_template.apk' }
+    }
+    doLast {
+        def template = layout.buildDirectory.file('generated/appAssets/blocker/blocker_template.apk').get().asFile
+        if (!template.isFile()) throw new GradleException('Blocker template was not built')
+    }
+}
+tasks.named('preBuild').configure { dependsOn prepareAppAssets }

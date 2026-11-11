@@ -2,6 +2,7 @@ package com.fourtwo.hookintent.ui.settings;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
@@ -56,7 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import yuku.ambilwarna.AmbilWarnaDialog;
@@ -81,6 +82,20 @@ public class SettingsFragment extends Fragment {
     private String ALL_STRING;
 
     private final NetworkClient networkClient = new NetworkClient();
+    private final ExecutorService applicationsExecutor = Executors.newSingleThreadExecutor();
+    private final List<Dialog> activeDialogs = new ArrayList<>();
+    private LoadingOverlay applicationsLoading;
+    private int viewGeneration;
+    private int cloudGeneration;
+
+    private boolean currentView(int generation) {
+        return generation == viewGeneration && isAdded() && getView() != null;
+    }
+    private <T extends Dialog> T track(T dialog) {
+        activeDialogs.add(dialog);
+        dialog.setOnDismissListener(ignored -> activeDialogs.remove(dialog));
+        return dialog;
+    }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -89,7 +104,7 @@ public class SettingsFragment extends Fragment {
     }
 
     private void onEdit(Map<String, Object> currentItem, int position) {
-        showEditDialog(currentItem, null, requireContext(), () -> adapter.notifyItemChanged(position));
+        showEditDialog(currentItem, null, requireContext(), () -> {});
     }
 
     @Override
@@ -222,7 +237,8 @@ public class SettingsFragment extends Fragment {
         }
 
         if (filterJson.remove(normalized) != null) {
-            jsonHandler.writeJsonToFile(requireContext(), filterJson);
+            try { jsonHandler.writeJsonToFile(requireContext(), filterJson); }
+            catch (IllegalStateException e) { Toast.makeText(requireContext(), e.getMessage(), Toast.LENGTH_LONG).show(); }
         }
     }
 
@@ -403,22 +419,25 @@ public class SettingsFragment extends Fragment {
 
         TextInputLayout idTILQuery = dialogView.findViewById(R.id.idTILQuery);
         idTILQuery.setEndIconOnClickListener(view -> {
+            final int generation = viewGeneration;
+            Context appContext = requireContext().getApplicationContext();
             LoadingOverlay loadingOverlay = new LoadingOverlay(requireContext());
+            applicationsLoading = loadingOverlay;
             loadingOverlay.setLoadingText("正在加载应用列表...");
             loadingOverlay.show();
 
-            Executor executor = Executors.newSingleThreadExecutor();
-            executor.execute(() -> {
-                PackageManager packageManager = requireContext().getPackageManager();
+            applicationsExecutor.execute(() -> {
+                PackageManager packageManager = appContext.getPackageManager();
                 List<ApplicationInfo> installedApplications = packageManager.getInstalledApplications(PackageManager.GET_META_DATA);
 
                 List<Map<String, Object>> appInfoHash = new ArrayList<>();
 
                 for (ApplicationInfo app : installedApplications) {
+                    if (Thread.currentThread().isInterrupted()) return;
                     Map<String, Object> appInfo = new HashMap<>();
                     try {
                         appInfo.put("isSystem", (app.flags & ApplicationInfo.FLAG_SYSTEM) != 0);
-                        appInfo.put("appName", packageManager.getApplicationLabel(app));
+                        appInfo.put("appName", packageManager.getApplicationLabel(app).toString());
                         appInfo.put("packageName", app.packageName);
 
                         PackageInfo packageInfo = packageManager.getPackageInfo(app.packageName, 0);
@@ -431,6 +450,7 @@ public class SettingsFragment extends Fragment {
                 }
 
                 new Handler(Looper.getMainLooper()).post(() -> {
+                    if (!currentView(generation)) { loadingOverlay.hide(); return; }
                     androidx.appcompat.app.AlertDialog.Builder builderPackages = new androidx.appcompat.app.AlertDialog.Builder(requireContext());
 
                     View dialogPackagesView = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_custom_packages, null);
@@ -446,7 +466,7 @@ public class SettingsFragment extends Fragment {
                     all_package.setText(String.format("共%d个应用", filteredList.size()));
 
                     builderPackages.setView(dialogPackagesView);
-                    dialog = builderPackages.create();
+                    dialog = track(builderPackages.create());
 
                     PackageAdapter adapter = new PackageAdapter(filteredList, packageName -> {
                         inputPackageName.setText(packageName);
@@ -541,7 +561,7 @@ public class SettingsFragment extends Fragment {
             }
         }
 
-        AlertDialog dialog = builder.create();
+        AlertDialog dialog = track(builder.create());
 
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawableResource(R.drawable.dialog_rounded_background);
@@ -574,15 +594,33 @@ public class SettingsFragment extends Fragment {
         });
 
         buttonConfirm.setOnClickListener(v -> {
+            String packageValue = Objects.requireNonNull(inputPackageName.getText()).toString().trim();
+            String classValue = Objects.requireNonNull(inputClassName.getText()).toString().trim();
+            String methodValue = Objects.requireNonNull(inputMethodName.getText()).toString().trim();
+            String categoryValue = Objects.requireNonNull(inputCategory.getText()).toString().trim();
+            if (packageValue.isEmpty() || classValue.isEmpty() || methodValue.isEmpty() || categoryValue.isEmpty()) {
+                Toast.makeText(requireContext(), "className、methodName、packageName、category不能为空", Toast.LENGTH_LONG).show();
+                return;
+            }
+            for (EditText field : new EditText[]{inputTitleArgsIndex, inputDataArgsIndex}) {
+                if ((field == inputTitleArgsIndex ? checkboxTitleArgs : checkboxDataArgs).isChecked()) {
+                    String index = field.getText().toString().trim();
+                    try { if (!index.isEmpty() && Integer.parseInt(index) < 0) throw new NumberFormatException(); }
+                    catch (NumberFormatException e) { field.setError("请输入非负整数参数下标"); return; }
+                }
+            }
             Map<String, Object> newData = new HashMap<>();
-            newData.put("packageName", Objects.requireNonNull(inputPackageName.getText()).toString());
-            newData.put("methodName", Objects.requireNonNull(inputMethodName.getText()).toString());
-            newData.put("className", Objects.requireNonNull(inputClassName.getText()).toString());
-            newData.put("category", Objects.requireNonNull(inputCategory.getText()).toString());
+            newData.put("packageName", packageValue);
+            newData.put("methodName", methodValue);
+            newData.put("className", classValue);
+            newData.put("category", categoryValue);
 
             Map<String, Object> metadataSource = existingData != null ? existingData : presetData;
+            if (metadataSource != null) for (String key : new String[]{"name", "remark"}) {
+                if (metadataSource.containsKey(key)) newData.put(key, metadataSource.get(key));
+            }
 
-            String category = Objects.requireNonNull(inputCategory.getText()).toString();
+            String category = categoryValue;
             String colorHex;
 
             if (COLORS.containsKey(category)) {
@@ -632,14 +670,14 @@ public class SettingsFragment extends Fragment {
             }
 
             if (checkboxTitleArgs.isChecked()) {
-                String titleArgsValue = inputTitleArgsIndex.getText().toString();
+                String titleArgsValue = inputTitleArgsIndex.getText().toString().trim();
                 newData.put("title", titleArgsValue.isEmpty() ? "0" : titleArgsValue);
             } else {
                 newData.remove("title");
             }
 
             if (checkboxDataArgs.isChecked()) {
-                String dataArgsValue = inputDataArgsIndex.getText().toString();
+                String dataArgsValue = inputDataArgsIndex.getText().toString().trim();
                 newData.put("data", dataArgsValue.isEmpty() ? "0" : dataArgsValue);
             } else {
                 newData.remove("data");
@@ -679,7 +717,7 @@ public class SettingsFragment extends Fragment {
 
         AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
         builder.setView(dialogView);
-        AlertDialog dialog = builder.create();
+        AlertDialog dialog = track(builder.create());
 
         ArrayAdapter<String> urlHistoryAdapter = new ArrayAdapter<>(
                 requireContext(),
@@ -710,9 +748,10 @@ public class SettingsFragment extends Fragment {
 
         CloudConfigAdapter cloudAdapter = new CloudConfigAdapter(new ArrayList<>(), templateData -> {
             dialog.dismiss();
-            new Handler(Looper.getMainLooper()).post(() ->
-                    showEditDialog(null, templateData, requireContext(), () -> adapter.notifyDataSetChanged())
-            );
+            int generation = viewGeneration;
+            new Handler(Looper.getMainLooper()).post(() -> {
+                if (currentView(generation)) showEditDialog(null, templateData, requireContext(), () -> adapter.notifyDataSetChanged());
+            });
         });
         recyclerView.setAdapter(cloudAdapter);
 
@@ -794,9 +833,12 @@ public class SettingsFragment extends Fragment {
         emptyView.setVisibility(View.VISIBLE);
         emptyView.setText("正在请求云配置...");
 
+        final int generation = viewGeneration;
+        final int request = ++cloudGeneration;
         networkClient.getJsonArray(url, new NetworkClient.JsonArrayCallback() {
             @Override
             public void onSuccess(JSONArray data) {
+                if (!currentView(generation) || request != cloudGeneration || !recyclerView.isAttachedToWindow()) return;
                 List<Map<String, Object>> templateList = parseCloudConfigList(data);
 
                 progressBar.setVisibility(View.GONE);
@@ -818,6 +860,7 @@ public class SettingsFragment extends Fragment {
 
             @Override
             public void onFailure(String errorMessage) {
+                if (!currentView(generation) || request != cloudGeneration || !recyclerView.isAttachedToWindow()) return;
                 progressBar.setVisibility(View.GONE);
                 recyclerView.setVisibility(View.GONE);
                 emptyView.setVisibility(View.VISIBLE);
@@ -1022,6 +1065,21 @@ public class SettingsFragment extends Fragment {
             }
 
         }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
+    }
+
+    @Override public void onDestroyView() {
+        viewGeneration++;
+        cloudGeneration++;
+        for (Dialog dialog : new ArrayList<>(activeDialogs)) dialog.dismiss();
+        activeDialogs.clear();
+        if (applicationsLoading != null) applicationsLoading.hide();
+        applicationsLoading = null;
+        super.onDestroyView();
+    }
+
+    @Override public void onDestroy() {
+        applicationsExecutor.shutdownNow();
+        super.onDestroy();
     }
 
     @Override

@@ -100,6 +100,13 @@ public final class ShortcutHelper {
             String selectedItem,
             ShortcutCallback callback
     ) {
+        return createShortcut(context, shortcutName, shortcutIcon, targetIntent, replaceParams,
+                isChecked, selectedItem, null, callback);
+    }
+
+    public static boolean createShortcut(Context context, String shortcutName, Object shortcutIcon,
+            String targetIntent, ArrayList<String> replaceParams, Boolean isChecked, String selectedItem,
+            Intent completeTarget, ShortcutCallback callback) {
         final ShortcutCallback cb = callback == null ? new ShortcutCallback() {
         } : callback;
 
@@ -129,13 +136,17 @@ public final class ShortcutHelper {
 
         Intent shortcutIntent = new Intent(appContext, ShortcutActivity.class);
         shortcutIntent.setAction(Intent.ACTION_VIEW);
-        shortcutIntent.putExtra("target_intent", targetIntent);
-        shortcutIntent.putExtra(
-                "replace_params",
-                replaceParams == null ? new String[0] : replaceParams.toArray(new String[0])
-        );
         shortcutIntent.putExtra("isChecked", Boolean.TRUE.equals(isChecked));
         shortcutIntent.putExtra("SelectedItem", selectedItem == null ? "" : selectedItem);
+
+        try {
+            ShortcutParameterReplacer.validate(targetIntent, replaceParams == null ? null : replaceParams.toArray(new String[0]));
+            shortcutIntent.putExtra("target_payload_id", ShortcutPayloadStore.save(appContext, targetIntent,
+                    replaceParams == null ? null : replaceParams.toArray(new String[0]), completeTarget));
+        } catch (Exception error) {
+            cb.onError(error);
+            return false;
+        }
 
         Icon icon = buildIcon(appContext, shortcutIcon);
 

@@ -17,6 +17,10 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toolbar;
+import android.widget.Button;
+import android.os.Handler;
+import android.os.Looper;
+import com.fourtwo.hookintent.xposed.IntentJournal;
 
 import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.data.ImagesBase64;
@@ -52,7 +56,59 @@ public class FloatWindowView extends LinearLayout {
     }
 
     private final ArrayAdapter<String> adapter;
-    private final List<Intent> intentList; // 存储Intent列表
+    private final List<Intent> intentList;
+    private IntentJournal journal;
+    private long pageStart = -1;
+    private static final int PAGE_SIZE = 100;
+    private static final java.util.concurrent.ExecutorService pages = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final Handler main = new Handler(Looper.getMainLooper());
+    private boolean refreshScheduled, loading, reloadRequested, disposed;
+    private TextView pageLabel;
+    private ImageView openView;
+    private boolean hookEnabled;
+    private long pageGeneration;
+
+    public void dispose() { disposed = true; pageGeneration++; }
+    public void setJournal(IntentJournal journal) { this.journal = journal; }
+    public void setHookState(boolean enabled) {
+        hookEnabled = enabled;
+        if (openView != null) openView.setImageDrawable(enabled ? closeDrawable : openDrawable);
+    }
+    public void refreshJournal() {
+        if (Looper.myLooper() != Looper.getMainLooper()) { main.post(this::refreshJournal); return; }
+        if (disposed || refreshScheduled || journal == null) return;
+        refreshScheduled = true;
+        main.postDelayed(() -> { refreshScheduled = false; loadPage(); }, 100);
+    }
+    private void loadPage() {
+        if (disposed || journal == null) return;
+        if (loading) { reloadRequested = true; return; }
+        loading = true;
+        final long generation = ++pageGeneration;
+        final long requested = pageStart;
+        pages.execute(() -> {
+            try {
+                long count = journal.count();
+                long start = requested < 0 ? Math.max(0, ((count - 1) / PAGE_SIZE) * PAGE_SIZE)
+                        : Math.min(requested, Math.max(0, ((count - 1) / PAGE_SIZE) * PAGE_SIZE));
+                List<Intent> page = count == 0 ? new ArrayList<>() : journal.page(start, PAGE_SIZE);
+                main.post(() -> {
+                    loading = false;
+                    if (disposed || generation != pageGeneration) return;
+                    updateListView(page);
+                    if (pageLabel != null) pageLabel.setText((count == 0 ? 0 : start + 1) + "–" + (start + page.size()) + " / " + count);
+                    if (reloadRequested) { reloadRequested = false; refreshJournal(); }
+                });
+            } catch (Exception error) {
+                XposedBridge.log("JumpReplay floating history: " + error);
+                main.post(() -> {
+                    loading = false;
+                    if (pageLabel != null) pageLabel.setText(error.getMessage());
+                    if (reloadRequested) { reloadRequested = false; refreshJournal(); }
+                });
+            }
+        });
+    }
 
     @SuppressLint("UseCompatLoadingForDrawables")
     public FloatWindowView(Context context) {
@@ -85,6 +141,7 @@ public class FloatWindowView extends LinearLayout {
     @SuppressLint({"UseCompatLoadingForDrawables", "RtlHardcoded"})
     public FloatWindowView createView(boolean isHook) {
         floatWindowView = this;
+        hookEnabled = isHook;
         floatWindowView.setOrientation(LinearLayout.VERTICAL);
         floatWindowView.setPadding(5, 5, 5, 5); // 设置内边距
         floatWindowView.setAlpha(0f); // 初始隐藏
@@ -146,14 +203,15 @@ public class FloatWindowView extends LinearLayout {
         toolbar.addView(delListView, imageViewLayoutParams);
 
         // 添加开启/关闭按钮
-        ImageView openView = new ImageView(context);
+        openView = new ImageView(context);
         openView.setPadding(16, 0, 16, 0);
 
 //        openView.setImageDrawable(openDrawable);
         openView.setImageDrawable(isHook ? closeDrawable : openDrawable);
 
         openView.setOnClickListener(v -> {
-            boolean newIsHook = openView.getDrawable() == openDrawable;
+            boolean newIsHook = !hookEnabled;
+            hookEnabled = newIsHook;
             openView.setImageDrawable(newIsHook ? closeDrawable : openDrawable);
 
             if (openListener != null) {
@@ -174,7 +232,7 @@ public class FloatWindowView extends LinearLayout {
 
         // 计算 ListView 的实际高度
         int toolbarHeight = dpToPx(30); // Toolbar 的高度
-        int listViewHeight = screenHeight * 3 / 5 - toolbarHeight; // 减去 Toolbar 的高度
+        int listViewHeight = screenHeight * 3 / 5 - toolbarHeight - dpToPx(36); // 减去 Toolbar 的高度
 
         LinearLayout.LayoutParams listViewLayoutParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -188,7 +246,7 @@ public class FloatWindowView extends LinearLayout {
         // 设置点击监听器
         listView.setOnItemClickListener((AdapterView<?> parent, View view, int position, long id) -> {
             if (position >= 0 && position < intentList.size()) {
-                Intent intent = intentList.get(position);
+                Intent intent = new Intent(intentList.get(position));
                 try {
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     context.startActivity(intent); // 启动对应的Activity
@@ -202,6 +260,26 @@ public class FloatWindowView extends LinearLayout {
         // 添加子布局到父布局
         floatWindowView.addView(toolbar);
         floatWindowView.addView(listView);
+        LinearLayout navigation = new LinearLayout(context);
+        Button previous = new Button(context); previous.setText("‹");
+        Button next = new Button(context); next.setText("›");
+        pageLabel = new TextView(context); pageLabel.setGravity(Gravity.CENTER);
+        navigation.addView(previous, new LinearLayout.LayoutParams(dpToPx(56), dpToPx(36)));
+        navigation.addView(pageLabel, new LinearLayout.LayoutParams(0, dpToPx(36), 1));
+        navigation.addView(next, new LinearLayout.LayoutParams(dpToPx(56), dpToPx(36)));
+        previous.setOnClickListener(view -> {
+            long count = journal == null ? 0 : journal.count();
+            long current = pageStart < 0 ? Math.max(0, ((count - 1) / PAGE_SIZE) * PAGE_SIZE) : pageStart;
+            pageStart = Math.max(0, current - PAGE_SIZE); loadPage();
+        });
+        next.setOnClickListener(view -> {
+            long count = journal == null ? 0 : journal.count();
+            long last = Math.max(0, ((count - 1) / PAGE_SIZE) * PAGE_SIZE);
+            pageStart = pageStart < 0 || pageStart + PAGE_SIZE >= last ? -1 : pageStart + PAGE_SIZE;
+            loadPage();
+        });
+        floatWindowView.addView(navigation);
+        refreshJournal();
 
         return floatWindowView;
     }

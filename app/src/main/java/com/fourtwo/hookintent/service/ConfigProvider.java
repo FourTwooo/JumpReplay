@@ -16,8 +16,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ConfigProvider extends ContentProvider {
+    // Keep a strong reference: SharedPreferences only retains listeners weakly.
+    private final android.content.SharedPreferences.OnSharedPreferenceChangeListener changes = (preferences, key) -> {
+        if (getContext() != null) getContext().getContentResolver().notifyChange(
+                Constants.DISABLED_SCHEME.equals(key) ? Constants.SCHEME_URI : Constants.CONFIG_URI, null);
+    };
     @Override
     public boolean onCreate() {
+        getContext().getSharedPreferences("my_preferences", android.content.Context.MODE_PRIVATE)
+                .registerOnSharedPreferenceChangeListener(changes);
         return true;
     }
 
@@ -55,8 +62,24 @@ public class ConfigProvider extends ContentProvider {
     @Nullable
     @Override
     public Uri insert(@NonNull Uri uri, @Nullable ContentValues values) {
-        if (values != null) {
+        if (!Constants.CONFIG_URI.equals(uri)) throw new IllegalArgumentException("Unsupported configuration URI: " + uri);
+        if (values != null && values.get("value") instanceof String) {
             String value = values.getAsString("value");
+
+            // Injection-side initialization is intentionally writable across apps/LSPatch.
+            // Validate the existing protocol, without restricting caller identity or extra fields.
+            try {
+                org.json.JSONArray records = new org.json.JSONArray(value);
+                String[] required = {"packageName", "className", "methodName", "category"};
+                for (int index = 0; index < records.length(); index++) {
+                    org.json.JSONObject record = records.getJSONObject(index);
+                    for (String field : required) {
+                        if (!(record.opt(field) instanceof String) || record.getString(field).trim().isEmpty())
+                            throw new IllegalArgumentException("Invalid Hook field: " + field);
+                    }
+                    if (!(record.opt("open") instanceof Boolean)) throw new IllegalArgumentException("Invalid Hook open flag");
+                }
+            } catch (org.json.JSONException error) { throw new IllegalArgumentException("Invalid Hook configuration", error); }
 
             // 将数据存储到 SharedPreferences
             SharedPreferencesUtils.putStr(getContext(), Constants.INTERNAL_HOOKS_CONFIG, value);
@@ -64,7 +87,7 @@ public class ConfigProvider extends ContentProvider {
             // 返回新的数据 URI
             return Uri.withAppendedPath(Constants.CONFIG_URI, Constants.INTERNAL_HOOKS_CONFIG);
         }
-        return null;
+        throw new IllegalArgumentException("A string value is required");
     }
 
     @Override

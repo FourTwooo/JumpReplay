@@ -58,7 +58,8 @@ public final class BlockerApkBuilder {
     private BlockerApkBuilder() {
     }
 
-    public static File build(Context context, JSONObject spec) throws Exception {
+    public static synchronized File build(Context context, JSONObject spec) throws Exception {
+        checkInterrupted();
         File blockerDir = new File(context.getFilesDir(), "blocker");
         if (!blockerDir.exists()) {
             blockerDir.mkdirs();
@@ -68,9 +69,16 @@ public final class BlockerApkBuilder {
         File signedApk = new File(blockerDir, "blocker_signed.apk");
 
         patchTemplateApk(context, spec, unsignedApk);
+        checkInterrupted();
         signApk(unsignedApk, signedApk);
 
         return signedApk;
+    }
+
+    private static void checkInterrupted() throws InterruptedException {
+        if (Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("拦截器生成已取消");
+        }
     }
 
     public static void install(Context context, File apkFile) {
@@ -215,6 +223,7 @@ public final class BlockerApkBuilder {
 
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
+                checkInterrupted();
                 String name = entry.getName();
 
                 if (isSignatureEntry(name)) {
@@ -279,9 +288,10 @@ public final class BlockerApkBuilder {
                 continue;
             }
 
-            String normalized = scheme.toLowerCase(Locale.ROOT);
-            validateScheme(normalized);
-            ordered.add(normalized);
+            // Android matches schemes case-sensitively. Keep the spelling from the
+            // application's manifest (and from custom input) intact.
+            validateScheme(scheme);
+            ordered.add(scheme);
         }
 
         return new ArrayList<>(ordered);

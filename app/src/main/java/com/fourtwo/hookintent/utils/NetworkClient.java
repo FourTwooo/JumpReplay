@@ -36,6 +36,10 @@ public class NetworkClient {
         mainHandler = new Handler(Looper.getMainLooper());
     }
 
+    public void cancelAll() {
+        client.dispatcher().cancelAll();
+    }
+
     public interface ReadMeCallback {
         void onSuccess(String data);
         void onFailure(String errorMessage);
@@ -87,11 +91,16 @@ public class NetworkClient {
 
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try (Response responseResource = response) {
                 if (response.isSuccessful() && response.body() != null) {
                     String responseData = response.body().string();
                     mainHandler.post(() -> callback.onSuccess(responseData));
                 } else {
                     mainHandler.post(() -> callback.onFailure("请求失败，响应不成功"));
+                }
+
+                } catch (Exception error) {
+                    mainHandler.post(() -> callback.onFailure("请求处理失败：" + error.getMessage()));
                 }
             }
         });
@@ -108,6 +117,7 @@ public class NetworkClient {
 
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try (Response responseResource = response) {
                 if (response.isSuccessful() && response.body() != null) {
                     String responseData = response.body().string();
                     try {
@@ -126,6 +136,10 @@ public class NetworkClient {
                 } else {
                     mainHandler.post(() -> callback.onFailure("请求失败，响应不成功"));
                 }
+
+                } catch (Exception error) {
+                    mainHandler.post(() -> callback.onFailure("请求处理失败：" + error.getMessage()));
+                }
             }
         });
     }
@@ -141,6 +155,7 @@ public class NetworkClient {
 
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try (Response responseResource = response) {
                 if (!response.isSuccessful() || response.body() == null) {
                     mainHandler.post(() -> callback.onFailure("请求失败，响应不成功"));
                     return;
@@ -173,6 +188,10 @@ public class NetworkClient {
                 } catch (JSONException e) {
                     mainHandler.post(() -> callback.onFailure("解析JSON失败：" + e.getMessage()));
                 }
+
+                } catch (Exception error) {
+                    mainHandler.post(() -> callback.onFailure("请求处理失败：" + error.getMessage()));
+                }
             }
         });
     }
@@ -188,6 +207,7 @@ public class NetworkClient {
 
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try (Response responseResource = response) {
                 if (!response.isSuccessful() || response.body() == null) {
                     mainHandler.post(() -> callback.onFailure("请求失败，响应不成功"));
                     return;
@@ -199,6 +219,10 @@ public class NetworkClient {
                     mainHandler.post(() -> callback.onSuccess(releases));
                 } catch (JSONException e) {
                     mainHandler.post(() -> callback.onFailure("解析JSON失败：" + e.getMessage()));
+                }
+
+                } catch (Exception error) {
+                    mainHandler.post(() -> callback.onFailure("请求处理失败：" + error.getMessage()));
                 }
             }
         });
@@ -238,6 +262,7 @@ public class NetworkClient {
 
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try (Response responseResource = response) {
                 if (!response.isSuccessful() || response.body() == null) {
                     if (hasCache) {
                         try {
@@ -270,6 +295,10 @@ public class NetworkClient {
                     }
                     mainHandler.post(() -> callback.onFailure("解析JSON失败：" + e.getMessage()));
                 }
+
+                } catch (Exception error) {
+                    mainHandler.post(() -> callback.onFailure("请求处理失败：" + error.getMessage()));
+                }
             }
         });
     }
@@ -289,6 +318,7 @@ public class NetworkClient {
 
             @Override
             public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+                try (Response responseResource = response) {
                 if (!response.isSuccessful() || response.body() == null) {
                     if (outputFile.exists()) {
                         //noinspection ResultOfMethodCallIgnored
@@ -320,6 +350,10 @@ public class NetworkClient {
                         outputFile.delete();
                     }
                     mainHandler.post(() -> callback.onFailure("保存文件失败：" + e.getMessage()));
+                }
+
+                } catch (Exception error) {
+                    mainHandler.post(() -> callback.onFailure("请求处理失败：" + error.getMessage()));
                 }
             }
         });
