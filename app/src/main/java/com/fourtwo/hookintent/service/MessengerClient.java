@@ -31,6 +31,7 @@ public class MessengerClient {
     private boolean closed;
     private PassiveCallback passiveCallback;
     private ConnectionCallback connectionCallback;
+    private com.fourtwo.hookintent.replay.ExtrasRuntime extrasRuntime;
     private final Messenger incoming = new Messenger(new Handler(Looper.getMainLooper()) {
         @Override public void handleMessage(Message msg) {
             if (msg.what == MessengerService.MSG_REPLY) {
@@ -68,6 +69,10 @@ public class MessengerClient {
                 info.putInt("uid", context.getApplicationInfo().uid);
                 info.putString("className", context.getApplicationInfo().className);
                 info.putString("processName", DataConverter.getCurrentProcessName(context));
+                if (extrasRuntime != null) {
+                    info.putInt("editor_version", 2);
+                    info.putBinder("editor_endpoint", extrasRuntime.binder());
+                }
                 register.setData(info);
                 service.send(register);
                 if (connectionCallback != null) connectionCallback.onConnected();
@@ -89,6 +94,13 @@ public class MessengerClient {
         }
     };
     public MessengerClient(Context context) { this.context = context; }
+    /** Enable before registering; editor availability is independent of the capture switch. */
+    public void enableExtrasEditing(ClassLoader loader) {
+        extrasRuntime = new com.fourtwo.hookintent.replay.ExtrasRuntime(context, loader);
+    }
+    public void rememberExtrasLoaders(Intent intent) {
+        if (extrasRuntime != null) extrasRuntime.remember(intent);
+    }
     public void setConnectionCallback(ConnectionCallback callback) { main.post(() -> connectionCallback = callback); }
     public void registerPassiveCallback(PassiveCallback callback) {
         main.post(() -> { passiveCallback = callback; closed = false; connect(); });

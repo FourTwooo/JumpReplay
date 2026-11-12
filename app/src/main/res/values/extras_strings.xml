@@ -1,0 +1,18 @@
+<resources>
+    <string name="extras_editor_title">编辑 Intent 参数</string>
+    <string name="extras_editor_hint">点击值进行修改，点击对象展开字段。长按可置空引用类型；保存后应用修改。</string>
+    <string name="extras_root">参数</string>
+    <string name="extras_back">返回上级</string>
+    <string name="extras_cancel">取消</string>
+    <string name="extras_save">保存</string>
+    <string name="extras_apply">应用</string>
+    <string name="extras_set_null">置为 null</string>
+    <string name="extras_null_confirmation">将此值设为 null？它与空字符串不同。</string>
+    <string name="extras_retry">重试读取</string>
+    <string name="extras_loading">正在读取参数…</string>
+    <string name="extras_empty">此处没有可展开的字段。</string>
+    <string name="extras_read_only">此值无法直接修改。</string>
+    <string name="extras_missing_snapshot">未收到完整 Intent，修改尚未保存。</string>
+    <string name="extras_reference">引用 %1$s</string>
+    <string name="extras_value_type">值的类型</string>
+</resources>

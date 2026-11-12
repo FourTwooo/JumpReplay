@@ -11,6 +11,11 @@ public final class IntentPayloadCodec {
 
     private IntentPayloadCodec() {}
 
+    /** Host-side restoration stays opaque. Foreign object code only executes in a codec process. */
+    public static Intent decode(android.content.Context context, Bundle record) {
+        return decode(record);
+    }
+
     public static String encode(Intent intent) {
         Parcel parcel = Parcel.obtain();
         try {

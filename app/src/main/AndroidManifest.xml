@@ -83,6 +83,11 @@
         <service
             android:name=".service.ShortcutRootService"
             android:exported="false" />
+        <service
+            android:name=".replay.ExtrasSandboxService"
+            android:process=":extras_sandbox"
+            android:isolatedProcess="true"
+            android:exported="false" />
 
 
         <activity

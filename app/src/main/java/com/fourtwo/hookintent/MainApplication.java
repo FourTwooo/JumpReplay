@@ -23,11 +23,13 @@ public class MainApplication extends Application {
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
-        ShizukuProcessBridge.prepare(base);
+        if (android.os.Process.myUid() == base.getApplicationInfo().uid) ShizukuProcessBridge.prepare(base);
     }
     @Override
     public void onCreate() {
         super.onCreate();
+        // The offline object codec runs with an isolated UID and receives no privileged bridges.
+        if (android.os.Process.myUid() != getApplicationInfo().uid) return;
 
         // 开启系统隐藏API
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -43,7 +45,7 @@ public class MainApplication extends Application {
     @Override
     public void onTerminate() {
         super.onTerminate();
-        PermissionManager.unload(this); // 清理资源
+        if (android.os.Process.myUid() == getApplicationInfo().uid) PermissionManager.unload(this);
     }
 
 }

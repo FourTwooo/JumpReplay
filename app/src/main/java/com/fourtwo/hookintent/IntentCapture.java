@@ -83,6 +83,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private final java.util.concurrent.ExecutorService journalWorker = Executors.newSingleThreadExecutor();
     private HookConfigCache systemConfig;
     private volatile boolean storageErrorShown;
+    private long sourceLastUpdateTime;
+    private int sourceAppUid = -1;
     private final ThreadLocal<Boolean> captureInProgress = new ThreadLocal<Boolean>() {
         @Override protected Boolean initialValue() { return false; }
     };
@@ -170,6 +172,11 @@ public class IntentCapture implements IXposedHookLoadPackage {
         bundle.putString("time", new SimpleDateFormat("yyyy-MM-dd hh:mm:ss a").format(Calendar.getInstance().getTime()));
         bundle.putString("packageName", packageName);
         bundle.putString("processName", DataConverter.getCurrentProcessName(appContext));
+        bundle.putInt("source_uid", android.os.Process.myUid());
+        // Keep runtime identity distinct from the installed application's owner.
+        if (sourceAppUid != -1) bundle.putInt("source_app_uid", sourceAppUid);
+        bundle.putInt("capture_sdk", android.os.Build.VERSION.SDK_INT);
+        if (sourceLastUpdateTime != 0) bundle.putLong("source_last_update", sourceLastUpdateTime);
         bundle.putString("stack_trace", getStackTraceString());
 
         addMessage(bundle);
@@ -196,6 +203,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
         try {
             if (intent == null) return;
             Intent snapshot = new Intent(intent);
+            if (client != null) client.rememberExtrasLoaders(snapshot);
             synchronized (stateLock) {
                 if (hookStateKnown && !isHook) return;
                 try {
@@ -706,7 +714,14 @@ public class IntentCapture implements IXposedHookLoadPackage {
         }
 
         if (!isHostApp && client == null) {
+            try {
+                android.content.pm.PackageInfo source = applicationContext.getPackageManager().getPackageInfo(packageName, 0);
+                sourceLastUpdateTime = source.lastUpdateTime;
+                if (source.applicationInfo != null) sourceAppUid = source.applicationInfo.uid;
+            }
+            catch (Exception ignored) { }
             client = new MessengerClient(applicationContext);
+            client.enableExtrasEditing(loadPackageParam.classLoader);
             try { outbox = new DurableCaptureOutbox(applicationContext, client, error -> XposedBridge.log("JumpReplay transport retry: " + error)); }
             catch (Exception error) { reportCaptureError(error); }
             client.setConnectionCallback(new MessengerClient.ConnectionCallback() {

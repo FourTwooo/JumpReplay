@@ -44,6 +44,9 @@ public class ShortcutActivity extends AppCompatActivity {
     };
     private Intent originalTarget;
     private String originalTargetText;
+    private Bundle replayOrigin = new Bundle();
+    private com.fourtwo.hookintent.replay.ExtrasClient mergeClient;
+    private int mergeGeneration;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -58,6 +61,8 @@ public class ShortcutActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         launches.cancel();
+        mergeGeneration++;
+        if (mergeClient != null) mergeClient.close();
         launchStatus = null;
         hideWaiting();
         if (parameterDialog != null) {
@@ -80,6 +85,7 @@ public class ShortcutActivity extends AppCompatActivity {
             if (payload != null) {
                 targetIntent = payload.template;
                 replaceParams = payload.parameters;
+                replayOrigin = new Bundle(payload.origin);
             }
             ShortcutParameterReplacer.validate(targetIntent, replaceParams);
             originalTargetText = targetIntent;
@@ -87,8 +93,7 @@ public class ShortcutActivity extends AppCompatActivity {
             if (replaceParams != null && replaceParams.length > 0) {
                 showReplaceParamsDialog(targetIntent, replaceParams, isChecked, selectedItem);
             } else {
-                launchTarget(IntentReplay.fromText(targetIntent, originalTarget, originalTargetText),
-                        isChecked, selectedItem, null);
+                prepareTarget(targetIntent, isChecked, selectedItem, null);
             }
         } catch (Exception error) {
             Log.e("ShortcutActivity", "Cannot open shortcut", error);
@@ -185,8 +190,7 @@ public class ShortcutActivity extends AppCompatActivity {
                         replacements[index] = inputs[index].getText() == null ? "" : inputs[index].getText().toString();
                     }
                     String finalText = ShortcutParameterReplacer.replace(targetIntent, replaceParams, replacements);
-                    Intent target = IntentReplay.fromText(finalText, originalTarget, originalTargetText);
-                    launchTarget(target, isChecked, selectedItem, confirm);
+                    prepareTarget(finalText, isChecked, selectedItem, confirm);
                 } catch (Exception error) {
                     Log.e("ShortcutActivity", "Cannot read shortcut parameters", error);
                     Toast.makeText(this, "Intent URI 解析失败", Toast.LENGTH_SHORT).show();
@@ -203,11 +207,28 @@ public class ShortcutActivity extends AppCompatActivity {
         dialog.show();
     }
 
+    private void prepareTarget(String text, boolean privileged, String mode, Button confirm) {
+        int generation = ++mergeGeneration;
+        if (mergeClient != null) mergeClient.close();
+        if (confirm != null) confirm.setEnabled(false);
+        mergeClient = com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin,
+                text, originalTarget, originalTargetText, (target, error) -> {
+                    if (isFinishing() || isDestroyed() || generation != mergeGeneration) return;
+                    if (confirm != null) confirm.setEnabled(true);
+                    if (error != null) {
+                        if (launchStatus != null) launchStatus.setText("参数处理失败：" + error.getMessage());
+                        else { Toast.makeText(this, "参数处理失败：" + error.getMessage(), Toast.LENGTH_LONG).show(); finish(); }
+                    } else launchTarget(target, privileged, mode, confirm);
+                });
+    }
+
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
     @Override
     protected void onDestroy() {
+        mergeGeneration++;
+        if (mergeClient != null) mergeClient.close();
         if (launches != null) launches.cancel();
         hideWaiting();
         launchUi.removeCallbacksAndMessages(null);

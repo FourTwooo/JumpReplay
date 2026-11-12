@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- 移除列表选项 -->
+    <item android:id="@+id/edit_extras" android:title="@string/extras_editor_title" app:showAsAction="never" />
     <item
         android:id="@+id/add_link"
         android:icon="@drawable/add_link"

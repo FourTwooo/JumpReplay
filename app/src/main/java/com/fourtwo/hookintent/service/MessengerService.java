@@ -38,8 +38,9 @@ public class MessengerService extends Service {
         final Messenger messenger;
         final Bundle info;
         final IBinder.DeathRecipient death;
-        Client(Messenger messenger, Bundle info, IBinder.DeathRecipient death) {
-            this.messenger = messenger; this.info = info; this.death = death;
+        final int uid;
+        Client(Messenger messenger, Bundle info, IBinder.DeathRecipient death, int uid) {
+            this.messenger = messenger; this.info = info; this.death = death; this.uid = uid;
         }
     }
     private final Handler handler = new Handler(Looper.getMainLooper()) {
@@ -63,7 +64,10 @@ public class MessengerService extends Service {
                         sendReply(reply, type, request, HookStatusManager.isHook() ? 1 : 0, "Hook status checked");
                         break;
                     case MSG_REGISTER_CLIENT:
-                        register(reply, msg.getData());
+                        register(reply, msg.getData(), msg.sendingUid);
+                        break;
+                    case com.fourtwo.hookintent.replay.ExtrasRuntime.DISCOVER:
+                        if (msg.sendingUid == android.os.Process.myUid()) discoverEditor(reply, request, msg.getData());
                         break;
                     case MSG_UNREGISTER_CLIENT:
                         if (reply != null) remove(reply.getBinder());
@@ -82,14 +86,14 @@ public class MessengerService extends Service {
     public static MessengerService getInstance() { return instance; }
     public ConcurrentLinkedQueue<Bundle> getDataQueue() { return dataQueue; }
     @Override public IBinder onBind(Intent intent) { return messenger.getBinder(); }
-    private void register(Messenger messenger, Bundle info) {
+    private void register(Messenger messenger, Bundle info, int uid) {
         if (messenger == null) return;
         IBinder binder = messenger.getBinder();
         remove(binder);
         IBinder.DeathRecipient death = () -> handler.post(() -> remove(binder));
         try {
             binder.linkToDeath(death, 0);
-            clients.put(binder, new Client(messenger, new Bundle(info), death));
+            clients.put(binder, new Client(messenger, new Bundle(info), death, uid));
             // A connection snapshot must not overwrite a process-local floating-window override.
             Bundle snapshot = new Bundle();
             snapshot.putBoolean("isHook", HookStatusManager.isHook());
@@ -101,6 +105,29 @@ public class MessengerService extends Service {
     private void remove(IBinder binder) {
         Client client = clients.remove(binder);
         if (client != null) try { binder.unlinkToDeath(client.death, 0); } catch (java.util.NoSuchElementException ignored) { }
+    }
+    /** Only the host's editor can discover endpoints. Legacy capture registration stays open. */
+    private void discoverEditor(Messenger reply, int request, Bundle query) {
+        if (reply == null) return;
+        String source = query.getString("packageName"), process = query.getString("processName");
+        IBinder endpoint = null;
+        int endpointUid = -1;
+        for (Client client : clients.values()) {
+            if (client.info.getInt("editor_version", 0) < 2
+                    || !java.util.Objects.equals(source, client.info.getString("packageName"))) continue;
+            if (process != null && !process.isEmpty() && !java.util.Objects.equals(process, client.info.getString("processName"))) continue;
+            try {
+                if (getPackageManager().getApplicationInfo(source, 0).uid != client.uid) continue;
+                IBinder candidate = client.info.getBinder("editor_endpoint");
+                if (candidate != null && candidate.isBinderAlive()) { endpoint = candidate; endpointUid = client.uid; break; }
+            } catch (Exception ignored) { }
+        }
+        Bundle data = new Bundle();
+        data.putInt("requestType", com.fourtwo.hookintent.replay.ExtrasRuntime.DISCOVER);
+        data.putInt("requestId", request); data.putInt("resultCode", endpoint == null ? 0 : 1);
+        if (endpoint != null) { data.putBinder("editor_endpoint", endpoint); data.putInt("endpoint_uid", endpointUid); }
+        Message response = Message.obtain(null, MSG_REPLY); response.setData(data);
+        try { reply.send(response); } catch (RemoteException ignored) { }
     }
     public List<Bundle> getConnectedClients() {
         List<Bundle> result = new ArrayList<>();

@@ -107,6 +107,13 @@ public final class ShortcutHelper {
     public static boolean createShortcut(Context context, String shortcutName, Object shortcutIcon,
             String targetIntent, ArrayList<String> replaceParams, Boolean isChecked, String selectedItem,
             Intent completeTarget, ShortcutCallback callback) {
+        return createShortcut(context, shortcutName, shortcutIcon, targetIntent, replaceParams, isChecked,
+                selectedItem, completeTarget, null, callback);
+    }
+
+    public static boolean createShortcut(Context context, String shortcutName, Object shortcutIcon,
+            String targetIntent, ArrayList<String> replaceParams, Boolean isChecked, String selectedItem,
+            Intent completeTarget, android.os.Bundle origin, ShortcutCallback callback) {
         final ShortcutCallback cb = callback == null ? new ShortcutCallback() {
         } : callback;
 
@@ -143,7 +150,7 @@ public final class ShortcutHelper {
         try {
             ShortcutParameterReplacer.validate(targetIntent, replaceParams == null ? null : replaceParams.toArray(new String[0]));
             shortcutIntent.putExtra("target_payload_id", ShortcutPayloadStore.save(appContext, targetIntent,
-                    replaceParams == null ? null : replaceParams.toArray(new String[0]), completeTarget));
+                    replaceParams == null ? null : replaceParams.toArray(new String[0]), completeTarget, origin));
         } catch (Exception error) {
             cb.onError(error);
             return false;

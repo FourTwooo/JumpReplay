@@ -332,6 +332,20 @@ public class DetailFragment extends Fragment {
         List<Runnable> actions = new ArrayList<>();
 
         if (Category.equals("Intent")) {
+            options.add("编辑参数并重放");
+            actions.add(() -> com.fourtwo.hookintent.replay.ExtrasEditorDialog.show(requireActivity(), bundle, edited -> {
+                try {
+                    ItemData draft = new ItemData(itemData.getIcon(), itemData.getAppName(), itemData.getItem_from(),
+                            itemData.getItem_data(), itemData.getTimestamp(), itemData.getDataSize(), edited,
+                            itemData.getCategory(), itemData.getStackTrace(), edited.getString("uri", itemData.getUri()));
+                    String draftToken = DetailPayloadStore.save(requireContext(), draft);
+                    Intent editor = new Intent(requireContext(), IntentIntercept.class);
+                    editor.putExtra(DetailPayloadStore.EXTRA_TOKEN, draftToken);
+                    startActivity(editor);
+                } catch (Exception error) {
+                    throw new IllegalStateException("无法打开重放：" + error.getMessage(), error);
+                }
+            }));
             AmCommandBuilder.CommandResult command = AmCommandBuilder.buildIntentCommand(bundle);
             boolean hasError = command.hasError;
             String activityCommand = command.command;
@@ -451,12 +465,17 @@ public class DetailFragment extends Fragment {
             if (!Objects.equals(optionName, "am命令")) {
                 try {
                     String text = commandTextView.getText().toString();
-                    Intent newIntent = "intentUri".equals(optionName) && Objects.equals(text, originalText)
-                            ? IntentPayloadCodec.decode(itemData.getAppBundle())
-                            : Intent.parseUri(text, Intent.URI_INTENT_SCHEME);
-
-                    String SelectedItem = dropdownSpinner.getSelectedItem().toString();
-                    PermissionManager.startActivity(requireContext(), newIntent, enableFeatureCheckbox.isChecked(), SelectedItem);
+                    String mode = dropdownSpinner.getSelectedItem().toString();
+                    boolean privileged = enableFeatureCheckbox.isChecked();
+                    suCodeButton.setEnabled(false);
+                    com.fourtwo.hookintent.replay.ReplayTasks.fromText(requireContext(), itemData.getAppBundle(), text,
+                            "intentUri".equals(optionName) ? IntentPayloadCodec.decode(itemData.getAppBundle()) : null,
+                            originalText, (target, error) -> {
+                                if (!isAdded() || !suCodeButton.isAttachedToWindow()) return;
+                                suCodeButton.setEnabled(true);
+                                if (error != null) Toast.makeText(requireContext(), "启动失败：" + error.getMessage(), Toast.LENGTH_LONG).show();
+                                else PermissionManager.startActivity(requireContext(), target, privileged, mode);
+                            });
                 } catch (Exception e) {
                     Toast.makeText(requireContext(), "启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }

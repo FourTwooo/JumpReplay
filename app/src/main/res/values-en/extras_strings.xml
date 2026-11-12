@@ -1,0 +1,18 @@
+<resources>
+    <string name="extras_editor_title">Edit Intent parameters</string>
+    <string name="extras_editor_hint">Tap a value to edit or an object to expand its fields. Long press to set a reference to null. Save applies your changes.</string>
+    <string name="extras_root">Parameters</string>
+    <string name="extras_back">Back</string>
+    <string name="extras_cancel">Cancel</string>
+    <string name="extras_save">Save</string>
+    <string name="extras_apply">Apply</string>
+    <string name="extras_set_null">Set to null</string>
+    <string name="extras_null_confirmation">Set this value to null? This differs from an empty string.</string>
+    <string name="extras_retry">Retry loading</string>
+    <string name="extras_loading">Reading parameters…</string>
+    <string name="extras_empty">There are no fields to expand here.</string>
+    <string name="extras_read_only">This value cannot be edited directly.</string>
+    <string name="extras_missing_snapshot">The complete Intent was not received. Changes have not been saved.</string>
+    <string name="extras_reference">Reference %1$s</string>
+    <string name="extras_value_type">Value type</string>
+</resources>

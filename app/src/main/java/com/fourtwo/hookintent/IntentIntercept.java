@@ -78,6 +78,11 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     private ActivityIntentInterceptBinding binding; // 主布局绑定
     private ContentInterceptMainBinding contentBinding; // 子布局绑定
     private Intent originalTarget;
+    private Bundle replayOrigin = new Bundle();
+    private String editorDraftToken;
+    private int previewGeneration;
+    private Runnable previewTask;
+    private com.fourtwo.hookintent.replay.ExtrasClient previewClient;
     private final ExecutorService iconExecutor = Executors.newSingleThreadExecutor();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private Future<?> iconTask;
@@ -125,6 +130,8 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
             SharedPreferencesUtils.putBoolean(this, "interceptIsRoot", isChecked1);
         });
 
+        if (savedInstanceState != null && savedInstanceState.getString("editor_draft_token") != null)
+            getIntent().putExtra(DetailPayloadStore.EXTRA_TOKEN, savedInstanceState.getString("editor_draft_token"));
         handleIncomingIntent(getIntent());
         binding.resetButton.setVisibility(View.GONE);
         contentBinding.urlTextView.addTextChangedListener(new TextWatcher() {
@@ -206,8 +213,10 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
             String detailText = incoming.getStringExtra("DetailData");
             String token = incoming.getStringExtra(DetailPayloadStore.EXTRA_TOKEN);
             if (token != null) {
+                editorDraftToken = token;
                 ItemData saved = DetailPayloadStore.load(this, token);
-                detail = IntentPayloadCodec.decode(saved.getAppBundle());
+                replayOrigin = new Bundle(saved.getAppBundle());
+                detail = IntentPayloadCodec.decode(this, replayOrigin);
                 detailText = "Scheme".equals(saved.getCategory())
                         ? saved.getAppBundle().getString("scheme_raw_url") : saved.getUri();
                 if (detailText == null || detailText.isEmpty()) detailText = extractUrlFromIntent(detail);
@@ -474,14 +483,17 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
                 dynamicParams.add(paramInput.getText().toString());
             }
 
-            Intent completeTarget;
             try {
                 ShortcutParameterReplacer.validate(intent, dynamicParams.toArray(new String[0]));
-                completeTarget = IntentReplay.fromText(intent, originalTarget, originalUrlText);
             } catch (Exception error) {
                 intentString.setError(error.getMessage());
                 return;
             }
+            submitButton.setEnabled(false);
+            com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin, intent, originalTarget, originalUrlText, (completeTarget, failure) -> {
+            if (!isUiAlive() || !dialog.isShowing()) return;
+            submitButton.setEnabled(true);
+            if (failure != null) { intentString.setError(failure.getMessage()); return; }
             Bitmap shortcutIcon = getBitmapFromImageView(iconPreview);
 
             ShortcutHelper.createShortcut(
@@ -495,6 +507,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
                             ? ""
                             : dropdownSpinner.getSelectedItem().toString(),
                     completeTarget,
+                    replayOrigin,
                     new ShortcutHelper.ShortcutCallback() {
                         @Override
                         public void onNotSupported() {
@@ -548,6 +561,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
                         }
                     }
             );
+            });
         });
 
         // 取消按钮
@@ -559,7 +573,39 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem menuItem) {
         int itemId = menuItem.getItemId();
-        if (itemId == R.id.disabled) {
+        if (itemId == R.id.edit_extras) {
+            com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin,
+                    contentBinding.urlTextView.getText().toString(), originalTarget, originalUrlText, (current, failure) -> {
+            if (!isUiAlive()) return;
+            if (failure != null) { Toast.makeText(this, "无法读取参数：" + failure.getMessage(), Toast.LENGTH_LONG).show(); return; }
+            try {
+                Bundle record = new Bundle(replayOrigin);
+                record.putString(IntentPayloadCodec.KEY, IntentPayloadCodec.encode(current));
+                if (current.getComponent() != null && !record.containsKey("componentPackageName"))
+                    record.putString("componentPackageName", current.getComponent().getPackageName());
+                com.fourtwo.hookintent.replay.ExtrasEditorDialog.show(this, record, edited -> {
+                    try {
+                        Intent changed = IntentPayloadCodec.decode(this, edited);
+                        ItemData draft = new ItemData(null, "", edited.getString("component", ""), "", "", "", edited,
+                                "Intent", edited.getString("stack_trace", ""), edited.getString("uri", ""));
+                        String savedToken = DetailPayloadStore.save(this, draft);
+                        editorDraftToken = savedToken;
+                        getIntent().putExtra(DetailPayloadStore.EXTRA_TOKEN, savedToken);
+                        replayOrigin = new Bundle(edited);
+                        originalTarget = changed;
+                        originalUrlText = edited.getString("uri", originalUrlText);
+                        contentBinding.urlTextView.setText(originalUrlText);
+                        loadMatchingApps(changed);
+                    } catch (Exception error) {
+                        throw new IllegalStateException("无法应用参数：" + error.getMessage(), error);
+                    }
+                });
+            } catch (Exception error) {
+                Toast.makeText(this, "无法读取参数：" + error.getMessage(), Toast.LENGTH_LONG).show();
+            }
+            });
+            return true;
+        } else if (itemId == R.id.disabled) {
             Intent intent = new Intent(this, DisabledActivity.class);
             intent.putExtra("com.fourtwo.hookintent", "com.fourtwo.hookintent.DisabledActivity");
             startActivity(intent);
@@ -579,12 +625,15 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         // 显示或隐藏重置按钮
         binding.resetButton.setVisibility(updatedText.equals(originalUrlText) ? View.GONE : View.VISIBLE);
 
-        // 根据新的 URL 动态加载应用列表
-        try {
-            loadMatchingApps(IntentReplay.fromText(updatedText, originalTarget, originalUrlText));
-        } catch (URISyntaxException | IllegalArgumentException ignored) {
-            loadMatchingApps(new Intent(Intent.ACTION_VIEW));
-        }
+        int generation = ++previewGeneration;
+        if (previewTask != null) uiHandler.removeCallbacks(previewTask);
+        if (previewClient != null) { previewClient.close(); previewClient = null; }
+        previewTask = () -> previewClient = com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin,
+                updatedText, originalTarget, originalUrlText, (target, error) -> {
+                    if (!isUiAlive() || generation != previewGeneration) return;
+                    loadMatchingApps(error == null ? target : new Intent(Intent.ACTION_VIEW));
+                });
+        uiHandler.postDelayed(previewTask, 300);
     }
 
 
@@ -592,12 +641,16 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
      * 处理发送按钮的点击事件
      */
     private void handleReloadIntentClick() {
-        try {
-            Intent newIntent = IntentReplay.fromText(Objects.requireNonNull(contentBinding.urlTextView.getText()).toString(), originalTarget, originalUrlText);
-            PermissionManager.startActivity(this, newIntent, contentBinding.enableFeatureCheckbox.isChecked(), contentBinding.dropdownSpinner.getSelectedItem().toString());
-        } catch (Exception error) {
-            Toast.makeText(this, "Intent 无法重放：" + error.getMessage(), Toast.LENGTH_LONG).show();
-        }
+        boolean privileged = contentBinding.enableFeatureCheckbox.isChecked();
+        String mode = contentBinding.dropdownSpinner.getSelectedItem().toString();
+        binding.btnReloadIntent.setEnabled(false);
+        com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin,
+                contentBinding.urlTextView.getText().toString(), originalTarget, originalUrlText, (target, error) -> {
+                    if (!isUiAlive()) return;
+                    binding.btnReloadIntent.setEnabled(true);
+                    if (error != null) Toast.makeText(this, "Intent 无法重放：" + error.getMessage(), Toast.LENGTH_LONG).show();
+                    else PermissionManager.startActivity(this, target, privileged, mode);
+                });
     }
 
     /**
@@ -614,9 +667,6 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
      * 从 Intent 中提取 URL 并解码
      */
     private String extractUrlFromIntent(Intent intent) {
-        if (intent.getStringExtra("DetailData") != null){
-            return intent.getStringExtra("DetailData");
-        }
         String urlText = intent.getDataString();
         if (urlText == null) {
             urlText = intent.toUri(Intent.URI_INTENT_SCHEME);
@@ -678,7 +728,14 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     }
 
     @Override
+    protected void onSaveInstanceState(@NonNull Bundle state) {
+        super.onSaveInstanceState(state);
+        if (editorDraftToken != null) state.putString("editor_draft_token", editorDraftToken);
+    }
+
+    @Override
     protected void onDestroy() {
+        if (previewClient != null) previewClient.close();
         if (iconTask != null) iconTask.cancel(true);
         iconExecutor.shutdownNow();
         uiHandler.removeCallbacksAndMessages(null);

@@ -1,0 +1,16 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.fourtwo.hookintent.fixture'
+    compileSdk 33
+    defaultConfig {
+        applicationId 'com.fourtwo.hookintent.fixture'
+        minSdk 24
+        targetSdk 28
+        versionCode 1
+        versionName '1.0'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}

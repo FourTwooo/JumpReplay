@@ -1,0 +1,18 @@
+<resources>
+    <string name="extras_editor_title">Intent パラメータを編集</string>
+    <string name="extras_editor_hint">値をタップして編集し、オブジェクトをタップして展開します。長押しで参照型を null に変更できます。保存すると変更が適用されます。</string>
+    <string name="extras_root">パラメータ</string>
+    <string name="extras_back">上へ戻る</string>
+    <string name="extras_cancel">キャンセル</string>
+    <string name="extras_save">保存</string>
+    <string name="extras_apply">適用</string>
+    <string name="extras_set_null">null にする</string>
+    <string name="extras_null_confirmation">この値を null にしますか？空文字列とは異なります。</string>
+    <string name="extras_retry">読み込みを再試行</string>
+    <string name="extras_loading">パラメータを読み込み中…</string>
+    <string name="extras_empty">展開できるフィールドはありません。</string>
+    <string name="extras_read_only">この値は直接編集できません。</string>
+    <string name="extras_missing_snapshot">完全な Intent を受信できませんでした。変更は保存されていません。</string>
+    <string name="extras_reference">参照 %1$s</string>
+    <string name="extras_value_type">値の型</string>
+</resources>

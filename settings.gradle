@@ -18,3 +18,5 @@ rootProject.name = "HookIntent"
 include ':app'
 include ':hiddenapi'
 include ':blocker_template'
+// Standalone compatibility fixture; never packaged into the module APK.
+include ':replay_fixture'

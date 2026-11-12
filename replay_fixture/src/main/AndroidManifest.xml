@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="JumpReplay compatibility fixture" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false">
+        <service android:name=".FixtureService" android:exported="true" />
+        <activity android:name=".ReceiverActivity" android:exported="true" />
+    </application>
+</manifest>
