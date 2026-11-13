@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Collections;
 
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -17,18 +18,24 @@ public class RecordXposedBridge {
     public static Boolean isHostApp = false;
 
     public static Set<XC_MethodHook.Unhook> hookAllMethods(String category, Class<?> hookClass, String methodName, XC_MethodHook callback) {
+        if (!recordHook(category, hookClass.getName(), methodName) || isHostApp)
+            return Collections.emptySet();
+        return XposedBridge.hookAllMethods(hookClass, methodName, callback);
+    }
+
+    /** Records a logical switch without installing redundant wrapper hooks. */
+    public static boolean recordHook(String category, String className, String methodName) {
+        return recordHook(category, className, methodName, true);
+    }
+
+    public static boolean recordHook(String category, String className, String methodName, boolean defaultOpen) {
         // 获取类名和包名
-        String className = hookClass.getName();
         String packageName = "ALL";
 //        String packageName = Objects.requireNonNull(hookClass.getPackage()).getName();
 
         // 根据这四个字段查询 open 的值
-        boolean open = getOpenStatus(className, packageName, methodName, category);
-
-        // 如果是 HostApp，使用空的 callback
-        if (isHostApp || !open) {
-            callback = new XC_MethodHook() {};
-        }
+        boolean open = containsRecord(className, packageName, methodName, category)
+                ? getOpenStatus(className, packageName, methodName, category) : defaultOpen;
 
         // 构造记录 Map
         Map<String, Object> record = new HashMap<>();
@@ -43,8 +50,7 @@ public class RecordXposedBridge {
             hookedRecords.add(record); // 添加到记录列表
         }
 
-        // 调用 XposedBridge 的 hookAllMethods 方法
-        return XposedBridge.hookAllMethods(hookClass, methodName, callback);
+        return open;
     }
 
     /**
@@ -67,7 +73,7 @@ public class RecordXposedBridge {
      * 根据 className, packageName, methodName, category 查询 open 的状态
      * 如果不存在对应记录，则默认返回 true
      */
-    private static boolean getOpenStatus(String className, String packageName, String methodName, String category) {
+    public static boolean getOpenStatus(String className, String packageName, String methodName, String category) {
         for (Map<String, Object> record : hookedRecords) {
             if (className.equals(record.get("className")) &&
                     packageName.equals(record.get("packageName")) &&

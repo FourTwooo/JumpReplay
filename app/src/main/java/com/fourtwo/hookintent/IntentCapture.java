@@ -33,6 +33,7 @@ import com.fourtwo.hookintent.xposed.RecordXposedBridge;
 import com.fourtwo.hookintent.xposed.DurableCaptureOutbox;
 import com.fourtwo.hookintent.xposed.IntentJournal;
 import com.fourtwo.hookintent.xposed.HookConfigCache;
+import com.fourtwo.hookintent.xposed.ActivityCaptureHooks;
 import android.os.Handler;
 import android.os.Looper;
 import com.fourtwo.hookintent.xposed.ui.FloatWindow;
@@ -828,64 +829,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
             RecordXposedBridge.setHookedRecords(JsonHandler.deserializeHookedRecords(internalHooksConfig));
         }
 
-        Class<?> activityClass = XposedHelpers.findClass("android.app.Activity", classLoader);
-        RecordXposedBridge.hookAllMethods("Intent", activityClass, "startActivity", new XC_MethodHook() {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                if (!(methodHookParam.thisObject instanceof Context)) return;
-                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
-                    Intent intent = (Intent) methodHookParam.args[0];
-                    filterIntent(intent, "Activity.startActivity", methodHookParam.thisObject.getClass().getName());
-                }
-            }
-        });
-
-        RecordXposedBridge.hookAllMethods("Intent", activityClass, "startActivityForResult", new XC_MethodHook() {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                if (!(methodHookParam.thisObject instanceof Context)) return;
-                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
-                    Intent intent = (Intent) methodHookParam.args[0];
-                    filterIntent(intent, "Activity.startActivityForResult", methodHookParam.thisObject.getClass().getName());
-                }
-            }
-        });
-
-
-        RecordXposedBridge.hookAllMethods("Intent", activityClass, "onResume", new XC_MethodHook() {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                Intent intent = (Intent) XposedHelpers.callMethod(methodHookParam.thisObject, "getIntent");
-                filterIntent(intent, "Activity.onResume", methodHookParam.thisObject.getClass().getName());
-            }
-        });
-
-
-        RecordXposedBridge.hookAllMethods("Intent", XposedHelpers.findClass("android.content.ContextWrapper", classLoader), "startActivity", new XC_MethodHook() {
-            @Override
-            protected void beforeHookedMethod(MethodHookParam methodHookParam) throws Throwable {
-                super.beforeHookedMethod(methodHookParam);
-                if (!getIsHook()) return;
-                if (methodHookParam.args.length > 0 && methodHookParam.args[0] instanceof Intent) {
-                    Intent intent = (Intent) methodHookParam.args[0];
-                    filterIntent(intent, "ContextWrapper.startActivity", null);
-                }
-            }
-        });
-
-        RecordXposedBridge.hookAllMethods("Intent", activityClass, "onNewIntent", new XC_MethodHook() {
-            @Override protected void beforeHookedMethod(MethodHookParam param) {
-                if (!getIsHook()) return;
-                Intent incoming = findIntentArg(param.args);
-                if (incoming != null) filterIntent(incoming, "Activity.onNewIntent", param.thisObject.getClass().getName());
-            }
-        });
+        new ActivityCaptureHooks(this::getIsHook, this::filterIntent).install(classLoader);
 
         RecordXposedBridge.hookAllMethods("Scheme", XposedHelpers.findClass("android.net.Uri", classLoader), "parse", new XC_MethodHook() {
             @Override

@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            versionNameSuffix "-extras.3"
+            versionNameSuffix "-capture.1"
         }
         release {
             minifyEnabled false
@@ -84,6 +84,7 @@ dependencies {
     implementation 'androidx.preference:preference:1.2.0'
     implementation 'com.caverock:androidsvg:1.4'
     testImplementation 'junit:junit:4.13.2'
+    testImplementation files('libs/XposedBridgeAPI-89.jar')
     testImplementation 'org.robolectric:robolectric:4.10.3'
     androidTestImplementation 'androidx.test:runner:1.5.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
