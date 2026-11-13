@@ -9,8 +9,8 @@ android {
     defaultConfig {
         applicationId "com.fourtwo.hookintent"
         minSdk 24
-        versionCode
-        versionName "1.6.5"
+        versionCode 10700
+        versionName "1.7.0"
 
         multiDexEnabled true
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            versionNameSuffix "-schemefix.1"
+            versionNameSuffix "-dev"
         }
         release {
             minifyEnabled false
