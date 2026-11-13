@@ -295,6 +295,10 @@ public class SettingsFragment extends Fragment {
         filteredData.clear();
         if (ALL_STRING.equals(category)) {
             filteredData.addAll(dataList);
+            filteredData.sort(java.util.Comparator.comparingInt(item -> {
+                String type = String.valueOf(item.get("category"));
+                return "Intent".equals(type) ? 0 : "Scheme".equals(type) ? 1 : 2;
+            }));
         } else {
             for (Map<String, Object> item : dataList) {
                 String itemCategory = (String) item.get("category");
@@ -380,10 +384,6 @@ public class SettingsFragment extends Fragment {
 
         loadFromPreferences(Constants.INTERNAL_HOOKS_CONFIG, true, list);
         loadFromPreferences(Constants.EXTERNAL_HOOKS_CONFIG, false, list);
-        list.sort(java.util.Comparator.comparingInt(item -> {
-            String category = String.valueOf(item.get("category"));
-            return "Intent".equals(category) ? 0 : "Scheme".equals(category) ? 1 : 2;
-        }));
         return list;
     }
 
