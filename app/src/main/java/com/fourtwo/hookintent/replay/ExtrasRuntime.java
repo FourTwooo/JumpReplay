@@ -225,9 +225,37 @@ public final class ExtrasRuntime {
         return "<" + type.getName() + ">";
     }
     public static JSONObject readJson(InputStream stream) throws Exception {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(); byte[] buffer = new byte[8192]; int count;
-        while ((count = stream.read(buffer)) != -1) bytes.write(buffer, 0, count);
-        return new JSONObject(new String(bytes.toByteArray(), StandardCharsets.UTF_8));
+        // Android 13 lazy Bundles can retain a duplicate pipe writer until GC. A complete
+        // JSON object is the message boundary; waiting for EOF can deadlock an otherwise
+        // complete reply. The on-wire JSON remains compatible with existing endpoints.
+        android.util.JsonReader reader = new android.util.JsonReader(new java.io.InputStreamReader(stream, StandardCharsets.UTF_8));
+        Object value = readValue(reader, 0);
+        if (!(value instanceof JSONObject)) throw new IllegalArgumentException("参数通信响应必须是 JSON 对象");
+        return (JSONObject)value;
+    }
+    private static Object readValue(android.util.JsonReader reader, int depth) throws Exception {
+        if (depth > 64) throw new IllegalArgumentException("参数通信数据嵌套过深");
+        switch (reader.peek()) {
+            case BEGIN_OBJECT:
+                JSONObject object = new JSONObject(); reader.beginObject();
+                while (reader.hasNext()) object.put(reader.nextName(), readValue(reader, depth + 1));
+                reader.endObject(); return object;
+            case BEGIN_ARRAY:
+                JSONArray array = new JSONArray(); reader.beginArray();
+                while (reader.hasNext()) array.put(readValue(reader, depth + 1));
+                reader.endArray(); return array;
+            case STRING: return reader.nextString();
+            case NUMBER:
+                String number = reader.nextString();
+                try {
+                    long integer=Long.parseLong(number);
+                    if(integer >= Integer.MIN_VALUE && integer <= Integer.MAX_VALUE) return Integer.valueOf((int)integer);
+                    return Long.valueOf(integer);
+                } catch (NumberFormatException ignored) { return Double.valueOf(number); }
+            case BOOLEAN: return reader.nextBoolean();
+            case NULL: reader.nextNull(); return JSONObject.NULL;
+            default: throw new IllegalArgumentException("参数通信 JSON 无效");
+        }
     }
     public static void writeJson(OutputStream stream, JSONObject json) throws Exception {
         stream.write(json.toString().getBytes(StandardCharsets.UTF_8)); stream.flush();
