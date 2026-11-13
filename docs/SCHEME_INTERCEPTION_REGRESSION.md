@@ -1,5 +1,7 @@
 # Scheme 系统拦截回归修复：Android 10 实机验证
 
+后续已补充 Android 11 / 12 / 13 原生模拟器同包、两轮冷启动验证，见 [Android 11+ 验证报告](SCHEME_ANDROID11PLUS_VERIFICATION.md)。下文保留 Android 10 修复当时的验证范围与记录。
+
 验证版本：`1.6.5-schemefix.1`。设备为已连接的 OnePlus 6，Android 10 / API 29；LSPosed 已勾选系统框架。本次安装后通过 ADB 重启手机，在真正的 system_server 中验证，没有用显式指定 JumpReplay Activity 的方式代替拦截。
 
 ## 实机根因
