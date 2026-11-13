@@ -47,4 +47,23 @@ public class ReplayIdentityTest {
         try { ReplayClassLoaders.prepare(install(),record); fail("changed version accepted"); }
         catch(IllegalStateException expected) { assertTrue(expected.getMessage().contains("更新")); }
     }
+    @Test public void laterWebViewPackageDoesNotInvalidateLegacyActualSource() throws Exception {
+        Context context=install();
+        Bundle record=record(); record.putInt("source_uid",10356);
+        record.putString("packageName","com.google.android.webview");
+        record.putString("processName","example.source:renderer");
+        Bundle normalized=ReplayClassLoaders.normalize(context,record);
+        assertEquals("example.source",normalized.getString("packageName"));
+        assertEquals("com.google.android.webview",record.getString("packageName"));
+        assertEquals("example.source",ReplayClassLoaders.prepare(context,record).getString("packageName"));
+    }
+    @Test public void legacyRepairRequiresMatchingVersionAndProcess() throws Exception {
+        Context context=install();
+        Bundle record=record(); record.putInt("source_uid",10356);
+        record.putString("packageName","com.google.android.webview");
+        record.putString("processName","another.application");
+        assertEquals("com.google.android.webview",ReplayClassLoaders.normalize(context,record).getString("packageName"));
+        record.putString("processName","example.source"); record.putLong("source_last_update",1L);
+        assertEquals("com.google.android.webview",ReplayClassLoaders.normalize(context,record).getString("packageName"));
+    }
 }

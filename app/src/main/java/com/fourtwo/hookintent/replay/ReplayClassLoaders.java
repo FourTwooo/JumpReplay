@@ -10,12 +10,35 @@ import java.util.List;
 public final class ReplayClassLoaders {
     private ReplayClassLoaders() { }
 
+    /** Repair legacy records whose package was overwritten by a later WebView load.
+     * Require installed UID, process naming and exact update time to agree; never guess. */
+    public static Bundle normalize(Context context, Bundle capture) throws Exception {
+        Bundle result = new Bundle(capture);
+        if (capture.containsKey("source_app_uid")) return result;
+        int uid = capture.getInt("source_uid", -1);
+        long updated = capture.getLong("source_last_update", 0);
+        String process = capture.getString("processName", "");
+        if (uid < 0 || updated == 0 || process.isEmpty()) return result;
+        String[] packages = context.getPackageManager().getPackagesForUid(uid);
+        String match = null;
+        if (packages != null) for (String name : packages) {
+            if (!process.equals(name) && !process.startsWith(name + ":")) continue;
+            PackageInfo info = context.getPackageManager().getPackageInfo(name, 0);
+            if (info.lastUpdateTime != updated) continue;
+            if (match != null) return result;
+            match = name;
+        }
+        if (match != null) result.putString("packageName", match);
+        return result;
+    }
+
     public static ClassLoader forRecord(Context context, Bundle record) throws Exception {
         return resolve(context, record, null);
     }
 
     /** The host resolves trusted installed-package paths; foreign bytecode runs in the sandbox only. */
     public static Bundle prepare(Context context, Bundle capture) throws Exception {
+        capture = normalize(context, capture);
         validate(context, capture);
         Bundle result = new Bundle(capture);
         java.util.LinkedHashSet<String> dex = new java.util.LinkedHashSet<>();

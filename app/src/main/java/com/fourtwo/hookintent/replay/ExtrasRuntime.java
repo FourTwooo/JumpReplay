@@ -31,6 +31,8 @@ public final class ExtrasRuntime {
     private final Context context;
     private final ClassLoader runtimeLoader;
     private final boolean sandbox;
+    private int ownerUid = -1;
+    public void setOwnerUid(int uid) { ownerUid = uid; }
     private final java.util.concurrent.CopyOnWriteArrayList<ClassLoader> capturedLoaders = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Map<String, Entry> sessions = new java.util.concurrent.ConcurrentHashMap<>();
@@ -101,7 +103,7 @@ public final class ExtrasRuntime {
     private boolean receive(Message message) {
         if (message.what != REQUEST) return true;
         boolean authorized = false;
-        try { authorized = message.sendingUid == (sandbox ? context.getApplicationInfo().uid
+        try { authorized = message.sendingUid == (sandbox ? ownerUid
                 : context.getPackageManager().getApplicationInfo(HOST, 0).uid); }
         catch (Exception ignored) { }
         // Authenticate before touching a foreign Bundle: even unpacking it can execute Parcelable code.

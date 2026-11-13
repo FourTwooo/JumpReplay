@@ -190,6 +190,7 @@ public final class ExtrasEditorDialog {
             String parcel = result.getString("parcel");
             if (parcel == null || parcel.isEmpty()) throw new IllegalStateException(context.getString(R.string.extras_missing_snapshot));
             Bundle changes = new Bundle();
+            if (result.getString("sourcePackage") != null) changes.putString("packageName", result.getString("sourcePackage"));
             changes.putString(IntentPayloadCodec.KEY, parcel);
             if (result.containsKey("uri")) changes.putString("uri", result.getString("uri"));
             String display = result.getString("intentExtras");

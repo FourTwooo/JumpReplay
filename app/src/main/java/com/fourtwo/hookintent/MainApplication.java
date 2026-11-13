@@ -13,6 +13,7 @@ import com.fourtwo.hookintent.utils.ShizukuProcessBridge;
 import org.lsposed.hiddenapibypass.HiddenApiBypass;
 
 public class MainApplication extends Application {
+    private static boolean isolated() { return android.os.Process.myUid() % 100000 >= 90000; }
 
     static {
         Shell.enableVerboseLogging = BuildConfig.DEBUG;
@@ -23,13 +24,13 @@ public class MainApplication extends Application {
     @Override
     protected void attachBaseContext(Context base) {
         super.attachBaseContext(base);
-        if (android.os.Process.myUid() == base.getApplicationInfo().uid) ShizukuProcessBridge.prepare(base);
+        if (!isolated()) ShizukuProcessBridge.prepare(base);
     }
     @Override
     public void onCreate() {
         super.onCreate();
         // The offline object codec runs with an isolated UID and receives no privileged bridges.
-        if (android.os.Process.myUid() != getApplicationInfo().uid) return;
+        if (isolated()) return;
 
         // 开启系统隐藏API
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -45,7 +46,7 @@ public class MainApplication extends Application {
     @Override
     public void onTerminate() {
         super.onTerminate();
-        if (android.os.Process.myUid() == getApplicationInfo().uid) PermissionManager.unload(this);
+        if (!isolated()) PermissionManager.unload(this);
     }
 
 }

@@ -83,6 +83,7 @@ public final class ExtrasClient {
             if (opening != null || session != null) { callback.complete(null, new IllegalStateException("参数编辑器已经连接")); return; }
             opening = callback;
             try {
+                record.putAll(ReplayClassLoaders.normalize(context, record));
                 Intent intent = new Intent().setClassName(ExtrasRuntime.HOST, MessengerService.class.getName());
                 bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
                 if (!bound) offlineOpen();
@@ -99,7 +100,8 @@ public final class ExtrasClient {
     private void startOpen() {
         if (remote == null) {
             try {
-                sandboxBound = context.bindService(new Intent(context, ExtrasSandboxService.class), sandboxConnection, Context.BIND_AUTO_CREATE);
+                sandboxBound = context.bindService(new Intent(context, ExtrasSandboxService.class)
+                        .putExtra("host_uid", android.os.Process.myUid()), sandboxConnection, Context.BIND_AUTO_CREATE);
                 if (!sandboxBound) failOpening(new IllegalStateException("无法启动隔离参数编辑进程"));
                 else main.postDelayed(() -> { if (!closed && opening != null) failOpening(new TimeoutException("隔离编辑进程启动超时")); }, 10000);
             } catch (Exception error) { failOpening(error); }
@@ -166,6 +168,7 @@ public final class ExtrasClient {
                         if (value instanceof String) result.putString(key, (String)value);
                     }
                     result.putString("environment", sandbox ? "installed_apk" : "app_process");
+                    if (record.getString("packageName") != null) result.putString("sourcePackage", record.getString("packageName"));
                 } catch (Throwable error) {
                     if (error instanceof VirtualMachineError) throw (VirtualMachineError)error;
                     if (error instanceof ThreadDeath) throw (ThreadDeath)error;

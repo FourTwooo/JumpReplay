@@ -769,7 +769,9 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam loadPackageParam) {
-        packageName = loadPackageParam.packageName;
+        // Loading WebView/another package in this process must not overwrite the
+        // identity captured when the application's hooks and transport were installed.
+        if (applicationContext == null) packageName = loadPackageParam.packageName;
         if (loadPackageParam.packageName.equals(myAppPackage)) {
             XposedHelpers.findAndHookMethod("com.fourtwo.hookintent.MainActivity", loadPackageParam.classLoader, "isXposed", XC_MethodReplacement.returnConstant(true));
             isHostApp = true;
