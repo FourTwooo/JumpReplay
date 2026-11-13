@@ -5,7 +5,6 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
 public class MainViewModel extends ViewModel {
-    private final MutableLiveData<Boolean> isHook = new MutableLiveData<>(false);
-    public LiveData<Boolean> getIsHook() { return isHook; }
-    public void setIsHook(boolean hook) { isHook.setValue(hook); }
+    public LiveData<Boolean> getIsHook() { return com.fourtwo.hookintent.manager.HookStatusManager.state(); }
+    public void setIsHook(boolean hook) { com.fourtwo.hookintent.manager.HookStatusManager.setHook(hook); }
 }

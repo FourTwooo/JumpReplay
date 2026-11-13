@@ -9,6 +9,9 @@
 
     <!--用于进程通信-->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--查询所有应用程序-->
     <uses-permission
@@ -34,6 +37,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.HookIntent"
         tools:targetApi="31">
+
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -70,6 +74,19 @@
             tools:ignore="ExportedContentProvider" />
 
         <service
+            android:name=".service.CaptureSessionService"
+            android:exported="false" />
+        <service
+            android:name=".service.CaptureTileService"
+            android:label="@string/capture_tile"
+            android:icon="@drawable/capture"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+        <service
             android:name=".service.MessengerService"
             android:enabled="true"
             android:exported="true"
@@ -99,6 +116,10 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
         </activity>

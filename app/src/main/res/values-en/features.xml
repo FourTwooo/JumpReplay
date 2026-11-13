@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_tile">JumpReplay capture</string>
+    <string name="capture_tile_add">Add capture Quick Settings tile</string>
+    <string name="capture_tile_added">Capture tile added</string>
+    <string name="capture_tile_manual">Open Quick Settings, tap Edit, and drag JumpReplay capture into the panel</string>
+    <string name="capture_running">Capturing</string>
+    <string name="capture_stopped">Capture stopped</string>
+    <string name="capture_channel">Capture session</string>
+    <string name="capture_monitor">Capture monitor</string>
+    <string name="capture_monitor_explain">Show the number of newly saved records and the latest source while using other apps. The monitor hides when you return to JumpReplay. Overlay permission is required.</string>
+    <string name="capture_monitor_hide">Hide monitor</string>
+    <string name="capture_monitor_show">Show monitor</string>
+    <string name="capture_stop">Stop capture</string>
+    <string name="capture_pause">Pause</string>
+    <string name="capture_resume">Resume</string>
+    <string name="capture_view_latest">Latest record</string>
+    <string name="actions_title">Quick actions</string>
+    <string name="action_save">Save as quick action</string>
+    <string name="action_add">Add action</string>
+    <string name="action_edit">Edit action</string>
+    <string name="action_name">Action name</string>
+    <string name="action_content">Scheme / Intent URI</string>
+    <string name="action_empty_title">Keep your favourite launches handy</string>
+    <string name="action_empty_body">Enter a Scheme or Intent URI, or save an action from capture details. Use actions in home screen shortcuts and stacked cards.</string>
+    <string name="action_export">Export action backup</string>
+    <string name="action_import">Import actions / URI</string>
+    <string name="action_saved">Action saved</string>
+    <string name="action_widget">JumpReplay cards</string>
+    <string name="action_widget_description">Swipe vertically to switch actions; tap a card to launch</string>
+    <string name="action_widget_select">Choose home screen cards</string>
+    <string name="action_widget_empty">No cards yet. Tap to configure.</string>
+    <string name="action_widget_configure">Configure cards</string>
+    <string name="action_widget_hint">Swipe to switch · Tap to launch</string>
+    <string name="action_widget_add">Add stacked card widget</string>
+    <string name="action_choose_icon">Choose icon</string>
+    <string name="action_parameters_hint">Enter the original text to replace at launch, following the existing shortcut rules.</string>
+</resources>

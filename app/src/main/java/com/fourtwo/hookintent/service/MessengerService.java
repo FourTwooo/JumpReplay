@@ -32,6 +32,7 @@ public class MessengerService extends Service {
     // Retained for source compatibility; repository owns consumption, so no second in-memory backlog.
     private final ConcurrentLinkedQueue<Bundle> dataQueue = new ConcurrentLinkedQueue<>();
     public static final MutableLiveData<Boolean> liveDataTrigger = new MutableLiveData<>();
+    public static final MutableLiveData<Integer> connectionCount = new MutableLiveData<>(0);
     private final Map<IBinder, Client> clients = new LinkedHashMap<>();
     private CaptureFrameReceiver frames;
     private static final class Client {
@@ -78,7 +79,7 @@ public class MessengerService extends Service {
         }
     };
     private final Messenger messenger = new Messenger(handler);
-    @Override public void onCreate() { super.onCreate(); instance = this; frames = new CaptureFrameReceiver(getApplicationContext()); }
+    @Override public void onCreate() { super.onCreate(); HookStatusManager.initialize(this); instance = this; frames = new CaptureFrameReceiver(getApplicationContext()); }
     @Override public void onDestroy() {
         for (IBinder binder : new ArrayList<>(clients.keySet())) remove(binder);
         frames.close(); instance = null; super.onDestroy();
@@ -94,6 +95,7 @@ public class MessengerService extends Service {
         try {
             binder.linkToDeath(death, 0);
             clients.put(binder, new Client(messenger, new Bundle(info), death, uid));
+            connectionCount.setValue(clients.size());
             // A connection snapshot must not overwrite a process-local floating-window override.
             Bundle snapshot = new Bundle();
             snapshot.putBoolean("isHook", HookStatusManager.isHook());
@@ -104,6 +106,7 @@ public class MessengerService extends Service {
     }
     private void remove(IBinder binder) {
         Client client = clients.remove(binder);
+        connectionCount.setValue(clients.size());
         if (client != null) try { binder.unlinkToDeath(client.death, 0); } catch (java.util.NoSuchElementException ignored) { }
     }
     /** Only the host's editor can discover endpoints. Legacy capture registration stays open. */

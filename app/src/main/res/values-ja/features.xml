@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_tile">JumpReplay キャプチャ</string>
+    <string name="capture_tile_add">キャプチャタイルを追加</string>
+    <string name="capture_tile_added">キャプチャタイルを追加しました</string>
+    <string name="capture_tile_manual">クイック設定の編集から JumpReplay キャプチャを追加してください</string>
+    <string name="capture_running">キャプチャ中</string>
+    <string name="capture_stopped">キャプチャ停止中</string>
+    <string name="capture_channel">キャプチャセッション</string>
+    <string name="capture_monitor">キャプチャモニター</string>
+    <string name="capture_monitor_explain">他のアプリを使用中に、新しく保存された件数と最新の取得元を表示します。JumpReplay に戻ると非表示になります。オーバーレイ権限が必要です。</string>
+    <string name="capture_monitor_hide">モニターを閉じる</string>
+    <string name="capture_monitor_show">モニターを表示</string>
+    <string name="capture_stop">キャプチャを停止</string>
+    <string name="capture_pause">一時停止</string>
+    <string name="capture_resume">再開</string>
+    <string name="capture_view_latest">最新の記録</string>
+    <string name="actions_title">クイックアクション</string>
+    <string name="action_save">クイックアクションとして保存</string>
+    <string name="action_add">アクションを追加</string>
+    <string name="action_edit">アクションを編集</string>
+    <string name="action_name">アクション名</string>
+    <string name="action_content">スキーム / Intent URI</string>
+    <string name="action_empty_title">よく使う起動をまとめましょう</string>
+    <string name="action_empty_body">スキームや Intent URI を入力するか、取得した記録から保存できます。ホーム画面のショートカットやカードで利用できます。</string>
+    <string name="action_export">アクションをエクスポート</string>
+    <string name="action_import">アクション / URI をインポート</string>
+    <string name="action_saved">アクションを保存しました</string>
+    <string name="action_widget">JumpReplay カード</string>
+    <string name="action_widget_description">上下にスワイプして切り替え、タップして実行</string>
+    <string name="action_widget_select">ホーム画面のカードを選択</string>
+    <string name="action_widget_empty">カードがありません。タップして設定してください。</string>
+    <string name="action_widget_configure">カードを設定</string>
+    <string name="action_widget_hint">スワイプで切り替え · タップで実行</string>
+    <string name="action_widget_add">カードウィジェットを追加</string>
+    <string name="action_choose_icon">アイコンを選択</string>
+    <string name="action_parameters_hint">起動時に置き換える元の文字列を入力してください。既存のショートカットと同じ置換規則です。</string>
+</resources>

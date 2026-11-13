@@ -97,6 +97,18 @@ public final class CaptureRepository {
     public LiveData<Boolean> getHasMore() { return hasMore; }
     public LiveData<String> getErrors() { return errors; }
 
+    public void latestDetail(java.util.function.BiConsumer<String, Exception> callback) {
+        worker.execute(() -> {
+            String token = null; Exception error = null;
+            try (Cursor cursor = store.getReadableDatabase().query("captures", new String[]{"data"},
+                    null, null, null, null, "id DESC", "1")) {
+                if (cursor.moveToFirst()) token = com.fourtwo.hookintent.base.DetailPayloadStore.save(context, decode(readArchive(cursor.getString(0))));
+            } catch (Exception failure) { error = failure; }
+            String value = token; Exception failure = error;
+            main.post(() -> callback.accept(value, failure));
+        });
+    }
+
     public void append(Bundle message) { append(message, null, null); }
 
     /** The success callback runs only after the raw payload has been committed to disk. */
@@ -292,6 +304,7 @@ public final class CaptureRepository {
                         db.setTransactionSuccessful();
                     } finally { db.endTransaction(); }
                     committed = true;
+                    com.fourtwo.hookintent.manager.CaptureMonitor.committed(converted);
                     if (processingError == null) deleteArchive(payloadPath);
                     else errors.postValue(processingError + "（原始批次已保留）");
                 } finally {

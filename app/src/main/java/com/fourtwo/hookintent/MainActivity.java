@@ -124,6 +124,7 @@ public class MainActivity extends AppCompatActivity {
 
         initializeUIComponents();
         initializeDefaultConfigs();
+        openLatestCapture(getIntent());
 
         showLegalNoticeIfNeeded(() -> {
             refreshVersionHeader();
@@ -139,6 +140,26 @@ public class MainActivity extends AppCompatActivity {
         if (SharedPreferencesUtils.getStr(this, Constants.FLOAT_WINDOW_CONFIG) == null) {
             SharedPreferencesUtils.putStr(this, Constants.FLOAT_WINDOW_CONFIG, "{\"float_window\": true, \"my_float_window\": false}");
         }
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent); setIntent(intent); openLatestCapture(intent);
+    }
+    private void openLatestCapture(Intent intent) {
+        if (intent == null || !intent.getBooleanExtra("show_latest_capture", false)) return;
+        intent.removeExtra("show_latest_capture");
+        com.fourtwo.hookintent.data.CaptureRepository.get(this).latestDetail((token, error) -> {
+            if (isFinishing() || isDestroyed()) return;
+            NavController nav = Navigation.findNavController(this, R.id.nav_host_fragment_content_main);
+            if (token == null) {
+                nav.navigate(R.id.nav_home);
+                Toast.makeText(this, error == null ? "还没有收录记录" : error.getMessage(), Toast.LENGTH_LONG).show();
+            } else {
+                Bundle arguments = new Bundle();
+                arguments.putString(com.fourtwo.hookintent.base.DetailPayloadStore.ARG_TOKEN, token);
+                nav.navigate(R.id.nav_detail, arguments);
+            }
+        });
     }
 
     @SuppressLint("NonConstantResourceId")

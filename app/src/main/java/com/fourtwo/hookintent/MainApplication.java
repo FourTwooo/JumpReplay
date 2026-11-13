@@ -39,6 +39,21 @@ public class MainApplication extends Application {
 
         PermissionManager.ShizukuInit();
         ShizukuProcessBridge.requestBinder(this);
+        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
+            private int visible;
+            @Override public void onActivityStarted(android.app.Activity activity) {
+                visible++; com.fourtwo.hookintent.service.CaptureSessionService.mainVisible(true);
+            }
+            @Override public void onActivityStopped(android.app.Activity activity) {
+                visible=Math.max(0,visible-1);
+                com.fourtwo.hookintent.service.CaptureSessionService.mainVisible(visible > 0);
+            }
+            @Override public void onActivityCreated(android.app.Activity activity,android.os.Bundle state) { }
+            @Override public void onActivityResumed(android.app.Activity activity) { }
+            @Override public void onActivityPaused(android.app.Activity activity) { }
+            @Override public void onActivitySaveInstanceState(android.app.Activity activity,android.os.Bundle state) { }
+            @Override public void onActivityDestroyed(android.app.Activity activity) { }
+        });
         // A provider-only background start must not request Root just to deliver Shizuku's Binder.
         // The visible main Activity warms Root; shortcut Root mode connects on demand.
     }

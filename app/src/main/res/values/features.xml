@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="capture_tile">JumpReplay 捕获</string>
+    <string name="capture_tile_add">添加捕获快捷开关</string>
+    <string name="capture_tile_added">捕获开关已添加</string>
+    <string name="capture_tile_manual">请下拉快捷设置，点击编辑，将 JumpReplay 捕获拖入面板</string>
+    <string name="capture_running">捕获中</string>
+    <string name="capture_stopped">已停止捕获</string>
+    <string name="capture_channel">捕获会话</string>
+    <string name="capture_monitor">捕获监视窗</string>
+    <string name="capture_monitor_explain">开启后，在其他应用中显示本次新增数量和最后收录来源；回到 JumpReplay 后自动收起。需要悬浮窗权限。</string>
+    <string name="capture_monitor_hide">收起监视窗</string>
+    <string name="capture_monitor_show">显示监视窗</string>
+    <string name="capture_stop">停止捕获</string>
+    <string name="capture_pause">暂停</string>
+    <string name="capture_resume">继续</string>
+    <string name="capture_view_latest">查看最新</string>
+    <string name="actions_title">快捷动作</string>
+    <string name="action_save">保存为快捷动作</string>
+    <string name="action_add">添加动作</string>
+    <string name="action_edit">编辑动作</string>
+    <string name="action_name">动作名称</string>
+    <string name="action_content">Scheme / Intent URI</string>
+    <string name="action_empty_title">整理你的常用跳转</string>
+    <string name="action_empty_body">直接输入 Scheme 或 Intent URI，也可以从捕获详情保存。动作可用于桌面快捷方式和叠卡组件。</string>
+    <string name="action_export">导出动作备份</string>
+    <string name="action_import">导入动作 / URI</string>
+    <string name="action_saved">动作已保存</string>
+    <string name="action_widget">JumpReplay 叠卡</string>
+    <string name="action_widget_description">上下滑动切换快捷动作，点击卡片执行</string>
+    <string name="action_widget_select">选择桌面卡片</string>
+    <string name="action_widget_empty">还没有卡片，点击配置</string>
+    <string name="action_widget_configure">配置卡片</string>
+    <string name="action_widget_hint">上下滑动切换 · 点击执行</string>
+    <string name="action_widget_add">添加桌面叠卡</string>
+    <string name="action_choose_icon">选择图标</string>
+    <string name="action_parameters_hint">参数填写需要在启动时被替换的原文，与现有快捷方式规则一致。</string>
+</resources>

@@ -68,6 +68,7 @@ public class HomeFragment extends Fragment {
     private boolean hasMore;
     private boolean loadingMore;
     private boolean regexSearch;
+    private boolean monitorPermissionPending;
 
     private void search(EditText input) {
         String query = input.getText().toString();
@@ -86,22 +87,13 @@ public class HomeFragment extends Fragment {
     @Override public void onSaveInstanceState(@NonNull Bundle state) {
         super.onSaveInstanceState(state);
         state.putBoolean("capture_search_regex", regexSearch);
+        state.putBoolean("monitor_permission_pending", monitorPermissionPending);
     }
 
     private FloatingActionButton fab;
     private static boolean isHook = false; // 保留 isHook 状态
 
     private Map<String, Object> JsonData = new HashMap<>();
-
-    private void notifyGlobalHook(boolean enabled) {
-        // 调用 MessengerService 的 notifyClients 方法
-        MessengerService service = MessengerService.getInstance();
-        if (service != null) {
-            Bundle bundle = new Bundle();
-            bundle.putBoolean("isHook", enabled);
-            service.notifyClients(bundle);
-        }
-    }
 
     @SuppressLint("UseCompatLoadingForDrawables")
     @Override
@@ -128,7 +120,12 @@ public class HomeFragment extends Fragment {
             @Override
             public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
                 int itemId = menuItem.getItemId();
-                if (itemId == R.id.remove_list) {
+                if (itemId == R.id.capture_tile_add) {
+                    com.fourtwo.hookintent.service.CaptureTileService.requestAdd((androidx.appcompat.app.AppCompatActivity) requireActivity());
+                    return true;
+                } else if (itemId == R.id.capture_monitor_toggle) {
+                    configureMonitor(); return true;
+                } else if (itemId == R.id.remove_list) {
                     // 清空RecyclerView的数据
                     repository.clear();
                     return true;
@@ -204,6 +201,7 @@ public class HomeFragment extends Fragment {
         // Initialize search EditText and set its TextWatcher
         EditText searchEditText = view.findViewById(R.id.searchEditText);
         if (savedInstanceState != null) regexSearch = savedInstanceState.getBoolean("capture_search_regex");
+        if (savedInstanceState != null) monitorPermissionPending = savedInstanceState.getBoolean("monitor_permission_pending");
         com.google.android.material.textfield.TextInputLayout searchBox = view.findViewById(R.id.home_search_box);
         Runnable updateSearchIcon = () -> {
             searchBox.setEndIconContentDescription(regexSearch ? R.string.input_regex_on : R.string.input_regex_off);
@@ -231,7 +229,9 @@ public class HomeFragment extends Fragment {
             }
         });
 
-        // 按钮保活
+        HookStatusManager.initialize(requireContext());
+        if (HookStatusManager.isHook()) com.fourtwo.hookintent.service.CaptureSessionService.refresh(requireContext());
+        // 所有全局入口观察同一状态，视图重建不会关闭捕获。
         viewModel.getIsHook().observe(getViewLifecycleOwner(), hook -> {
             isHook = hook;
             updateFabAppearance();
@@ -240,9 +240,7 @@ public class HomeFragment extends Fragment {
         fab = view.findViewById(R.id.fab);
         fab.setOnClickListener(v -> {
             // Toggle the isHook state
-            boolean newIsHook = !isHook;
-            viewModel.setIsHook(newIsHook);
-            notifyGlobalHook(newIsHook);
+            HookStatusManager.setHook(requireContext(), !HookStatusManager.isHook());
         });
 
         updateFabAppearance();
@@ -310,6 +308,25 @@ public class HomeFragment extends Fragment {
         }
     }
 
+    private void configureMonitor() {
+        boolean current = com.fourtwo.hookintent.service.CaptureSessionService.monitorEnabled(requireContext());
+        AppDialogs.builder(requireContext()).setTitle(R.string.capture_monitor)
+                .setMessage(R.string.capture_monitor_explain)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(current ? R.string.capture_monitor_hide : R.string.capture_monitor_show, (dialog, which) -> {
+                    if (current) com.fourtwo.hookintent.service.CaptureSessionService.monitorEnabled(requireContext(), false);
+                    else if (android.provider.Settings.canDrawOverlays(requireContext())) {
+                        com.fourtwo.hookintent.service.CaptureSessionService.monitorEnabled(requireContext(), true);
+                        Toast.makeText(requireContext(), "捕获时离开主应用即可显示监视窗", Toast.LENGTH_LONG).show();
+                    } else {
+                        monitorPermissionPending = true;
+                        try { startActivity(new android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                android.net.Uri.parse("package:" + requireContext().getPackageName()))); }
+                        catch (RuntimeException error) { monitorPermissionPending=false; Toast.makeText(requireContext(),error.getMessage(),Toast.LENGTH_LONG).show(); }
+                    }
+                }).show();
+    }
+
     private void updateFabAppearance() {
         if (isHook) {
             fab.setImageResource(android.R.drawable.ic_media_pause);
@@ -319,7 +336,6 @@ public class HomeFragment extends Fragment {
             fab.setBackgroundTintList(ColorStateList.valueOf(Color.parseColor("#CE1A7EAC")));
         }
         updateEmptyState();
-        HookStatusManager.setHook(isHook);
         Log.d(TAG, "isHook: " + isHook);
     }
 
@@ -374,6 +390,12 @@ public class HomeFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
+        if (monitorPermissionPending) {
+            monitorPermissionPending = false;
+            boolean granted = android.provider.Settings.canDrawOverlays(requireContext());
+            com.fourtwo.hookintent.service.CaptureSessionService.monitorEnabled(requireContext(), granted);
+            Toast.makeText(requireContext(), granted ? "监视窗已开启，捕获时离开主应用即可显示" : "未授予悬浮窗权限，基础捕获仍可使用", Toast.LENGTH_LONG).show();
+        }
 
         if (fab != null) {
             fab.show();
