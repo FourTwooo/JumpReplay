@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="@color/screen_bg">
+    <androidx.recyclerview.widget.RecyclerView android:id="@+id/actions_list" android:layout_width="match_parent"
+        android:layout_height="match_parent" android:clipToPadding="false" android:padding="12dp" android:paddingBottom="88dp" />
+    <LinearLayout android:id="@+id/actions_empty" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_gravity="center" android:orientation="vertical" android:gravity="center" android:padding="32dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/action_empty_title"
+            android:textSize="18sp" android:textStyle="bold" android:textColor="@color/screen_text" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp"
+            android:text="@string/action_empty_body" android:textSize="14sp" android:textColor="@color/screen_secondary"
+            android:gravity="center" android:lineSpacingExtra="4dp" />
+    </LinearLayout>
+    <com.google.android.material.floatingactionbutton.FloatingActionButton android:id="@+id/action_add_button"
+        android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="bottom|end"
+        android:layout_margin="20dp" android:src="@drawable/add" android:contentDescription="@string/action_add"
+        app:backgroundTint="@color/screen_primary" app:tint="@android:color/white" />
+</FrameLayout>

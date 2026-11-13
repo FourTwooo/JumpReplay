@@ -22,6 +22,7 @@
         tools:layout="@layout/fragment_detail" />
 
     <!-- Other fragments -->
+    <fragment android:id="@+id/nav_actions" android:name="com.fourtwo.hookintent.actions.ActionsFragment" android:label="@string/actions_title" tools:layout="@layout/fragment_actions" />
     <fragment
         android:id="@+id/nav_star"
         android:name="com.fourtwo.hookintent.ui.star.StarFragment"

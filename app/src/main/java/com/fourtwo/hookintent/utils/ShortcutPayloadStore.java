@@ -37,6 +37,10 @@ public final class ShortcutPayloadStore {
     }
 
     public static String save(Context context, String template, String[] parameters, Intent target, Bundle origin) throws Exception {
+        return saveRaw(context, content(template, parameters, target, origin));
+    }
+
+    public static JSONObject content(String template, String[] parameters, Intent target, Bundle origin) throws Exception {
         JSONObject content = new JSONObject();
         content.put("template", template);
         content.put("parameters", new JSONArray(parameters == null ? new String[0] : parameters));
@@ -48,6 +52,10 @@ public final class ShortcutPayloadStore {
             }
             content.put("origin", source);
         }
+        return content;
+    }
+
+    public static String saveRaw(Context context, JSONObject content) throws Exception {
         byte[] encoded = content.toString().getBytes(StandardCharsets.UTF_8);
         File folder = new File(context.getFilesDir(), "shortcut_payloads");
         if (!folder.isDirectory() && !folder.mkdirs()) throw new java.io.IOException("无法保存快捷方式内容");
@@ -70,11 +78,19 @@ public final class ShortcutPayloadStore {
     }
 
     public static Payload load(Context context, String id) throws Exception {
+        JSONObject content = readRaw(context, id);
+        return content == null ? null : decode(context, content);
+    }
+
+    public static JSONObject readRaw(Context context, String id) throws Exception {
         if (id == null) return null;
         if (!id.matches("[0-9a-fA-F-]{36}")) throw new IllegalArgumentException("快捷方式内容标识无效");
         File folder = new File(context.getFilesDir(), "shortcut_payloads");
         byte[] bytes = new AtomicFile(new File(folder, id + ".txt")).readFully();
-        JSONObject content = new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+        return new JSONObject(new String(bytes, StandardCharsets.UTF_8));
+    }
+
+    public static Payload decode(Context context, JSONObject content) throws Exception {
         JSONArray names = content.optJSONArray("parameters");
         String[] parameters = new String[names == null ? 0 : names.length()];
         for (int index = 0; index < parameters.length; index++) parameters[index] = names.getString(index);

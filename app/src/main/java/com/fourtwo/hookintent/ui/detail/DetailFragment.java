@@ -252,6 +252,8 @@ public class DetailFragment extends Fragment {
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menu.clear(); // 清除现有菜单项，避免重复
                 menuInflater.inflate(R.menu.detail_drawer, menu); // 加载菜单
+                menu.findItem(R.id.action_save).setVisible(itemData != null
+                        && ("Intent".equals(itemData.getCategory()) || "Scheme".equals(itemData.getCategory())));
 
                 // 动态设置收藏按钮图标
                 try {
@@ -276,7 +278,14 @@ public class DetailFragment extends Fragment {
             @Override
             public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
                 int itemId = menuItem.getItemId();
-                if (itemId == R.id.copy_code) {
+                if (itemId == R.id.action_save) {
+                    try {
+                        String token=DetailPayloadStore.save(requireContext(),itemData);
+                        startActivity(new Intent(requireContext(),com.fourtwo.hookintent.actions.ActionEditorActivity.class)
+                                .putExtra(DetailPayloadStore.EXTRA_TOKEN,token));
+                    } catch(Exception error) { Toast.makeText(requireContext(),error.getMessage(),Toast.LENGTH_LONG).show(); }
+                    return true;
+                } else if (itemId == R.id.copy_code) {
                     // 获取菜单项的 View 并传递给 showOptionsDialog
                     View anchorView = requireActivity().findViewById(R.id.copy_code);
                     showOptionsDialog(anchorView); // 调用修改后的 showOptionsDialog

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_card"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical"
+    android:background="@drawable/widget_card_background" android:padding="16dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
+        <ImageView android:id="@+id/widget_action_icon" android:layout_width="40dp" android:layout_height="40dp"
+            android:scaleType="fitCenter" android:contentDescription="@null" />
+        <TextView android:id="@+id/widget_action_name" android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:layout_marginStart="12dp" android:textSize="17sp" android:textStyle="bold"
+            android:maxLines="2" android:ellipsize="end" android:textColor="@color/screen_text" />
+    </LinearLayout>
+    <TextView android:id="@+id/widget_action_content" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:layout_marginTop="10dp" android:textColor="@color/screen_secondary"
+        android:maxLines="2" android:ellipsize="end" android:textSize="12sp" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="@string/action_widget_hint" android:textColor="@color/screen_hint" android:textSize="11sp" />
+        <TextView android:id="@+id/widget_action_position" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/screen_hint" android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

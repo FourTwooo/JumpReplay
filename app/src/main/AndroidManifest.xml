@@ -38,6 +38,15 @@
         android:theme="@style/Theme.HookIntent"
         tools:targetApi="31">
 
+        <activity android:name=".actions.ActionEditorActivity" android:exported="false" android:theme="@style/Theme.HookIntent.NoActionBar" android:windowSoftInputMode="adjustResize" />
+        <activity android:name=".widget.ActionWidgetConfigureActivity" android:exported="true" android:taskAffinity="${applicationId}.widget_config" android:excludeFromRecents="true" android:theme="@style/Theme.HookIntent.NoActionBar">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
+        </activity>
+        <receiver android:name=".widget.ActionWidgetProvider" android:label="@string/action_widget" android:exported="false">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/action_widget_info" />
+        </receiver>
+        <service android:name=".widget.ActionWidgetService" android:permission="android.permission.BIND_REMOTEVIEWS" android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

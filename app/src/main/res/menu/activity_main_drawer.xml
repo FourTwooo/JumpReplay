@@ -18,6 +18,7 @@
             android:id="@+id/nav_settings"
             android:icon="@drawable/button_checked"
             android:title="@string/settings" />
+        <item android:id="@+id/nav_actions" android:icon="@drawable/add_link" android:title="@string/actions_title" />
     </group>
 
 

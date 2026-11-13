@@ -74,7 +74,77 @@ public class CustomExtrasDeviceTest {
                 assertTrue(receipt.getBoolean("cycle"));
                 assertTrue(receipt.getBoolean("alias"));
                 assertEquals(400000, receipt.getInt("largeLength"));
+
+                // The new action/card path must keep the same foreign objects through a
+                // database snapshot, backup import and ordinary-parameter URI edit.
+                com.fourtwo.hookintent.actions.ActionStore actions=com.fourtwo.hookintent.actions.ActionStore.get(context);
+                String actionId=java.util.UUID.randomUUID().toString(), importedId=null;
+                String baseUri=uri.replace("S.title=plain-edited","S.title=plain-shortcut");
+                com.fourtwo.hookintent.actions.QuickAction action=new com.fourtwo.hookintent.actions.QuickAction(actionId,
+                        "compatibility-"+actionId,baseUri.replace("S.title=plain-shortcut","S.title=plain-action"),new String[0],false,"root",
+                        ShortcutPayloadStore.content(baseUri,new String[0],replay,restored.origin).toString(),null);
+                try {
+                    actions.save(action);
+                    JSONObject backup=new JSONObject().put("format","jumpreplay-actions").put("version",1)
+                            .put("actions",new JSONArray().put(actions.find(actionId).json()));
+                    assertEquals(1,actions.importFrom(new ByteArrayInputStream(backup.toString().getBytes(StandardCharsets.UTF_8))));
+                    java.util.List<com.fourtwo.hookintent.actions.QuickAction> saved=actions.all();
+                    importedId=saved.get(saved.size()-1).id;
+                    actions.delete(actionId); // The imported action owns its own snapshot.
+                    fixture.call(4,null);
+                    context.startActivity(com.fourtwo.hookintent.actions.ActionStore.launchIntent(context,importedId));
+                    JSONObject actionReceipt=receipt(fixture);
+                    assertEquals("plain-action",actionReceipt.getString("plain"));
+                    assertEquals(9007199254740993L,actionReceipt.getLong("id"));
+                    assertEquals("nested-edited",actionReceipt.getString("note"));
+                    assertEquals("serial-edited",actionReceipt.getString("serialNote"));
+                    assertEquals(200,actionReceipt.getInt("number"));
+                    assertTrue(actionReceipt.getBoolean("cycle")); assertTrue(actionReceipt.getBoolean("alias"));
+                    assertTrue(actionReceipt.getBoolean("nullableIsNull")); assertEquals(400000,actionReceipt.getInt("largeLength"));
+                } finally {
+                    actions.delete(actionId); if(importedId != null) actions.delete(importedId);
+                }
             } finally { new File(new File(context.getFilesDir(), "shortcut_payloads"), shortcut + ".txt").delete(); }
+        }
+    }
+
+    @Test public void actionReplayWithinActivityBinderBudgetKeepsForeignObjects() throws Exception {
+        Bundle original;
+        try(Fixture fixture=new Fixture()) { original=bundle(fixture.call(1,null)); }
+        shell("am force-stop "+FIXTURE);
+        Bundle edited=edit(original,"installed_apk");
+        try(Fixture fixture=new Fixture()) {
+            // Keep the original 400k-character codec test. Only the actual Activity launch
+            // uses 100k characters: Android 13 rejects the original ~800k Binder transaction.
+            assertValues(fixture.call(2,new JSONObject().put("parcel",edited.getString(IntentPayloadCodec.KEY))),true);
+            ExtrasClient client=new ExtrasClient(context,edited);
+            Bundle compact;
+            try {
+                await(client::open);
+                compact=set(client,find(children(client,"root"),"large"),new String(new char[100000]).replace('\0','x'));
+            } finally { client.close(); }
+            String uri=compact.getString("uri");
+            Bundle record=new Bundle(edited); record.putString(IntentPayloadCodec.KEY,compact.getString("parcel")); record.putString("uri",uri);
+            com.fourtwo.hookintent.actions.ActionStore actions=com.fourtwo.hookintent.actions.ActionStore.get(context);
+            String id=java.util.UUID.randomUUID().toString(), imported=null;
+            try {
+                com.fourtwo.hookintent.actions.QuickAction action=new com.fourtwo.hookintent.actions.QuickAction(id,"binder-budget-"+id,
+                        uri.replace("S.title=plain-edited","S.title=plain-action"),new String[0],false,"root",
+                        ShortcutPayloadStore.content(uri,new String[0],IntentPayloadCodec.decode(context,record),record).toString(),null);
+                actions.save(action);
+                JSONObject backup=new JSONObject().put("format","jumpreplay-actions").put("version",1).put("actions",new JSONArray().put(actions.find(id).json()));
+                assertEquals(1,actions.importFrom(new ByteArrayInputStream(backup.toString().getBytes(StandardCharsets.UTF_8))));
+                java.util.List<com.fourtwo.hookintent.actions.QuickAction> saved=actions.all(); imported=saved.get(saved.size()-1).id;
+                actions.delete(id); fixture.call(4,null);
+                context.startActivity(com.fourtwo.hookintent.actions.ActionStore.launchIntent(context,imported));
+                JSONObject received=receipt(fixture);
+                assertEquals("plain-action",received.getString("plain")); assertEquals(9007199254740993L,received.getLong("id"));
+                assertEquals("post-edited",received.getString("postTitle")); assertEquals("nested-edited",received.getString("note"));
+                assertEquals("serial-edited",received.getString("serialNote")); assertEquals(200,received.getInt("number"));
+                assertEquals("tag-edited",received.getString("tag")); assertEquals(99,received.getInt("map"));
+                assertTrue(received.getBoolean("cycle")); assertTrue(received.getBoolean("alias")); assertTrue(received.getBoolean("nullableIsNull"));
+                assertEquals(100000,received.getInt("largeLength"));
+            } finally { actions.delete(id); if(imported != null) actions.delete(imported); }
         }
     }
 

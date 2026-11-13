@@ -75,20 +75,31 @@ public class ShortcutActivity extends AppCompatActivity {
 
     private void handleShortcut(Intent incoming) {
         try {
+            replayOrigin = new Bundle();
+            originalTarget = null;
+            originalTargetText = null;
             Bundle bundle = incoming == null ? null : incoming.getExtras();
             if (bundle == null) { finish(); return; }
             String targetIntent = bundle.getString("target_intent");
             String[] replaceParams = bundle.getStringArray("replace_params");
             boolean isChecked = bundle.getBoolean("isChecked", false);
             String selectedItem = bundle.getString("SelectedItem", "");
-            ShortcutPayloadStore.Payload payload = ShortcutPayloadStore.load(this, bundle.getString("target_payload_id"));
+            com.fourtwo.hookintent.actions.QuickAction action = null;
+            if (bundle.containsKey("quick_action_id")) {
+                action = com.fourtwo.hookintent.actions.ActionStore.get(this).find(bundle.getString("quick_action_id"));
+                if (action == null) throw new IllegalArgumentException("该快捷动作已删除，请重新配置桌面入口");
+                targetIntent=action.template; replaceParams=action.parameters;
+                isChecked=action.privileged; selectedItem=action.mode;
+            }
+            ShortcutPayloadStore.Payload payload = action == null
+                    ? ShortcutPayloadStore.load(this, bundle.getString("target_payload_id"))
+                    : action.payload == null ? null : ShortcutPayloadStore.decode(this,new org.json.JSONObject(action.payload));
             if (payload != null) {
-                targetIntent = payload.template;
-                replaceParams = payload.parameters;
+                if (action == null) { targetIntent = payload.template; replaceParams = payload.parameters; }
                 replayOrigin = new Bundle(payload.origin);
             }
             ShortcutParameterReplacer.validate(targetIntent, replaceParams);
-            originalTargetText = targetIntent;
+            originalTargetText = payload == null ? targetIntent : payload.template;
             originalTarget = payload == null ? null : payload.target;
             if (replaceParams != null && replaceParams.length > 0) {
                 showReplaceParamsDialog(targetIntent, replaceParams, isChecked, selectedItem);

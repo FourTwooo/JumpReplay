@@ -19,4 +19,5 @@
         app:tint="@color/white"
         app:showAsAction="ifRoom" />
 
+    <item android:id="@+id/action_save" android:title="@string/action_save" app:showAsAction="never" />
 </menu>

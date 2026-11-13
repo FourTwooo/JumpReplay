@@ -573,7 +573,21 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     @Override
     public boolean onOptionsItemSelected(@NonNull MenuItem menuItem) {
         int itemId = menuItem.getItemId();
-        if (itemId == R.id.edit_extras) {
+        if (itemId == R.id.action_save) {
+            String text=contentBinding.urlTextView.getText().toString();
+            com.fourtwo.hookintent.replay.ReplayTasks.fromText(this,replayOrigin,text,originalTarget,originalUrlText,(target,error) -> {
+                if(!isUiAlive()) return;
+                if(error != null) { Toast.makeText(this,error.getMessage(),Toast.LENGTH_LONG).show(); return; }
+                com.fourtwo.hookintent.actions.ActionStore.IO.execute(() -> {
+                    try {
+                        String id=com.fourtwo.hookintent.utils.ShortcutPayloadStore.save(this,text,new String[0],target,replayOrigin);
+                        uiHandler.post(() -> { if(isUiAlive()) startActivity(new Intent(this,com.fourtwo.hookintent.actions.ActionEditorActivity.class)
+                                .putExtra("draft_payload_id",id)); });
+                    } catch(Exception failure) { uiHandler.post(() -> { if(isUiAlive()) Toast.makeText(this,failure.getMessage(),Toast.LENGTH_LONG).show(); }); }
+                });
+            });
+            return true;
+        } else if (itemId == R.id.edit_extras) {
             com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin,
                     contentBinding.urlTextView.getText().toString(), originalTarget, originalUrlText, (current, failure) -> {
             if (!isUiAlive()) return;

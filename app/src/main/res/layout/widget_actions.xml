@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="4dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="32dp" android:gravity="center_vertical">
+        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+            android:text="JumpReplay" android:textSize="12sp" android:textColor="@color/screen_secondary" android:paddingStart="12dp" />
+        <TextView android:id="@+id/widget_configure" android:layout_width="48dp" android:layout_height="match_parent"
+            android:gravity="center" android:text="编辑" android:textSize="12sp" android:textColor="@color/screen_secondary"
+            android:contentDescription="@string/action_widget_configure" />
+    </LinearLayout>
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <StackView android:id="@+id/action_stack" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:loopViews="true" android:animateLayoutChanges="false" />
+        <TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="match_parent"
+            android:gravity="center" android:background="@drawable/widget_card_background" android:padding="16dp"
+            android:text="@string/action_widget_empty" android:textColor="@color/screen_text" android:textSize="14sp" />
+    </FrameLayout>
+</LinearLayout>
