@@ -29,6 +29,7 @@ public final class HookStatusManager {
     public static LiveData<Boolean> state() { return state; }
 
     public static void setHook(Context context, boolean value) {
+        if(Looper.myLooper() != Looper.getMainLooper()) { main.post(() -> setHook(context,value)); return; }
         initialize(context);
         if(value && !enabled && !CaptureSessionService.isRunning()) CaptureMonitor.reset();
         setHook(value);

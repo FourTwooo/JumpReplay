@@ -380,7 +380,10 @@ public class SettingsFragment extends Fragment {
 
         loadFromPreferences(Constants.INTERNAL_HOOKS_CONFIG, true, list);
         loadFromPreferences(Constants.EXTERNAL_HOOKS_CONFIG, false, list);
-
+        list.sort(java.util.Comparator.comparingInt(item -> {
+            String category = String.valueOf(item.get("category"));
+            return "Intent".equals(category) ? 0 : "Scheme".equals(category) ? 1 : 2;
+        }));
         return list;
     }
 

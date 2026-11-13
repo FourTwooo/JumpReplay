@@ -32,7 +32,13 @@ public class CaptureSessionService extends Service {
     private TextView summary, status;
     private Button pause;
     private final Observer<CaptureMonitor.Snapshot> recordsObserver = value -> update();
-    private final Observer<Boolean> stateObserver = value -> update();
+    private final Observer<Boolean> stateObserver = value -> {
+        if (!Boolean.TRUE.equals(value)) {
+            hideOverlay();
+            stopForeground(true);
+            stopSelf();
+        } else update();
+    };
     private final Observer<Integer> connectionObserver = value -> update();
     private boolean starting = true;
     public static boolean isRunning() { return instance != null; }
@@ -73,10 +79,10 @@ public class CaptureSessionService extends Service {
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
-        if (STOP.equals(action) || !HookStatusManager.isHook() && !PAUSE.equals(action)) {
-            HookStatusManager.setHook(false); stopSelf(); return START_NOT_STICKY;
+        if (STOP.equals(action) || PAUSE.equals(action) || !HookStatusManager.isHook()) {
+            HookStatusManager.setHook(false);
+            hideOverlay(); stopForeground(true); stopSelf(); return START_NOT_STICKY;
         }
-        if (PAUSE.equals(action)) HookStatusManager.setHook(!HookStatusManager.isHook());
         update();
         return START_STICKY;
     }
@@ -107,6 +113,7 @@ public class CaptureSessionService extends Service {
     }
     private void update() {
         if (starting) return;
+        if (!HookStatusManager.isHook()) { hideOverlay(); return; }
         getSystemService(NotificationManager.class).notify(NOTIFICATION, notification());
         if (!mainVisible && monitorEnabled(this) && Settings.canDrawOverlays(this)) showOverlay();
         else hideOverlay();
@@ -132,16 +139,16 @@ public class CaptureSessionService extends Service {
         summary.setMaxLines(3); content.addView(summary);
         LinearLayout buttons = new LinearLayout(themed);
         pause = new Button(themed, null, 0, R.style.Widget_HookIntent_DialogNegativeButton);
-        pause.setOnClickListener(v -> HookStatusManager.setHook(!HookStatusManager.isHook()));
+        pause.setOnClickListener(v -> HookStatusManager.setHook(this, false));
         Button view = new Button(themed, null, 0, R.style.Widget_HookIntent_DialogNegativeButton);
         view.setText(R.string.capture_view_latest);
         view.setOnClickListener(v -> { try { open().send(); } catch (PendingIntent.CanceledException ignored) { } });
         Button close = new Button(themed, null, 0, R.style.Widget_HookIntent_DialogNegativeButton);
         close.setText("×"); close.setContentDescription(getString(R.string.capture_monitor_hide));
         close.setOnClickListener(v -> monitorEnabled(this, false));
-        buttons.addView(pause, new LinearLayout.LayoutParams(0,dp(48),1));
-        buttons.addView(view, new LinearLayout.LayoutParams(0,dp(48),1.5f));
-        buttons.addView(close, new LinearLayout.LayoutParams(dp(48),dp(48)));
+        buttons.addView(pause, new LinearLayout.LayoutParams(0,-2,1));
+        buttons.addView(view, new LinearLayout.LayoutParams(0,-2,1.5f));
+        buttons.addView(close, new LinearLayout.LayoutParams(dp(48),-2));
         content.addView(buttons);
         WindowManager.LayoutParams layout = new WindowManager.LayoutParams(dp(280),WindowManager.LayoutParams.WRAP_CONTENT,
                 Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,

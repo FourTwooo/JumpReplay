@@ -41,12 +41,13 @@ public class MainApplication extends Application {
         ShizukuProcessBridge.requestBinder(this);
         registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
             private int visible;
+            private final android.os.Handler ui=new android.os.Handler(android.os.Looper.getMainLooper());
             @Override public void onActivityStarted(android.app.Activity activity) {
                 visible++; com.fourtwo.hookintent.service.CaptureSessionService.mainVisible(true);
             }
             @Override public void onActivityStopped(android.app.Activity activity) {
                 visible=Math.max(0,visible-1);
-                com.fourtwo.hookintent.service.CaptureSessionService.mainVisible(visible > 0);
+                ui.postDelayed(() -> { if(visible == 0) com.fourtwo.hookintent.service.CaptureSessionService.mainVisible(false); },200);
             }
             @Override public void onActivityCreated(android.app.Activity activity,android.os.Bundle state) { }
             @Override public void onActivityResumed(android.app.Activity activity) { }

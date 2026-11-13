@@ -320,8 +320,22 @@ public class HomeFragment extends Fragment {
                         Toast.makeText(requireContext(), "捕获时离开主应用即可显示监视窗", Toast.LENGTH_LONG).show();
                     } else {
                         monitorPermissionPending = true;
-                        try { startActivity(new android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                android.net.Uri.parse("package:" + requireContext().getPackageName()))); }
+                        try {
+                            android.content.Intent permission=new android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    android.net.Uri.parse("package:" + requireContext().getPackageName()));
+                            // The user's global Scheme interceptor may also match package: settings links.
+                            // Select an actual system settings handler explicitly for this permission request.
+                            boolean resolved=false;
+                            for(android.content.pm.ResolveInfo candidate:requireContext().getPackageManager().queryIntentActivities(permission,0)) {
+                                android.content.pm.ActivityInfo activity=candidate.activityInfo;
+                                if(activity != null && activity.applicationInfo != null
+                                        && (activity.applicationInfo.flags & android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0) {
+                                    permission.setComponent(new android.content.ComponentName(activity.packageName,activity.name)); resolved=true; break;
+                                }
+                            }
+                            if(!resolved) permission=new android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION);
+                            startActivity(permission);
+                        }
                         catch (RuntimeException error) { monitorPermissionPending=false; Toast.makeText(requireContext(),error.getMessage(),Toast.LENGTH_LONG).show(); }
                     }
                 }).show();
