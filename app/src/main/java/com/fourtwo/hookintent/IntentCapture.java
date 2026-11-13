@@ -9,6 +9,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -32,8 +33,6 @@ import com.fourtwo.hookintent.xposed.RecordXposedBridge;
 import com.fourtwo.hookintent.xposed.DurableCaptureOutbox;
 import com.fourtwo.hookintent.xposed.IntentJournal;
 import com.fourtwo.hookintent.xposed.HookConfigCache;
-import com.fourtwo.hookintent.xposed.SystemQuerySpec;
-import com.fourtwo.hookintent.xposed.SchemeResolver;
 import com.fourtwo.hookintent.xposed.ActivityCaptureHooks;
 import android.os.Handler;
 import android.os.Looper;
@@ -56,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.XC_MethodHook;
@@ -82,8 +83,9 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private IntentJournal intentJournal, pendingJournal;
     private final java.util.concurrent.ExecutorService journalWorker = Executors.newSingleThreadExecutor();
     private volatile HookConfigCache systemConfig;
+    private boolean systemProcess;
     private boolean systemHooksInstalled;
-    private final java.util.concurrent.atomic.AtomicBoolean systemHookErrorLogged = new java.util.concurrent.atomic.AtomicBoolean();
+    private ClassLoader systemClassLoader;
     private volatile boolean storageErrorShown;
     private long sourceLastUpdateTime;
     private int sourceAppUid = -1;
@@ -253,12 +255,85 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private void hookAllIfExists(ClassLoader classLoader, String className, String methodName, XC_MethodHook hook) {
         try {
             Class<?> clazz = XposedHelpers.findClass(className, classLoader);
-            if (!XposedBridge.hookAllMethods(clazz, methodName, hook).isEmpty())
-                XposedBridge.log("Hooked " + className + "#" + methodName);
+            XposedBridge.hookAllMethods(clazz, methodName, hook);
+            XposedBridge.log("Hooked " + className + "#" + methodName);
         } catch (Throwable ignored) {
         }
     }
 
+    private Intent findIntentArg(Object[] args) {
+        if (args == null) {
+            return null;
+        }
+        for (Object arg : args) {
+            if (arg instanceof Intent) {
+                return (Intent) arg;
+            }
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ResolveInfo> extractResolveInfoList(Object resultObj) {
+        if (resultObj == null) {
+            return null;
+        }
+
+        if (resultObj instanceof List) {
+            return new ArrayList<>((List<ResolveInfo>) resultObj);
+        }
+
+        try {
+            if ("android.content.pm.ParceledListSlice".equals(resultObj.getClass().getName())) {
+                Method getListMethod = resultObj.getClass().getMethod("getList");
+                Object listObj = getListMethod.invoke(resultObj);
+                if (listObj instanceof List) {
+                    return new ArrayList<>((List<ResolveInfo>) listObj);
+                }
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("extractResolveInfoList failed: " + t);
+        }
+
+        return null;
+    }
+
+    private Object rebuildResolveInfoResult(Object originalResultObj, List<ResolveInfo> newList) {
+        if (originalResultObj == null) {
+            return newList;
+        }
+
+        if (originalResultObj instanceof List) {
+            return newList;
+        }
+
+        try {
+            if ("android.content.pm.ParceledListSlice".equals(originalResultObj.getClass().getName())) {
+                Constructor<?> constructor = originalResultObj.getClass().getDeclaredConstructor(List.class);
+                constructor.setAccessible(true);
+                return constructor.newInstance(newList);
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("rebuildResolveInfoResult failed: " + t);
+        }
+
+        return originalResultObj;
+    }
+
+    private boolean containsMyResolveInfo(List<ResolveInfo> resolveInfos) {
+        if (resolveInfos == null) {
+            return false;
+        }
+
+        for (ResolveInfo resolveInfo : resolveInfos) {
+            if (resolveInfo != null
+                    && resolveInfo.activityInfo != null
+                    && myAppPackage.equals(resolveInfo.activityInfo.packageName)) {
+                return true;
+            }
+        }
+        return false;
+    }
     private boolean isMyComponent(ComponentName componentName, String className) {
         return componentName != null
                 && myAppPackage.equals(componentName.getPackageName())
@@ -391,7 +466,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
         }
     }
 
-    private void hookProviderVisibilityBypass(Context context, ClassLoader classLoader) {
+    private void hookProviderVisibilityBypass(Context context) {
+        ClassLoader classLoader = systemClassLoader == null ? context.getClassLoader() : systemClassLoader;
 
         XC_MethodHook providerHook = new XC_MethodHook() {
             @Override
@@ -412,13 +488,13 @@ public class IntentCapture implements IXposedHookLoadPackage {
             }
         };
 
-        for (String owner : SystemQuerySpec.owners()) {
-            hookAllIfExists(classLoader, owner, "resolveContentProvider", providerHook);
-            hookAllIfExists(classLoader, owner, "resolveContentProviderInternal", providerHook);
-        }
+        hookAllIfExists(classLoader, "com.android.server.pm.PackageManagerService", "resolveContentProvider", providerHook);
+        hookAllIfExists(classLoader, "com.android.server.pm.ComputerEngine", "resolveContentProvider", providerHook);
+        hookAllIfExists(classLoader, "com.android.server.pm.ComputerEngine", "resolveContentProviderInternal", providerHook);
     }
 
-    private void hookServiceVisibilityBypass(Context context, ClassLoader classLoader) {
+    private void hookServiceVisibilityBypass(Context context) {
+        ClassLoader classLoader = systemClassLoader == null ? context.getClassLoader() : systemClassLoader;
 
         XC_MethodHook serviceInfoHook = new XC_MethodHook() {
             @Override
@@ -458,81 +534,162 @@ public class IntentCapture implements IXposedHookLoadPackage {
             }
         };
 
-        for (String owner : SystemQuerySpec.owners()) {
-            hookAllIfExists(classLoader, owner, "getServiceInfo", serviceInfoHook);
-            hookAllIfExists(classLoader, owner, "getServiceInfoInternal", serviceInfoHook);
-            hookAllIfExists(classLoader, owner, "resolveService", resolveServiceHook);
-            hookAllIfExists(classLoader, owner, "resolveServiceInternal", resolveServiceHook);
-        }
+        hookAllIfExists(classLoader, "com.android.server.pm.PackageManagerService", "getServiceInfo", serviceInfoHook);
+        hookAllIfExists(classLoader, "com.android.server.pm.ComputerEngine", "getServiceInfo", serviceInfoHook);
+        hookAllIfExists(classLoader, "com.android.server.pm.ComputerEngine", "getServiceInfoInternal", serviceInfoHook);
+
+        hookAllIfExists(classLoader, "com.android.server.pm.PackageManagerService", "resolveService", resolveServiceHook);
+        hookAllIfExists(classLoader, "com.android.server.pm.ComputerEngine", "resolveService", resolveServiceHook);
+        hookAllIfExists(classLoader, "com.android.server.pm.ComputerEngine", "resolveServiceInternal", resolveServiceHook);
     }
 
-    private void hookSystemMethods(Context context, ClassLoader systemLoader) {
-        if (systemHooksInstalled) return;
-        systemHooksInstalled = true;
-        // This loader contains services.jar. Context.getClassLoader() need not contain it.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            hookProviderVisibilityBypass(context, systemLoader);
-            hookServiceVisibilityBypass(context, systemLoader);
-        }
-        Method selected = null;
-        for (String owner : SystemQuerySpec.owners()) {
-            try {
-                Class<?> type = XposedHelpers.findClassIfExists(owner, systemLoader);
-                if (type != null) selected = SystemQuerySpec.select(type);
-                if (selected != null) break;
-            } catch (Throwable error) { logSystemHookError(error); }
-        }
-        if (selected == null) {
-            XposedBridge.log("JumpReplay scheme hook inactive: no supported query signature; sdk=" + Build.VERSION.SDK_INT);
-            return;
-        }
-        final int userIndex = SystemQuerySpec.userIdIndex(selected);
+    private ActivityInfo findMyInterceptActivityInfo(Context context) {
         try {
-            XposedBridge.hookMethod(selected, new XC_MethodHook() {
-                @Override protected void afterHookedMethod(MethodHookParam param) {
-                    if (param.hasThrowable()) return;
-                    try {
-                        HookConfigCache config = systemConfig;
-                        if (config == null || !(param.getResult() instanceof List)) return;
-                        Intent intent = SystemQuerySpec.implicitUri((Intent) param.args[0]);
-                        if (intent == null) return;
-                        Object original = param.getResult();
-                        Object result = SchemeResolver.resolve(original, intent, (Integer) param.args[userIndex],
-                                config.getActivity(), config::isDisabled);
-                        if (result != original) param.setResult(result);
-                    } catch (Throwable error) {
-                        // Unknown OEM data must leave the original PackageManager result intact.
-                        logSystemHookError(error);
+            PackageManager pm = context.getPackageManager();
+            PackageInfo packageInfo = pm.getPackageInfo(
+                    myAppPackage,
+                    PackageManager.GET_ACTIVITIES | PackageManager.GET_META_DATA
+            );
+
+            if (packageInfo.activities != null) {
+                for (ActivityInfo activityInfo : packageInfo.activities) {
+                    if (myAppClass.equals(activityInfo.name)) {
+                        return activityInfo;
                     }
                 }
-            });
-            XposedBridge.log("JumpReplay scheme hook installed: " + selected.toGenericString());
-        } catch (Throwable error) { logSystemHookError(error); }
-        // The main loop starts after bootstrap services finish. No provider calls, receiver
-        // registrations or worker creation are allowed on the early bootstrap stack.
+            }
+        } catch (Throwable t) {
+            XposedBridge.log("findMyInterceptActivityInfo failed: " + t);
+        }
+        return null;
+    }
+
+    private ResolveInfo buildMyChooserResolveInfo(Context context, ResolveInfo templateResolveInfo, Intent sourceIntent) {
+        try {
+            ActivityInfo myActivityInfo = systemConfig == null ? null : systemConfig.getActivity();
+            if (myActivityInfo == null) {
+                XposedBridge.log("buildMyChooserResolveInfo: myActivityInfo == null");
+                return null;
+            }
+
+            ResolveInfo myResolveInfo = new ResolveInfo();
+            myResolveInfo.activityInfo = myActivityInfo;
+            myResolveInfo.resolvePackageName = myActivityInfo.packageName;
+
+            if (templateResolveInfo != null) {
+                myResolveInfo.match = templateResolveInfo.match;
+                myResolveInfo.priority = templateResolveInfo.priority;
+                myResolveInfo.preferredOrder = templateResolveInfo.preferredOrder;
+            } else {
+                myResolveInfo.match = 0;
+                myResolveInfo.priority = 0;
+                myResolveInfo.preferredOrder = 0;
+            }
+
+            myResolveInfo.isDefault = true;
+
+            IntentFilter intentFilter = new IntentFilter();
+            intentFilter.addAction(Intent.ACTION_VIEW);
+            intentFilter.addCategory(Intent.CATEGORY_DEFAULT);
+            intentFilter.addCategory(Intent.CATEGORY_BROWSABLE);
+
+            if (sourceIntent.getScheme() != null) {
+                intentFilter.addDataScheme(sourceIntent.getScheme());
+            }
+
+            myResolveInfo.filter = intentFilter;
+            return myResolveInfo;
+        } catch (Throwable t) {
+            XposedBridge.log("buildMyChooserResolveInfo failed: " + t);
+            return null;
+        }
+    }
+
+    public void hookSystemMethods(Context applicationContext) {
+        ClassLoader classLoader = systemClassLoader == null ? applicationContext.getClassLoader() : systemClassLoader;
+        // System bootstrap must not contact this app's Provider or register receivers.
+        // The callback reads only a ready cache; preserve the original result until then.
         new Handler(Looper.getMainLooper()).post(() -> {
-            try { systemConfig = new HookConfigCache(context); }
-            catch (Throwable error) { logSystemHookError(error); }
+            try { systemConfig = new HookConfigCache(applicationContext); }
+            catch (Throwable error) { XposedBridge.log("JumpReplay system cache initialization failed: " + error); }
         });
+
+        // 只修复 Android 11+ 上的 Provider / MessengerService 可见性
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            hookProviderVisibilityBypass(applicationContext);
+            hookServiceVisibilityBypass(applicationContext);
+        }
+
+        String ClassName = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ? "com.android.server.pm.ComputerEngine" : "com.android.server.pm.PackageManagerService";
+        if (Build.VERSION.SDK_INT == 31 || Build.VERSION.SDK_INT == 32) {
+            if (XposedHelpers.findClassIfExists("com.android.server.pm.PackageManagerService$ComputerEngine", classLoader) != null)
+                ClassName = "com.android.server.pm.PackageManagerService$ComputerEngine";
+        }
+        Class<?> hookClass;
+        try {
+            hookClass = XposedHelpers.findClass(ClassName, classLoader);
+            XposedBridge.log("android.server加载成功! => " + ClassName);
+//            HookClass(classLoader, ClassName);
+            XposedBridge.hookAllMethods(hookClass, "queryIntentActivitiesInternal", new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
+                    Intent intent = findIntentArg(param.args);
+                    if (intent == null || param.hasThrowable() || systemConfig == null) return;
+                    // 如果是自己的 Intent，不再处理，直接返回
+                    if (myAppPackage.equals(intent.getPackage())) {
+                        return;
+                    }
+                    if (intent.getComponent() != null || intent.getScheme() == null || intent.getPackage() != null || intent.getDataString() == null) {
+                        return;
+                    }
+
+                    XposedBridge.log("queryIntentActivitiesInternal Scheme: " + intent.getDataString());
+
+                    // 获取原始返回值
+                    List<ResolveInfo> originalResult = extractResolveInfoList(param.getResult());
+                    if (originalResult == null) return;
+                    // Rules also apply when HTTP/HTTPS already resolves to this module.
+                    if (systemConfig.isDisabled(intent.getScheme(), intent.getDataString())) {
+                        param.setResult(rebuildResolveInfoResult(param.getResult(), new ArrayList<>())); return;
+                    }
+                    if (containsMyResolveInfo(originalResult)) return;
+
+                    // 直接手工构造自己的 ResolveInfo，不再递归 queryIntentActivitiesInternal
+                    ResolveInfo clAppResolveInfo = originalResult.isEmpty() ? null : originalResult.get(0);
+                    ResolveInfo myAppResolveInfo = buildMyChooserResolveInfo(
+                            applicationContext,
+                            clAppResolveInfo,
+                            intent
+                    );
+
+                    if (myAppResolveInfo != null) {
+                        originalResult.add(myAppResolveInfo);
+                        XposedBridge.log("originalResult.add: " + originalResult);
+                    } else {
+                        XposedBridge.log("myAppResolveInfo == null, skip inject");
+                    }
+
+                    // 将修改后的结果设置回返回值
+                    param.setResult(rebuildResolveInfoResult(param.getResult(), originalResult));
+                }
+            });
+        } catch (XposedHelpers.ClassNotFoundError ignored) {
+        }
+
     }
 
-    private void logSystemHookError(Throwable error) {
-        if (systemHookErrorLogged.compareAndSet(false, true))
-            XposedBridge.log("JumpReplay system hook kept original result: " + error);
-    }
-
-    private static boolean isSystemServer(XC_LoadPackage.LoadPackageParam param) {
-        return ANDROID_PACKAGE.equals(param.packageName)
-                && ("android".equals(param.processName) || "system_server".equals(param.processName));
-    }
-
-    private void startSystemHooks(XC_LoadPackage.LoadPackageParam param) {
+    private void initializeSystemHooks() {
+        if (systemHooksInstalled) return;
         try {
             Object thread = XposedHelpers.callStaticMethod(ActivityThread.class, "currentActivityThread");
             Context context = (Context) XposedHelpers.callMethod(thread, "getSystemContext");
+            if (context == null) throw new IllegalStateException("System context is not ready");
             applicationContext = context;
-            hookSystemMethods(context, param.classLoader);
-        } catch (Throwable error) { logSystemHookError(error); }
+            systemHooksInstalled = true;
+            hookSystemMethods(context);
+        } catch (Throwable error) {
+            XposedBridge.log("JumpReplay could not initialize system scheme hook: " + error);
+        }
     }
 
     public void SetFloatWindowUi(Context applicationContext) {
@@ -578,8 +735,9 @@ public class IntentCapture implements IXposedHookLoadPackage {
     // 确保整个进程只会Hook一次
     public void HookStart(XC_LoadPackage.LoadPackageParam loadPackageParam) {
         mainHandler = new Handler(Looper.getMainLooper());
+        if (systemProcess) { initializeSystemHooks(); return; }
         if (ANDROID_PACKAGE.equals(loadPackageParam.packageName) && ("android".equals(loadPackageParam.processName) || "system_server".equals(loadPackageParam.processName))) {
-            startSystemHooks(loadPackageParam);
+            hookSystemMethods(applicationContext);
             return;
         }
 
@@ -639,12 +797,17 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam loadPackageParam) {
-        // LSPosed dispatches this after the system Application has already attached.
-        // Waiting for another Application.attach here leaves system hooks uninstalled.
-        if (isSystemServer(loadPackageParam)) {
-            startSystemHooks(loadPackageParam);
+        if ("android".equals(loadPackageParam.packageName)
+                && ("android".equals(loadPackageParam.processName) || "system_server".equals(loadPackageParam.processName))) {
+            // The system Application may already be attached when LSPosed calls us.
+            // Remember the PROCESS role before SettingsProvider loads another package here.
+            systemProcess = true;
+            systemClassLoader = loadPackageParam.classLoader;
+            initializeSystemHooks();
             return;
         }
+        // Packages loaded inside system_server must never install normal app capture/IPC.
+        if (systemProcess) return;
         // Loading WebView/another package in this process must not overwrite the
         // identity captured when the application's hooks and transport were installed.
         if (applicationContext == null) packageName = loadPackageParam.packageName;
