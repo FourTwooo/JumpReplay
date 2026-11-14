@@ -34,3 +34,13 @@
 - 改善动作编辑草稿回收与恢复，避免长期积累临时文件。
 - 补齐动作、桌面卡片及捕获监视相关英文 / 日文文案，修复本地化启动方式兼容性。
 - 修复应用重启后部分桌面卡片停留在加载状态的问题。
+
+## 后续：签名打包模板定位修复
+
+Android Studio 签名时，模板可能输出为 `blocker_template-release.apk`，并被重定向到 IDE 指定目录。旧 `prepareAppAssets` 写死 `build/outputs/apk/release/blocker_template-release-unsigned.apk`，因此模板已经构建也会报 `Blocker template was not built`。
+
+现在使用 AGP 8.0.1 的 `SingleArtifact.APK` 和 `BuiltArtifactsLoader`，在模板构建结束后读取本次实际输出路径，仅接受一个存在的模板 APK，再同步到主应用资源；不按目录里任意一个 APK 猜测，也不依赖旧 unsigned 文件。签名配置和运行时功能没有改动。
+
+验证：普通未签名 Release、Debug、主应用签名并重定向输出、模板也签名并重定向输出均构建成功。签名验证只使用本机调试证书，未读取或修改用户正式证书；已验证内嵌模板与本次准备的模板逐字节相同，签名模板通过 APK v2 验证。最终恢复普通构建，生成的 Release 仍为未签名包。本次无需安装或操作手机。
+
+构建日志及校验：`audit-artifacts/template-signing-fix-*.log`、`template-signing-fix-validation.json`。修复前回退标签为 `pre-template-signing-fix-20261114`，完成标签为 `v1.7.0-rc-signing-fix-20261114`。用户手工生成的 `app/release` 文件变化不纳入本次提交。

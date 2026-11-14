@@ -104,19 +104,37 @@ dependencies {
     compileOnly files('libs/XposedBridgeAPI-89.jar')
 }
 // Every app variant embeds the template built from the same checkout.
-def prepareAppAssets = tasks.register('prepareAppAssets', Sync) {
+def prepareAppAssets = tasks.register('prepareAppAssets') {
     dependsOn ':blocker_template:assembleRelease'
-    into layout.buildDirectory.dir('generated/appAssets')
-    from('src/main/assets') {
-        exclude 'blocker/blocker_template.apk'
-    }
-    from(project(':blocker_template').layout.buildDirectory.file('outputs/apk/release/blocker_template-release-unsigned.apk')) {
-        into 'blocker'
-        rename { 'blocker_template.apk' }
-    }
-    doLast {
-        def template = layout.buildDirectory.file('generated/appAssets/blocker/blocker_template.apk').get().asFile
-        if (!template.isFile()) throw new GradleException('Blocker template was not built')
+    inputs.dir('src/main/assets')
+    outputs.dir(layout.buildDirectory.dir('generated/appAssets'))
+}
+// Android Studio may sign and redirect every application module's APK. Consume
+// AGP's actual release artifact instead of assuming an unsigned name or location.
+def templateProject = project(':blocker_template')
+templateProject.plugins.withId('com.android.application') {
+    def components = templateProject.extensions.getByName('androidComponents')
+    components.onVariants(components.selector().withBuildType('release')) { variant ->
+        def apkDirectory = variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.APK.INSTANCE)
+        def loader = variant.artifacts.getBuiltArtifactsLoader()
+        prepareAppAssets.configure {
+            inputs.dir(apkDirectory).withPropertyName('blockerReleaseApks')
+            doLast {
+                def built = loader.load(apkDirectory.get())
+                if (built == null || built.elements.size() != 1)
+                    throw new GradleException('Expected one blocker template release APK in ' + apkDirectory.get().asFile)
+                def apk = new File(built.elements.first().outputFile)
+                if (!apk.isFile()) throw new GradleException('Blocker template APK not found: ' + apk)
+                project.sync {
+                    into layout.buildDirectory.dir('generated/appAssets')
+                    from('src/main/assets') { exclude 'blocker/blocker_template.apk' }
+                    from(apk) {
+                        into 'blocker'
+                        rename { 'blocker_template.apk' }
+                    }
+                }
+            }
+        }
     }
 }
 tasks.named('preBuild').configure { dependsOn prepareAppAssets }
