@@ -37,6 +37,14 @@ public class ActionWidgetTest {
                 android.widget.RemoteViews card=factory.getViewAt(0);
                 android.view.View view=card.apply(context,new android.widget.FrameLayout(context));
                 android.widget.TextView name=view.findViewById(com.fourtwo.hookintent.R.id.widget_action_name);
+                // Reproduce StackView's AT_MOST child measurement. Short names must not shrink
+                // the card and make the stack spread into separate tiles on the real launcher.
+                int measuredWidth=Math.round(size[0]*0.9f);
+                int measuredHeight=Math.round(size[1]*0.9f);
+                view.measure(android.view.View.MeasureSpec.makeMeasureSpec(measuredWidth,android.view.View.MeasureSpec.AT_MOST),
+                        android.view.View.MeasureSpec.makeMeasureSpec(measuredHeight,android.view.View.MeasureSpec.AT_MOST));
+                assertEquals(measuredWidth,view.getMeasuredWidth());
+                assertEquals(measuredHeight,view.getMeasuredHeight());
                 assertEquals(action.name,name.getText().toString());
                 assertFalse(viewText(view).contains("private-value"));
                 assertEquals(Collections.singletonList(action.id),ActionWidgetProvider.selection(context,id));
@@ -49,6 +57,38 @@ public class ActionWidgetTest {
                 }
             }
         } finally { store.close(); }
+    }
+    @Test public void portraitUsesMaximumHeightAndLandscapeUsesMaximumWidth() throws Exception {
+        Context context=RuntimeEnvironment.getApplication();
+        java.lang.reflect.Field field=ActionStore.class.getDeclaredField("instance");field.setAccessible(true);field.set(null,null);
+        ActionStore store=ActionStore.get(context);
+        try {
+            QuickAction action=new QuickAction(UUID.randomUUID().toString(),"A","demo://one",new String[0],false,"root",null,null);
+            store.save(action);
+            AppWidgetManager manager=AppWidgetManager.getInstance(context);
+            int id=Shadows.shadowOf(manager).createWidget(ActionWidgetProvider.class,com.fourtwo.hookintent.R.layout.widget_actions);
+            ActionWidgetProvider.save(context,id,Collections.singletonList(action.id));
+            android.os.Bundle options=new android.os.Bundle();
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,138);
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH,283);
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,51);
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,113);
+            manager.updateAppWidgetOptions(id,options);
+            ActionWidgetService service=Robolectric.buildService(ActionWidgetService.class).create().get();
+            RemoteViewsService.RemoteViewsFactory factory=service.onGetViewFactory(new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id));
+            for(String orientation:new String[]{"port","land"}) {
+                RuntimeEnvironment.setQualifiers(orientation);
+                factory.onDataSetChanged();
+                android.view.View card=factory.getViewAt(0).apply(context,new android.widget.FrameLayout(context));
+                int expectedHeight=orientation.equals("port") ? 113 : 51;
+                int expectedWidth=orientation.equals("port") ? 138 : 283;
+                float density=context.getResources().getDisplayMetrics().density;
+                assertEquals(Math.round(expectedHeight*density),card.getMinimumHeight());
+                assertEquals(Math.round(expectedWidth*density),((android.widget.TextView)card.findViewById(com.fourtwo.hookintent.R.id.widget_action_name)).getMinWidth());
+                assertEquals(orientation.equals("port") ? android.view.View.VISIBLE : android.view.View.GONE,
+                        card.findViewById(com.fourtwo.hookintent.R.id.widget_action_position).getVisibility());
+            }
+        } finally { RuntimeEnvironment.setQualifiers("port");store.close(); }
     }
     private String viewText(android.view.View view) {
         StringBuilder text=new StringBuilder();

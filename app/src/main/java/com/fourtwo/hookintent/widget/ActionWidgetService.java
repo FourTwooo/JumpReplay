@@ -2,6 +2,7 @@ package com.fourtwo.hookintent.widget;
 
 import android.appwidget.AppWidgetManager;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.BitmapFactory;
 import android.widget.*;
 import com.fourtwo.hookintent.R;
@@ -14,11 +15,19 @@ public class ActionWidgetService extends RemoteViewsService {
         return new RemoteViewsFactory() {
             List<QuickAction> values=new ArrayList<>();
             boolean compact=true, shortHeight;
+            int cardWidth=110, cardHeight=110;
             @Override public void onCreate() { onDataSetChanged(); }
             @Override public void onDataSetChanged() {
                 android.os.Bundle options=AppWidgetManager.getInstance(ActionWidgetService.this).getAppWidgetOptions(id);
                 int width=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,110);
                 int height=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,110);
+                // Legacy widget options describe both orientations, not a single minimum-size box.
+                if(getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE)
+                    width=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH,width);
+                else height=options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,height);
+                float density=getResources().getDisplayMetrics().density;
+                cardWidth=Math.round(width*density);
+                cardHeight=Math.round(height*density);
                 compact=width < 220 || height < 160;
                 shortHeight=height < 90;
                 List<QuickAction> next=new ArrayList<>();
@@ -39,6 +48,10 @@ public class ActionWidgetService extends RemoteViewsService {
                 view.setTextViewText(R.id.widget_action_position,(position+1)+" / "+values.size());
                 view.setViewVisibility(R.id.widget_action_position,shortHeight ? android.view.View.GONE : android.view.View.VISIBLE);
                 view.setInt(R.id.widget_action_name,"setMaxLines",shortHeight ? 1 : 2);
+                // StackView measures children with AT_MOST and spreads undersized cards apart.
+                // These supported RemoteViews setters fill that space consistently for every name.
+                view.setInt(R.id.widget_action_name,"setMinWidth",cardWidth);
+                view.setInt(R.id.widget_card,"setMinimumHeight",cardHeight);
                 if(action.icon == null) view.setImageViewResource(R.id.widget_action_icon,R.mipmap.ic_launcher);
                 else view.setImageViewBitmap(R.id.widget_action_icon,BitmapFactory.decodeByteArray(action.icon,0,action.icon.length));
                 view.setOnClickFillInIntent(R.id.widget_card,new Intent().putExtra("quick_action_id",action.id));
