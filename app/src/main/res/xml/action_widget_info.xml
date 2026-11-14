@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="220dp" android:minHeight="150dp" android:minResizeWidth="180dp" android:minResizeHeight="130dp"
-    android:targetCellWidth="4" android:targetCellHeight="3" android:resizeMode="horizontal|vertical"
+    android:minWidth="110dp" android:minHeight="110dp" android:minResizeWidth="110dp" android:minResizeHeight="48dp"
+    android:targetCellWidth="2" android:targetCellHeight="2" android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0" android:initialLayout="@layout/widget_actions" android:previewLayout="@layout/widget_actions"
     android:configure="com.fourtwo.hookintent.widget.ActionWidgetConfigureActivity"
     android:description="@string/action_widget_description" android:widgetCategory="home_screen"

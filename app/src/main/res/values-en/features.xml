@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="capture_tile">JumpReplay capture</string>
-    <string name="capture_tile_add">Add capture Quick Settings tile</string>
-    <string name="capture_tile_added">Capture tile added</string>
-    <string name="capture_tile_manual">Open Quick Settings, tap Edit, and drag JumpReplay capture into the panel</string>
     <string name="capture_running">Capturing</string>
     <string name="capture_stopped">Capture stopped</string>
     <string name="capture_channel">Capture session</string>

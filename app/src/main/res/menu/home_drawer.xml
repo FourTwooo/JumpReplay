@@ -25,6 +25,5 @@
         app:showAsAction="never" />
 
 
-    <item android:id="@+id/capture_tile_add" android:title="@string/capture_tile_add" app:showAsAction="never" />
-    <item android:id="@+id/capture_monitor_toggle" android:title="@string/capture_monitor" app:showAsAction="never" />
+    <item android:id="@+id/capture_monitor_toggle" android:icon="@drawable/capture_monitor" android:title="@string/capture_monitor" app:showAsAction="never" />
 </menu>

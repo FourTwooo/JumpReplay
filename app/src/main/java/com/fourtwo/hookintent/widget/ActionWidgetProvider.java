@@ -31,6 +31,7 @@ public class ActionWidgetProvider extends AppWidgetProvider {
     public static void update(Context context,AppWidgetManager manager,int id) {
         RemoteViews views=new RemoteViews(context.getPackageName(),R.layout.widget_actions);
         views.setTextViewText(R.id.widget_empty,context.getString(R.string.action_widget_empty));
+        views.setImageViewResource(R.id.widget_configure,R.drawable.widget_edit);
         Intent adapter=new Intent(context,ActionWidgetService.class).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id)
                 .setData(Uri.parse("jumpreplay-widget-adapter:"+id));
         views.setRemoteAdapter(R.id.action_stack,adapter);

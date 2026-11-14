@@ -15,6 +15,50 @@ import java.util.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(application=Application.class,sdk=33)
 public class ActionWidgetTest {
+    @Test public void resizingPreservesActionIdentityAndKeepsIntentContentsOffTheDesktop() throws Exception {
+        Context context=RuntimeEnvironment.getApplication();
+        java.lang.reflect.Field field=ActionStore.class.getDeclaredField("instance");field.setAccessible(true);field.set(null,null);
+        ActionStore store=ActionStore.get(context);
+        try {
+            QuickAction action=new QuickAction(UUID.randomUUID().toString(),"我的常用动作", "demo://open?token=private-value",new String[0],false,"root",null,null);
+            store.save(action);
+            AppWidgetManager manager=AppWidgetManager.getInstance(context);
+            int id=Shadows.shadowOf(manager).createWidget(ActionWidgetProvider.class,com.fourtwo.hookintent.R.layout.widget_actions);
+            ActionWidgetProvider.save(context,id,Collections.singletonList(action.id));
+            ActionWidgetService service=Robolectric.buildService(ActionWidgetService.class).create().get();
+            RemoteViewsService.RemoteViewsFactory factory=service.onGetViewFactory(new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id));
+            android.os.Bundle options=new android.os.Bundle();
+            long stableId=0; int firstLayout=0;
+            for(int[] size:new int[][]{{140,110},{300,220},{140,52}}) {
+                options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,size[0]);
+                options.putInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT,size[1]);
+                manager.updateAppWidgetOptions(id,options);factory.onDataSetChanged();
+                assertEquals(1,factory.getCount());
+                android.widget.RemoteViews card=factory.getViewAt(0);
+                android.view.View view=card.apply(context,new android.widget.FrameLayout(context));
+                android.widget.TextView name=view.findViewById(com.fourtwo.hookintent.R.id.widget_action_name);
+                assertEquals(action.name,name.getText().toString());
+                assertFalse(viewText(view).contains("private-value"));
+                assertEquals(Collections.singletonList(action.id),ActionWidgetProvider.selection(context,id));
+                if(firstLayout == 0) { firstLayout=card.getLayoutId();stableId=factory.getItemId(0); }
+                else assertEquals(stableId,factory.getItemId(0));
+                if(size[0] == 300) assertNotEquals(firstLayout,card.getLayoutId());
+                if(size[1] == 52) {
+                    assertEquals(android.view.View.GONE,view.findViewById(com.fourtwo.hookintent.R.id.widget_action_position).getVisibility());
+                    assertEquals(1,name.getMaxLines());
+                }
+            }
+        } finally { store.close(); }
+    }
+    private String viewText(android.view.View view) {
+        StringBuilder text=new StringBuilder();
+        if(view instanceof android.widget.TextView) text.append(((android.widget.TextView)view).getText());
+        if(view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group=(android.view.ViewGroup)view;
+            for(int i=0;i<group.getChildCount();i++) text.append(viewText(group.getChildAt(i)));
+        }
+        return text.toString();
+    }
     @Test public void widgetsHaveIndependentSelectionsAndDeletedActionsDisappear() throws Exception {
         Context context=RuntimeEnvironment.getApplication();
         java.lang.reflect.Field field=ActionStore.class.getDeclaredField("instance");field.setAccessible(true);field.set(null,null);

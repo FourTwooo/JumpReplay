@@ -120,10 +120,7 @@ public class HomeFragment extends Fragment {
             @Override
             public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
                 int itemId = menuItem.getItemId();
-                if (itemId == R.id.capture_tile_add) {
-                    com.fourtwo.hookintent.service.CaptureTileService.requestAdd((androidx.appcompat.app.AppCompatActivity) requireActivity());
-                    return true;
-                } else if (itemId == R.id.capture_monitor_toggle) {
+                if (itemId == R.id.capture_monitor_toggle) {
                     configureMonitor(); return true;
                 } else if (itemId == R.id.remove_list) {
                     // 清空RecyclerView的数据

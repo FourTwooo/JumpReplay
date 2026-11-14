@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="capture_tile">JumpReplay キャプチャ</string>
-    <string name="capture_tile_add">キャプチャタイルを追加</string>
-    <string name="capture_tile_added">キャプチャタイルを追加しました</string>
-    <string name="capture_tile_manual">クイック設定の編集から JumpReplay キャプチャを追加してください</string>
     <string name="capture_running">キャプチャ中</string>
     <string name="capture_stopped">キャプチャ停止中</string>
     <string name="capture_channel">キャプチャセッション</string>

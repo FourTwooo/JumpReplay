@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="capture_tile">JumpReplay 捕获</string>
-    <string name="capture_tile_add">添加捕获快捷开关</string>
-    <string name="capture_tile_added">捕获开关已添加</string>
-    <string name="capture_tile_manual">请下拉快捷设置，点击编辑，将 JumpReplay 捕获拖入面板</string>
     <string name="capture_running">捕获中</string>
     <string name="capture_stopped">已停止捕获</string>
     <string name="capture_channel">捕获会话</string>
