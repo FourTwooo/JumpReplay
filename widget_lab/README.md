@@ -35,4 +35,8 @@
 
 ## 后续决策
 
-等待用户判断真实桌面上的系统整帧翻页是否可接受。接受后才接入真实动作并补齐边界；若要求与应用内连续轮转完全相同，当前标准 RemoteViews 路线不满足要求，不能以它冒充完成品。用户已明确排除依赖 Root / Xposed 的桌面注入方案。
+用户最终要求为卡片随滚动位置连续改变角度、大小和前后关系，并且普通非 Root 用户可用。当前整帧翻页原型不满足，停止并入正式版。未安装的 dev.4 接入工作已保存在 `codex/rotary-stack-integration-paused-20261114`（8a5d9a9），当前分支及真机主应用保留 dev.3。
+
+传统 RemoteViews ListView 没有让提供方安装逐帧滚动监听、按项目在宿主中的位置实时变换角度的公开接口，仅替换成列表仍不满足。新的 Remote Compose 允许受支持的宿主本地处理手势、远程状态和动画，值得单独验证；DrawInstructions 接口始于 API 35，Android 10 不具备此接口，且新系统仍须检查播放器版本和操作支持，不能只按 SDK 版本承诺兼容。
+
+参考：[传统组件限制](https://developer.android.com/develop/ui/views/appwidgets)、[Remote Compose 架构](https://developer.android.com/develop/ui/compose/system/remote-compose)、[DrawInstructions](https://developer.android.com/reference/android/widget/RemoteViews.DrawInstructions)。
