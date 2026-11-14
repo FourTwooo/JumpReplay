@@ -1,0 +1,16 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.fourtwo.hookintent.widgetlab'
+    compileSdk 33
+    defaultConfig {
+        applicationId 'com.fourtwo.hookintent.widgetlab'
+        minSdk 24
+        targetSdk 33
+        versionCode 1
+        versionName '0.1-prototype'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}

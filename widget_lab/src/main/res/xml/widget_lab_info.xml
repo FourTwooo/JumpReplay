@@ -1,0 +1,5 @@
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="40dp" android:minHeight="40dp" android:targetCellWidth="2" android:targetCellHeight="2"
+    android:minResizeWidth="40dp" android:minResizeHeight="40dp" android:maxResizeWidth="140dp" android:maxResizeHeight="373dp"
+    android:initialLayout="@layout/widget_rotary_native" android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0" android:widgetCategory="home_screen" />

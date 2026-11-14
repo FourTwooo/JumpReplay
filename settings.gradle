@@ -20,3 +20,5 @@ include ':hiddenapi'
 include ':blocker_template'
 // Standalone compatibility fixture; never packaged into the module APK.
 include ':replay_fixture'
+// Isolated widget feasibility prototype; never packaged into JumpReplay.
+if (providers.gradleProperty('widgetLab').isPresent()) include ':widget_lab'
