@@ -48,7 +48,7 @@ public class CaptureSessionService extends Service {
             try { ContextCompat.startForegroundService(context, new Intent(context, CaptureSessionService.class)); }
             catch (RuntimeException error) {
                 HookStatusManager.setHook(false);
-                Toast.makeText(context, "无法启动捕获会话：" + error.getMessage(), Toast.LENGTH_LONG).show();
+                Toast.makeText(context, context.getString(R.string.capture_session_error,error.getMessage()), Toast.LENGTH_LONG).show();
             }
         } else context.stopService(new Intent(context, CaptureSessionService.class));
     }
@@ -97,11 +97,11 @@ public class CaptureSessionService extends Service {
     }
     private String description() {
         CaptureMonitor.Snapshot value = CaptureMonitor.changes().getValue();
-        String text = "本次新增 " + (value == null ? 0 : value.count) + " 条";
+        String text = getString(R.string.capture_session_count,value == null ? 0 : value.count);
         if (value != null && value.time > 0) text += " · " + value.source + " · "
                 + android.text.format.DateFormat.format("HH:mm:ss", value.time);
         Integer connected=MessengerService.connectionCount.getValue();
-        text += "\n已连接 " + (connected == null ? 0 : connected) + " 个进程";
+        text += "\n" + getString(R.string.capture_connected_count,connected == null ? 0 : connected);
         return text;
     }
     private Notification notification() {

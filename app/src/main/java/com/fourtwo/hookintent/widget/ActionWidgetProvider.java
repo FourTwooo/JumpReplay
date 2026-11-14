@@ -11,6 +11,9 @@ import java.util.*;
 import org.json.JSONArray;
 
 public class ActionWidgetProvider extends AppWidgetProvider {
+    // A launcher may retain a dead RemoteViews binding after force-stop. A new host
+    // process gets a fresh adapter identity; updates within the same process keep it stable.
+    private static final String ADAPTER_SESSION=UUID.randomUUID().toString();
     public static List<String> selection(Context context,int id) {
         List<String> result=new ArrayList<>();
         try {
@@ -21,7 +24,7 @@ public class ActionWidgetProvider extends AppWidgetProvider {
     }
     public static void save(Context context,int id,List<String> values) {
         if(!context.getSharedPreferences("action_widgets",0).edit().putString("widget_"+id,new JSONArray(values).toString()).commit())
-            throw new IllegalStateException("无法保存桌面卡片配置");
+            throw new IllegalStateException(context.getString(R.string.action_widget_save_error));
         update(context,AppWidgetManager.getInstance(context),id);
     }
     public static void updateAll(Context context) {
@@ -33,7 +36,7 @@ public class ActionWidgetProvider extends AppWidgetProvider {
         views.setTextViewText(R.id.widget_empty,context.getString(R.string.action_widget_empty));
         views.setImageViewResource(R.id.widget_configure,R.drawable.widget_edit);
         Intent adapter=new Intent(context,ActionWidgetService.class).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id)
-                .setData(Uri.parse("jumpreplay-widget-adapter:"+id));
+                .setData(Uri.parse("jumpreplay-widget-adapter:"+id+":"+ADAPTER_SESSION));
         views.setRemoteAdapter(R.id.action_stack,adapter);
         views.setEmptyView(R.id.action_stack,R.id.widget_empty);
         Intent launch=new Intent(context,ShortcutActivity.class).setAction(Intent.ACTION_VIEW)

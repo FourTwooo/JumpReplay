@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_error_empty_intent">Intent 不能为空</string>
+    <string name="action_error_empty_parameter">替换参数不能为空</string>
+    <string name="action_error_duplicate_parameter">替换参数不能重复：%1$s</string>
+    <string name="action_error_missing_parameter">Intent 中找不到替换参数：%1$s</string>
+    <string name="action_error_parameter_count">替换参数数量不一致</string>
+    <string name="action_error_authority_parameter">主机参数包含 URL 结构分隔符</string>
+    <string name="action_icon_app">从应用选择</string>
+    <string name="action_icon_image">从图片选择</string>
+    <string name="action_icon_default">恢复默认</string>
+    <string name="action_parameter_original">需要替换的原文</string>
+    <string name="action_import_uri">输入或粘贴 Scheme / Intent URI</string>
+    <string name="action_import_file">导入动作备份文件</string>
+    <string name="action_next">下一步</string>
+    <string name="action_run">执行动作</string>
+    <string name="action_pin">创建桌面快捷方式</string>
+    <string name="action_delete_title">删除动作？</string>
+    <string name="action_delete_body">关联的桌面快捷方式将失效，卡片中将不再显示此动作。收藏和捕获记录会保留。</string>
+    <string name="action_pin_system_unsupported">当前系统不支持请求固定快捷方式</string>
+    <string name="action_pin_launcher_unsupported">当前桌面不支持固定快捷方式</string>
+    <string name="action_pin_permission_title">需要桌面快捷方式权限</string>
+    <string name="action_pin_permission_body">请在系统设置中允许创建桌面快捷方式后重试。</string>
+    <string name="action_open_settings">去设置</string>
+    <string name="action_pin_confirm">请在桌面弹窗中确认添加；未出现时请检查桌面权限</string>
+    <string name="action_pin_rejected">桌面未接受添加请求</string>
+    <string name="action_widget_manual">请长按桌面，进入小组件列表添加 JumpReplay 叠卡</string>
+    <string name="action_widget_confirm">请在桌面确认添加，并选择要显示的动作</string>
+    <string name="action_widget_rejected">桌面未接受添加请求，请从小组件列表添加</string>
+    <string name="action_backup_exported">动作备份已导出</string>
+    <string name="action_backup_export_error">导出失败：%1$s</string>
+    <string name="action_backup_import_error">导入失败：%1$s</string>
+    <string name="action_import_count">已导入 %1$d 个动作</string>
+    <string name="action_file_write_error">无法写入所选文件</string>
+    <string name="action_file_read_error">无法读取所选文件</string>
+    <string name="action_image_read_error">无法读取图片</string>
+    <string name="action_icon_save_error">无法保存图标</string>
+    <string name="action_missing">动作已删除</string>
+    <string name="action_shortcut_missing">该快捷动作已删除，请重新添加</string>
+    <string name="action_widget_instructions">勾选要显示的动作，拖动右侧手柄调整卡片顺序。\n每个桌面组件分别保存自己的选择。</string>
+    <string name="action_widget_save">保存卡片</string>
+    <string name="action_widget_select_required">请先添加并选择至少一个动作</string>
+    <string name="action_widget_save_error">无法保存桌面卡片配置</string>
+    <string name="action_select_named">选择 %1$s</string>
+    <string name="action_run_named">执行 %1$s</string>
+    <string name="action_parameter_summary">%1$d 个动态参数 · %2$s</string>
+    <string name="action_error_name">请输入动作名称</string>
+    <string name="action_error_uri">请输入完整 Scheme 或 Intent URI</string>
+    <string name="action_error_mode">启动方式无效</string>
+    <string name="action_error_snapshot">动作快照无效</string>
+    <string name="action_error_icon_size">图标过大</string>
+    <string name="action_error_icon">图标无效或尺寸超过 512 像素</string>
+    <string name="action_backup_duplicate">备份包含重复的动作列表</string>
+    <string name="action_backup_entry">动作条目无效</string>
+    <string name="action_backup_unsupported">不是支持的 JumpReplay 动作备份</string>
+    <string name="action_backup_depth">备份结构嵌套过深</string>
+    <string name="action_backup_json">备份 JSON 无效</string>
+    <string name="capture_session_error">无法启动捕获会话：%1$s</string>
+    <string name="capture_session_count">本次新增 %1$d 条</string>
+    <string name="capture_connected_count">已连接 %1$d 个进程</string>
+    <string-array name="action_icon_options">
+        <item>@string/action_icon_app</item>
+        <item>@string/action_icon_image</item>
+        <item>@string/action_icon_default</item>
+    </string-array>
+    <string-array name="action_import_options">
+        <item>@string/action_import_uri</item>
+        <item>@string/action_import_file</item>
+    </string-array>
+    <string-array name="action_menu_options">
+        <item>@string/action_edit</item>
+        <item>@string/action_run</item>
+        <item>@string/action_pin</item>
+        <item>@string/action_delete_action</item>
+    </string-array>
+    <string name="action_drag_description">拖动排序</string>
+    <string name="action_delete_action">删除动作</string>
+</resources>

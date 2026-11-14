@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_error_empty_intent">Intent cannot be empty</string>
+    <string name="action_error_empty_parameter">Replacement text cannot be empty</string>
+    <string name="action_error_duplicate_parameter">Duplicate replacement text: %1$s</string>
+    <string name="action_error_missing_parameter">Replacement text not found in Intent: %1$s</string>
+    <string name="action_error_parameter_count">The number of replacement values does not match</string>
+    <string name="action_error_authority_parameter">The host value contains URL separators</string>
+    <string name="action_icon_app">Choose from apps</string>
+    <string name="action_icon_image">Choose an image</string>
+    <string name="action_icon_default">Use default icon</string>
+    <string name="action_parameter_original">Original text to replace</string>
+    <string name="action_import_uri">Type or paste a Scheme / Intent URI</string>
+    <string name="action_import_file">Import an action backup</string>
+    <string name="action_next">Next</string>
+    <string name="action_run">Run action</string>
+    <string name="action_pin">Create home screen shortcut</string>
+    <string name="action_delete_title">Delete this action?</string>
+    <string name="action_delete_body">Linked shortcuts will stop working and this action will disappear from widgets. Favorites and captures will be kept.</string>
+    <string name="action_pin_system_unsupported">This Android version cannot request pinned shortcuts</string>
+    <string name="action_pin_launcher_unsupported">This launcher does not support pinned shortcuts</string>
+    <string name="action_pin_permission_title">Shortcut permission required</string>
+    <string name="action_pin_permission_body">Allow home screen shortcut creation in system settings, then try again.</string>
+    <string name="action_open_settings">Open settings</string>
+    <string name="action_pin_confirm">Confirm in the launcher dialog. If it does not appear, check shortcut permission.</string>
+    <string name="action_pin_rejected">The launcher did not accept the request</string>
+    <string name="action_widget_manual">Long-press the home screen and add JumpReplay cards from the widget list</string>
+    <string name="action_widget_confirm">Confirm on the home screen, then choose the actions to display</string>
+    <string name="action_widget_rejected">The launcher did not accept the request. Add it from the widget list.</string>
+    <string name="action_backup_exported">Action backup exported</string>
+    <string name="action_backup_export_error">Export failed: %1$s</string>
+    <string name="action_backup_import_error">Import failed: %1$s</string>
+    <string name="action_import_count">Actions imported: %1$d</string>
+    <string name="action_file_write_error">Cannot write to the selected file</string>
+    <string name="action_file_read_error">Cannot read the selected file</string>
+    <string name="action_image_read_error">Cannot read the image</string>
+    <string name="action_icon_save_error">Cannot save the icon</string>
+    <string name="action_missing">This action has been deleted</string>
+    <string name="action_shortcut_missing">This action was deleted. Add the shortcut again.</string>
+    <string name="action_widget_instructions">Select actions and drag the handles to reorder them.\nEach widget keeps its own selection.</string>
+    <string name="action_widget_save">Save cards</string>
+    <string name="action_widget_select_required">Add and select at least one action first</string>
+    <string name="action_widget_save_error">Cannot save widget configuration</string>
+    <string name="action_select_named">Select %1$s</string>
+    <string name="action_run_named">Run %1$s</string>
+    <string name="action_parameter_summary">Dynamic parameters: %1$d · %2$s</string>
+    <string name="action_error_name">Enter an action name</string>
+    <string name="action_error_uri">Enter a complete Scheme or Intent URI</string>
+    <string name="action_error_mode">Invalid launch mode</string>
+    <string name="action_error_snapshot">Invalid action snapshot</string>
+    <string name="action_error_icon_size">The icon is too large</string>
+    <string name="action_error_icon">Invalid icon or dimensions exceed 512 pixels</string>
+    <string name="action_backup_duplicate">The backup contains duplicate action lists</string>
+    <string name="action_backup_entry">Invalid action entry</string>
+    <string name="action_backup_unsupported">Unsupported JumpReplay action backup</string>
+    <string name="action_backup_depth">The backup structure is nested too deeply</string>
+    <string name="action_backup_json">Invalid backup JSON</string>
+    <string name="capture_session_error">Cannot start capture session: %1$s</string>
+    <string name="capture_session_count">New captures this session: %1$d</string>
+    <string name="capture_connected_count">Connected processes: %1$d</string>
+    <string-array name="action_icon_options">
+        <item>@string/action_icon_app</item>
+        <item>@string/action_icon_image</item>
+        <item>@string/action_icon_default</item>
+    </string-array>
+    <string-array name="action_import_options">
+        <item>@string/action_import_uri</item>
+        <item>@string/action_import_file</item>
+    </string-array>
+    <string-array name="action_menu_options">
+        <item>@string/action_edit</item>
+        <item>@string/action_run</item>
+        <item>@string/action_pin</item>
+        <item>@string/action_delete_action</item>
+    </string-array>
+    <string name="action_drag_description">Drag to reorder</string>
+    <string name="action_delete_action">Delete action</string>
+</resources>

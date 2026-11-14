@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_error_empty_intent">Intent を入力してください</string>
+    <string name="action_error_empty_parameter">置換する文字列を入力してください</string>
+    <string name="action_error_duplicate_parameter">置換する文字列が重複しています：%1$s</string>
+    <string name="action_error_missing_parameter">Intent に置換する文字列がありません：%1$s</string>
+    <string name="action_error_parameter_count">置換する値の数が一致しません</string>
+    <string name="action_error_authority_parameter">ホストの値に URL の区切り文字が含まれています</string>
+    <string name="action_icon_app">アプリから選択</string>
+    <string name="action_icon_image">画像から選択</string>
+    <string name="action_icon_default">標準に戻す</string>
+    <string name="action_parameter_original">置換する元の文字列</string>
+    <string name="action_import_uri">Scheme / Intent URI を入力・貼り付け</string>
+    <string name="action_import_file">アクションのバックアップを読み込む</string>
+    <string name="action_next">次へ</string>
+    <string name="action_run">アクションを実行</string>
+    <string name="action_pin">ホーム画面にショートカットを作成</string>
+    <string name="action_delete_title">このアクションを削除しますか？</string>
+    <string name="action_delete_body">関連するショートカットが無効になり、カードからこのアクションが消えます。お気に入りとキャプチャ記録は保持されます。</string>
+    <string name="action_pin_system_unsupported">この Android バージョンは固定ショートカットの追加要求に対応していません</string>
+    <string name="action_pin_launcher_unsupported">このホームアプリは固定ショートカットに対応していません</string>
+    <string name="action_pin_permission_title">ショートカット作成の権限が必要です</string>
+    <string name="action_pin_permission_body">システム設定でホーム画面のショートカット作成を許可してから再試行してください。</string>
+    <string name="action_open_settings">設定を開く</string>
+    <string name="action_pin_confirm">ホーム画面のダイアログで追加を確認してください。表示されない場合は権限を確認してください。</string>
+    <string name="action_pin_rejected">ホームアプリが追加要求を受け付けませんでした</string>
+    <string name="action_widget_manual">ホーム画面を長押しし、ウィジェット一覧から JumpReplay カードを追加してください</string>
+    <string name="action_widget_confirm">ホーム画面で追加を確認し、表示するアクションを選択してください</string>
+    <string name="action_widget_rejected">ホームアプリが要求を受け付けませんでした。ウィジェット一覧から追加してください。</string>
+    <string name="action_backup_exported">アクションのバックアップを保存しました</string>
+    <string name="action_backup_export_error">保存に失敗しました：%1$s</string>
+    <string name="action_backup_import_error">読み込みに失敗しました：%1$s</string>
+    <string name="action_import_count">%1$d 件のアクションを読み込みました</string>
+    <string name="action_file_write_error">選択したファイルに書き込めません</string>
+    <string name="action_file_read_error">選択したファイルを読み込めません</string>
+    <string name="action_image_read_error">画像を読み込めません</string>
+    <string name="action_icon_save_error">アイコンを保存できません</string>
+    <string name="action_missing">このアクションは削除されました</string>
+    <string name="action_shortcut_missing">このアクションは削除されました。ショートカットを再追加してください。</string>
+    <string name="action_widget_instructions">表示するアクションを選び、右のハンドルで順序を変更します。\n選択内容はウィジェットごとに保存されます。</string>
+    <string name="action_widget_save">カードを保存</string>
+    <string name="action_widget_select_required">アクションを追加し、少なくとも 1 件選択してください</string>
+    <string name="action_widget_save_error">ウィジェットの設定を保存できません</string>
+    <string name="action_select_named">%1$s を選択</string>
+    <string name="action_run_named">%1$s を実行</string>
+    <string name="action_parameter_summary">動的パラメータ %1$d 個 · %2$s</string>
+    <string name="action_error_name">アクション名を入力してください</string>
+    <string name="action_error_uri">完全な Scheme または Intent URI を入力してください</string>
+    <string name="action_error_mode">起動方法が無効です</string>
+    <string name="action_error_snapshot">アクションのスナップショットが無効です</string>
+    <string name="action_error_icon_size">アイコンが大きすぎます</string>
+    <string name="action_error_icon">アイコンが無効、またはサイズが 512 ピクセルを超えています</string>
+    <string name="action_backup_duplicate">バックアップにアクション一覧が重複しています</string>
+    <string name="action_backup_entry">アクションの項目が無効です</string>
+    <string name="action_backup_unsupported">対応していない JumpReplay アクションのバックアップです</string>
+    <string name="action_backup_depth">バックアップの階層が深すぎます</string>
+    <string name="action_backup_json">バックアップの JSON が無効です</string>
+    <string name="capture_session_error">キャプチャを開始できません：%1$s</string>
+    <string name="capture_session_count">今回の新規キャプチャ：%1$d 件</string>
+    <string name="capture_connected_count">接続中のプロセス：%1$d 個</string>
+    <string-array name="action_icon_options">
+        <item>@string/action_icon_app</item>
+        <item>@string/action_icon_image</item>
+        <item>@string/action_icon_default</item>
+    </string-array>
+    <string-array name="action_import_options">
+        <item>@string/action_import_uri</item>
+        <item>@string/action_import_file</item>
+    </string-array>
+    <string-array name="action_menu_options">
+        <item>@string/action_edit</item>
+        <item>@string/action_run</item>
+        <item>@string/action_pin</item>
+        <item>@string/action_delete_action</item>
+    </string-array>
+    <string name="action_drag_description">ドラッグして並べ替え</string>
+    <string name="action_delete_action">アクションを削除</string>
+</resources>

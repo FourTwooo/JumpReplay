@@ -27,6 +27,7 @@ public class ActionEditorActivity extends AppCompatActivity {
     private Spinner mode;
     private Button save;
     private String id,payload;
+    private String draftId;
     private byte[] iconBytes;
     private boolean loaded,saving;
     private ExtrasClient merge;
@@ -42,7 +43,7 @@ public class ActionEditorActivity extends AppCompatActivity {
                 options.inJustDecodeBounds=false;
                 Bitmap bitmap;
                 try(InputStream input=getContentResolver().openInputStream(uri)) { bitmap=BitmapFactory.decodeStream(input,null,options); }
-                if(bitmap == null) throw new IOException("无法读取图片");
+                if(bitmap == null) throw new IOException(getString(R.string.action_image_read_error));
                 byte[] bytes=iconData(bitmap);
                 main.post(() -> { if(alive()) { iconBytes=bytes; showIcon(); } });
             } catch(Exception | OutOfMemoryError error) { error(error); }
@@ -72,13 +73,23 @@ public class ActionEditorActivity extends AppCompatActivity {
         id=state == null ? getIntent().getStringExtra("action_id") : state.getString("action_id");
         if(id == null) id=UUID.randomUUID().toString();
         String restore=state == null ? null : state.getString("editor_state_id");
+        String current=state == null ? null : state.getString("action_draft_id");
+        draftId=current!=null ? current : getIntent().getStringExtra("action_draft_id");
+        if(draftId==null) draftId=ActionDraftStore.newId();
+        ActionDraftStore.retain(draftId);
+        boolean restoreDraft=state!=null && state.getBoolean("editor_form_saved",false);
         ActionStore.IO.execute(() -> {
             try {
+                ActionDraftStore.prune(this,System.currentTimeMillis());
                 QuickAction action=null;
-                if(restore != null) action=QuickAction.fromJson(ShortcutPayloadStore.readRaw(this,restore),false);
+                if(restoreDraft) action=QuickAction.fromJson(ActionDraftStore.read(this,draftId),false);
+                else if(restore != null) action=QuickAction.fromJson(ShortcutPayloadStore.readRaw(this,restore),false);
                 else if(getIntent().hasExtra("action_id")) {
                     action=ActionStore.get(this).find(id);
-                    if(action == null) throw new IllegalArgumentException("动作已删除");
+                    if(action == null) throw new IllegalArgumentException(getString(R.string.action_missing));
+                } else if(getIntent().hasExtra("action_draft_id")) {
+                    JSONObject draft=ActionDraftStore.read(this,draftId);
+                    action=new QuickAction(id,getIntent().getStringExtra("draft_name"),draft.getString("template"),new String[0],false,"root",draft.toString(),null);
                 } else if(getIntent().hasExtra("draft_payload_id")) {
                     JSONObject draft=ShortcutPayloadStore.readRaw(this,getIntent().getStringExtra("draft_payload_id"));
                     action=new QuickAction(id,getIntent().getStringExtra("draft_name"),draft.getString("template"),new String[0],false,"root",draft.toString(),null);
@@ -102,7 +113,7 @@ public class ActionEditorActivity extends AppCompatActivity {
     }
     private void render(QuickAction value) {
         name.setText(value.name); template.setText(value.template); privileged.setChecked(value.privileged);
-        for(int i=0;i<mode.getCount();i++) if(mode.getItemAtPosition(i).toString().equals(value.mode)) mode.setSelection(i);
+        for(int i=0;i<mode.getCount();i++) if(QuickAction.modeAt(i).equals(value.mode)) mode.setSelection(i);
         payload=value.payload; iconBytes=value.icon; showIcon();
         for(String parameter:value.parameters) addParameter(parameter);
     }
@@ -112,7 +123,7 @@ public class ActionEditorActivity extends AppCompatActivity {
     }
     private void addParameter(String text) {
         LinearLayout row=new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
-        EditText input=AppDialogs.input(this); input.setHint("需要替换的原文"); input.setSingleLine(); input.setText(text);
+        EditText input=AppDialogs.input(this); input.setHint(getString(R.string.action_parameter_original)); input.setSingleLine(); input.setText(text);
         row.addView(input,new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1));
         ImageButton remove=new ImageButton(this); remove.setImageResource(R.drawable.baseline_delete_outline_24);
         remove.setBackground(null); remove.setContentDescription(getString(R.string.delete));
@@ -125,12 +136,12 @@ public class ActionEditorActivity extends AppCompatActivity {
             LinearLayout row=(LinearLayout)parameters.getChildAt(i); names.add(((EditText)row.getChildAt(0)).getText().toString());
         }
         return new QuickAction(id,name.getText().toString().trim(),template.getText().toString().trim(),names.toArray(new String[0]),
-                privileged.isChecked(),String.valueOf(mode.getSelectedItem()),payload,iconBytes);
+                privileged.isChecked(),QuickAction.modeAt(mode.getSelectedItemPosition()),payload,iconBytes);
     }
     private void save() {
         if(!loaded || saving) return;
         final QuickAction action=readForm();
-        try { action.validate(); } catch(Exception error) { template.setError(error.getMessage()); return; }
+        try { action.validate(); } catch(Exception error) { template.setError(ActionValidationException.text(this,error)); return; }
         saving=true; save.setEnabled(false);
         ActionStore.IO.execute(() -> {
             try {
@@ -168,7 +179,7 @@ public class ActionEditorActivity extends AppCompatActivity {
         } catch(Exception error) { error(error); }
     }
     private void chooseIcon() {
-        AppDialogs.builder(this).setTitle(R.string.action_choose_icon).setItems(new String[]{"从应用选择","从图片选择","恢复默认"},(dialog,which) -> {
+        AppDialogs.builder(this).setTitle(R.string.action_choose_icon).setItems(R.array.action_icon_options,(dialog,which) -> {
             if(which == 1) imagePicker.launch("image/*");
             else if(which == 2) { iconBytes=null; showIcon(); }
             else ActionStore.IO.execute(() -> {
@@ -200,16 +211,22 @@ public class ActionEditorActivity extends AppCompatActivity {
         float ratio=Math.min(1f,192f/Math.max(source.getWidth(),source.getHeight()));
         Bitmap bitmap=Bitmap.createScaledBitmap(source,Math.max(1,Math.round(source.getWidth()*ratio)),Math.max(1,Math.round(source.getHeight()*ratio)),true);
         ByteArrayOutputStream output=new ByteArrayOutputStream();
-        if(!bitmap.compress(Bitmap.CompressFormat.PNG,100,output)) throw new IOException("无法保存图标"); return output.toByteArray();
+        if(!bitmap.compress(Bitmap.CompressFormat.PNG,100,output)) throw new IOException(getString(R.string.action_icon_save_error)); return output.toByteArray();
     }
     private boolean alive() { return !isFinishing() && !isDestroyed(); }
     private int dp(int value) { return AppDialogs.dp(this,value); }
-    private void error(Throwable error) { main.post(() -> { if(alive()) Toast.makeText(this,error.getMessage(),Toast.LENGTH_LONG).show(); }); }
+    private void error(Throwable error) { main.post(() -> { if(alive()) Toast.makeText(this,ActionValidationException.text(this,error),Toast.LENGTH_LONG).show(); }); }
     @Override protected void onSaveInstanceState(Bundle state) {
         state.putString("action_id",id);
-        if(loaded) try { state.putString("editor_state_id",ShortcutPayloadStore.saveRaw(this,readForm().json())); }
+        state.putString("action_draft_id",draftId);
+        if(loaded) try { ActionDraftStore.write(this,draftId,readForm().json());state.putBoolean("editor_form_saved",true); }
         catch(Exception error) { error(error); }
         super.onSaveInstanceState(state);
     }
-    @Override protected void onDestroy() { if(merge != null) merge.close(); super.onDestroy(); }
+    @Override protected void onDestroy() {
+        if(merge != null) merge.close();
+        String cleanup=draftId;ActionDraftStore.release(cleanup);
+        if(isFinishing()) ActionStore.IO.execute(() -> ActionDraftStore.delete(getApplicationContext(),cleanup));
+        super.onDestroy();
+    }
 }

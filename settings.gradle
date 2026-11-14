@@ -22,3 +22,4 @@ include ':blocker_template'
 include ':replay_fixture'
 // Isolated widget feasibility prototype; never packaged into JumpReplay.
 if (providers.gradleProperty('widgetLab').isPresent()) include ':widget_lab'
+if (providers.gradleProperty('visibilityProbe').isPresent()) include ':visibility_probe'

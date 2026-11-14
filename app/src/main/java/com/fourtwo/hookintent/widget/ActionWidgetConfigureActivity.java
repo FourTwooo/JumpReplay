@@ -35,18 +35,18 @@ public class ActionWidgetConfigureActivity extends AppCompatActivity implements 
         toolbar.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this,R.color.screen_toolbar));
         toolbar.setTitleTextColor(android.graphics.Color.WHITE);
         root.addView(toolbar,new LinearLayout.LayoutParams(-1,AppDialogs.dp(this,56)));
-        TextView hint=new TextView(this); hint.setText("勾选要显示的动作，拖动右侧手柄调整卡片顺序。\n每个桌面组件分别保存自己的选择。");
+        TextView hint=new TextView(this); hint.setText(R.string.action_widget_instructions);
         hint.setPadding(dp(20),dp(12),dp(20),dp(12)); hint.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.screen_secondary)); root.addView(hint);
         Button add=new Button(this,null,0,R.style.Widget_HookIntent_DialogNegativeButton); add.setText(R.string.action_add);
         add.setOnClickListener(v -> startActivity(new Intent(this,ActionEditorActivity.class))); root.addView(add);
         RecyclerView list=new RecyclerView(this); list.setLayoutManager(new LinearLayoutManager(this)); list.setPadding(dp(12),0,dp(12),0);
         root.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         adapter=new ActionListAdapter(true,this); list.setAdapter(adapter); adapter.attach(list);
-        Button save=new Button(this,null,0,R.style.Widget_HookIntent_DialogButton); save.setText("保存卡片");
+        Button save=new Button(this,null,0,R.style.Widget_HookIntent_DialogButton); save.setText(getString(R.string.action_widget_save));
         LinearLayout.LayoutParams button=new LinearLayout.LayoutParams(-1,-2); button.setMargins(dp(16),dp(8),dp(16),dp(16)); root.addView(save,button);
         save.setOnClickListener(v -> {
             List<String> selection=adapter.ids(true);
-            if(!ready || selection.isEmpty()) { Toast.makeText(this,"请先添加并选择至少一个动作",Toast.LENGTH_LONG).show(); return; }
+            if(!ready || selection.isEmpty()) { Toast.makeText(this,getString(R.string.action_widget_select_required),Toast.LENGTH_LONG).show(); return; }
             try {
                 ActionWidgetProvider.save(this,widgetId,selection);
                 setResult(RESULT_OK,new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,widgetId)); finish();

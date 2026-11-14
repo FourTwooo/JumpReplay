@@ -32,6 +32,14 @@ public class MainApplication extends Application {
         // The offline object codec runs with an isolated UID and receives no privileged bridges.
         if (isolated()) return;
 
+        String process=Build.VERSION.SDK_INT>=28 ? Application.getProcessName()
+                : com.fourtwo.hookintent.base.DataConverter.getCurrentProcessName(this);
+        if(getPackageName().equals(process)) {
+            com.fourtwo.hookintent.service.CaptureVisibility.start(this);
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(
+                    () -> com.fourtwo.hookintent.widget.ActionWidgetProvider.updateAll(this));
+        }
+
         // 开启系统隐藏API
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             HiddenApiBypass.addHiddenApiExemptions("L");

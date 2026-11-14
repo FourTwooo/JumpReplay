@@ -50,6 +50,15 @@ public class ShortcutLaunchCoordinatorTest {
 
     private static void idle() { Shadows.shadowOf(Looper.getMainLooper()).idle(); }
 
+    @Test public void translatedLegacyAssistantSelectionsStillUseAssistantBackend() {
+        for(String label:new String[]{"Shizuku - System Helper","Shizuku - システムアシスタント"}) {
+            create();backend.binder=true;backend.granted=true;
+            coordinator.launch(target(),true,label,callback);idle();
+            assertEquals(ShortcutLaunchCoordinator.Mode.ASSISTANT,backend.modes.get(0));
+            coordinator.cancel();idle();
+        }
+    }
+
     @Test public void coldBinderWaitsForPermissionThenStartsExactlyOnceWithCompleteIntent() {
         Intent original = target();
         coordinator.launch(original, true, "Shizuku", callback);

@@ -22,7 +22,7 @@ android {
 
     buildTypes {
         debug {
-            versionNameSuffix "-dev.3"
+            versionNameSuffix "-dev.8"
         }
         release {
             minifyEnabled false

@@ -13,7 +13,7 @@
             android:maxLines="2" android:ellipsize="end" />
     </LinearLayout>
     <ImageButton android:id="@+id/action_run" android:layout_width="48dp" android:layout_height="48dp"
-        android:src="@drawable/action_play" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="执行动作" />
+        android:src="@drawable/action_play" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="@string/action_run" />
     <ImageButton android:id="@+id/action_drag" android:layout_width="40dp" android:layout_height="48dp"
-        android:src="@drawable/action_drag" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="拖动排序" />
+        android:src="@drawable/action_drag" android:background="?attr/selectableItemBackgroundBorderless" android:contentDescription="@string/action_drag_description" />
 </LinearLayout>

@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!--查询所有应用程序-->
     <uses-permission
@@ -37,6 +38,18 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.HookIntent"
         tools:targetApi="31">
+
+        <receiver android:name=".service.CaptureVisibility" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
 
         <activity android:name=".actions.ActionEditorActivity" android:exported="false" android:theme="@style/Theme.HookIntent.NoActionBar" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".widget.ActionWidgetConfigureActivity" android:exported="true" android:taskAffinity="${applicationId}.widget_config" android:excludeFromRecents="true" android:theme="@style/Theme.HookIntent.NoActionBar">

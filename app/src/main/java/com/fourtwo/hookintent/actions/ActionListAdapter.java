@@ -49,15 +49,15 @@ public final class ActionListAdapter extends RecyclerView.Adapter<ActionListAdap
     @Override public void onBindViewHolder(Holder holder,int position) {
         QuickAction action=values.get(position);
         holder.name.setText(action.name);
-        holder.summary.setText((action.parameters.length > 0 ? action.parameters.length+" 个动态参数 · " : "")+action.template);
+        holder.summary.setText(action.parameters.length > 0 ? holder.itemView.getResources().getString(R.string.action_parameter_summary,action.parameters.length,action.template) : action.template);
         if(action.icon == null) holder.icon.setImageResource(R.mipmap.ic_launcher);
         else holder.icon.setImageBitmap(BitmapFactory.decodeByteArray(action.icon,0,action.icon.length));
         holder.check.setVisibility(selecting ? View.VISIBLE : View.GONE);
         holder.check.setOnCheckedChangeListener(null); holder.check.setChecked(selected.contains(action.id));
-        holder.check.setContentDescription("选择 "+action.name);
+        holder.check.setContentDescription(holder.itemView.getResources().getString(R.string.action_select_named,action.name));
         holder.check.setOnCheckedChangeListener((button,checked) -> { if(checked) selected.add(action.id); else selected.remove(action.id); });
         holder.run.setVisibility(selecting ? View.GONE : View.VISIBLE);
-        holder.run.setContentDescription("执行 "+action.name); holder.run.setOnClickListener(v -> listener.run(action));
+        holder.run.setContentDescription(holder.itemView.getResources().getString(R.string.action_run_named,action.name)); holder.run.setOnClickListener(v -> listener.run(action));
         holder.itemView.setOnClickListener(v -> { if(selecting) holder.check.setChecked(!holder.check.isChecked()); else listener.open(action); });
         holder.itemView.setOnLongClickListener(v -> { if(!selecting) listener.options(action); return !selecting; });
         holder.drag.setOnTouchListener((v,event) -> { if(event.getActionMasked() == MotionEvent.ACTION_DOWN && drag != null) drag.startDrag(holder); return false; });

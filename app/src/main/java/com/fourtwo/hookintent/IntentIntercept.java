@@ -580,9 +580,12 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
                 if(error != null) { Toast.makeText(this,error.getMessage(),Toast.LENGTH_LONG).show(); return; }
                 com.fourtwo.hookintent.actions.ActionStore.IO.execute(() -> {
                     try {
-                        String id=com.fourtwo.hookintent.utils.ShortcutPayloadStore.save(this,text,new String[0],target,replayOrigin);
-                        uiHandler.post(() -> { if(isUiAlive()) startActivity(new Intent(this,com.fourtwo.hookintent.actions.ActionEditorActivity.class)
-                                .putExtra("draft_payload_id",id)); });
+                        String id=com.fourtwo.hookintent.actions.ActionDraftStore.create(this,
+                                com.fourtwo.hookintent.utils.ShortcutPayloadStore.content(text,new String[0],target,replayOrigin));
+                        uiHandler.post(() -> {
+                            if(isUiAlive()) startActivity(new Intent(this,com.fourtwo.hookintent.actions.ActionEditorActivity.class).putExtra("action_draft_id",id));
+                            else com.fourtwo.hookintent.actions.ActionStore.IO.execute(() -> com.fourtwo.hookintent.actions.ActionDraftStore.delete(this,id));
+                        });
                     } catch(Exception failure) { uiHandler.post(() -> { if(isUiAlive()) Toast.makeText(this,failure.getMessage(),Toast.LENGTH_LONG).show(); }); }
                 });
             });

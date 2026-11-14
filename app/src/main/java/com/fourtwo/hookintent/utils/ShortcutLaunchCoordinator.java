@@ -56,13 +56,18 @@ public final class ShortcutLaunchCoordinator {
 
     public ShortcutLaunchCoordinator(Backend backend, Handler main) { this.backend = backend; this.main = main; }
 
+    public static String canonicalSelection(String selected) {
+        return "Shizuku - System Helper".equals(selected) || "Shizuku - システムアシスタント".equals(selected)
+                ? "Shizuku - 系统助手" : selected;
+    }
+
     public void launch(Intent target, boolean privileged, String selected, Callback callback) {
         cancel();
         Mode mode;
         if (!privileged) mode = Mode.NORMAL;
         else if ("root".equals(selected)) mode = Mode.ROOT;
         else if ("Shizuku".equals(selected)) mode = Mode.SHIZUKU;
-        else if ("Shizuku - 系统助手".equals(selected)) mode = Mode.ASSISTANT;
+        else if ("Shizuku - 系统助手".equals(canonicalSelection(selected))) mode = Mode.ASSISTANT;
         else { callback.complete(new IllegalArgumentException("未知启动模式：" + selected)); return; }
         Pending operation = new Pending(target, mode, callback);
         pending = operation;

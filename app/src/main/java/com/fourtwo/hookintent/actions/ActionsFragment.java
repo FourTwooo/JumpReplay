@@ -47,7 +47,7 @@ public class ActionsFragment extends Fragment implements ActionListAdapter.Liste
             @Override public boolean onMenuItemSelected(MenuItem item) {
                 if(item.getItemId() == 1) {
                     AppDialogs.builder(requireContext()).setTitle(R.string.action_import)
-                            .setItems(new String[]{"输入或粘贴 Scheme / Intent URI","导入动作备份文件"},(dialog,index) -> {
+                            .setItems(R.array.action_import_options,(dialog,index) -> {
                                 if(index == 0) pasteUri(); else importFile.launch(new String[]{"application/json","text/plain","application/octet-stream"});
                             }).show(); return true;
                 }
@@ -61,13 +61,13 @@ public class ActionsFragment extends Fragment implements ActionListAdapter.Liste
         EditText input=AppDialogs.input(requireContext()); input.setHint(R.string.action_content); input.setMinLines(3); input.setMaxLines(7);
         LinearLayout content=AppDialogs.content(requireContext()); content.addView(input);
         androidx.appcompat.app.AlertDialog dialog=AppDialogs.builder(requireContext()).setTitle(R.string.action_import)
-                .setView(content).setNegativeButton(R.string.cancel,null).setPositiveButton("下一步",null).create();
+                .setView(content).setNegativeButton(R.string.cancel,null).setPositiveButton(getString(R.string.action_next),null).create();
         dialog.setOnShowListener(v -> dialog.getButton(-1).setOnClickListener(button -> {
             String uri=input.getText().toString().trim();
             try {
                 new QuickAction("draft","draft",uri,new String[0],false,"root",null,null).validate();
                 openUriEditor(uri); dialog.dismiss();
-            } catch(Exception error) { input.setError(error.getMessage()); }
+            } catch(Exception error) { input.setError(ActionValidationException.text(requireContext(),error)); }
         })); dialog.show();
     }
     @Override public void onResume() { super.onResume(); reload(); }
@@ -77,70 +77,70 @@ public class ActionsFragment extends Fragment implements ActionListAdapter.Liste
             try {
                 List<QuickAction> values=ActionStore.get(context).all();
                 main.post(() -> { if(getView() != null && generation == request) { adapter.submit(values,null); empty.setVisibility(values.isEmpty() ? View.VISIBLE : View.GONE); } });
-            } catch(Exception error) { message(error.getMessage()); }
+            } catch(Exception error) { failure(error); }
         });
     }
     @Override public void open(QuickAction action) { startActivity(new Intent(requireContext(),ActionEditorActivity.class).putExtra("action_id",action.id)); }
     @Override public void run(QuickAction action) { startActivity(ActionStore.launchIntent(requireContext(),action.id)); }
     @Override public void options(QuickAction action) {
-        AppDialogs.builder(requireContext()).setTitle(action.name).setItems(new String[]{"编辑动作","执行动作","创建桌面快捷方式","删除动作"},(dialog,index) -> {
+        AppDialogs.builder(requireContext()).setTitle(action.name).setItems(R.array.action_menu_options,(dialog,index) -> {
             if(index == 0) open(action); else if(index == 1) run(action); else if(index == 2) pin(action);
-            else AppDialogs.builder(requireContext()).setTitle("删除动作？").setMessage("关联的桌面快捷方式将失效，卡片中将不再显示此动作。收藏和捕获记录会保留。")
+            else AppDialogs.builder(requireContext()).setTitle(getString(R.string.action_delete_title)).setMessage(getString(R.string.action_delete_body))
                     .setNegativeButton(R.string.cancel,null).setPositiveButton(R.string.delete,(confirm,which) -> {
                         Context context=requireContext().getApplicationContext();
                         ActionStore.IO.execute(() -> { try { ActionStore.get(context).delete(action.id); main.post(() -> { if(isAdded() && getView() != null) reload(); }); }
-                            catch(Exception error) { message(error.getMessage()); } });
+                            catch(Exception error) { failure(error); } });
                     }).show();
         }).show();
     }
     @Override public void reordered(List<String> ids) {
         Context context=requireContext().getApplicationContext();
-        ActionStore.IO.execute(() -> { try { ActionStore.get(context).reorder(ids); } catch(Exception error) { message(error.getMessage()); } });
+        ActionStore.IO.execute(() -> { try { ActionStore.get(context).reorder(ids); } catch(Exception error) { failure(error); } });
     }
     private void pin(QuickAction action) {
-        if(Build.VERSION.SDK_INT < 26) { message("当前系统不支持请求固定快捷方式"); return; }
+        if(Build.VERSION.SDK_INT < 26) { message(getString(R.string.action_pin_system_unsupported)); return; }
         ShortcutManager manager=requireContext().getSystemService(ShortcutManager.class);
-        if(manager == null || !manager.isRequestPinShortcutSupported()) { message("当前桌面不支持固定快捷方式"); return; }
+        if(manager == null || !manager.isRequestPinShortcutSupported()) { message(getString(R.string.action_pin_launcher_unsupported)); return; }
         if(ShortcutHelper.checkShortcutPermissionBestEffort(requireContext()) == ShortcutHelper.PermissionState.DENIED) {
-            AppDialogs.builder(requireContext()).setTitle("需要桌面快捷方式权限").setMessage("请在系统设置中允许创建桌面快捷方式后重试。")
-                    .setNegativeButton(R.string.cancel,null).setPositiveButton("去设置",(d,w) -> ShortcutHelper.openShortcutPermissionSettings(requireContext())).show(); return;
+            AppDialogs.builder(requireContext()).setTitle(getString(R.string.action_pin_permission_title)).setMessage(getString(R.string.action_pin_permission_body))
+                    .setNegativeButton(R.string.cancel,null).setPositiveButton(getString(R.string.action_open_settings),(d,w) -> ShortcutHelper.openShortcutPermissionSettings(requireContext())).show(); return;
         }
         try {
             Icon icon=action.icon == null ? Icon.createWithResource(requireContext(),R.mipmap.ic_launcher)
                     : Icon.createWithBitmap(BitmapFactory.decodeByteArray(action.icon,0,action.icon.length));
             boolean sent=manager.requestPinShortcut(new ShortcutInfo.Builder(requireContext(),"action-"+action.id)
                     .setShortLabel(action.name).setLongLabel(action.name).setIcon(icon).setIntent(ActionStore.launchIntent(requireContext(),action.id)).build(),null);
-            message(sent ? "请在桌面弹窗中确认添加；未出现时请检查桌面权限" : "桌面未接受添加请求");
-        } catch(Exception error) { message(error.getMessage()); }
+            message(sent ? getString(R.string.action_pin_confirm) : getString(R.string.action_pin_rejected));
+        } catch(Exception error) { failure(error); }
     }
     private void pinWidget() {
-        if(Build.VERSION.SDK_INT < 26) { message("请长按桌面，进入小组件列表添加 JumpReplay 叠卡"); return; }
+        if(Build.VERSION.SDK_INT < 26) { message(getString(R.string.action_widget_manual)); return; }
         AppWidgetManager manager=AppWidgetManager.getInstance(requireContext());
-        if(!manager.isRequestPinAppWidgetSupported()) { message("请长按桌面，进入小组件列表添加 JumpReplay 叠卡"); return; }
+        if(!manager.isRequestPinAppWidgetSupported()) { message(getString(R.string.action_widget_manual)); return; }
         try {
             Intent configure=new Intent(requireContext(),com.fourtwo.hookintent.widget.ActionWidgetConfigureActivity.class)
                     .setAction(AppWidgetManager.ACTION_APPWIDGET_CONFIGURE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             android.app.PendingIntent callback=android.app.PendingIntent.getActivity(requireContext(),1700,configure,
                     android.app.PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 31 ? android.app.PendingIntent.FLAG_MUTABLE : 0));
             boolean sent=manager.requestPinAppWidget(new ComponentName(requireContext(),ActionWidgetProvider.class),null,callback);
-            message(sent ? "请在桌面确认添加，并选择要显示的动作" : "桌面未接受添加请求，请从小组件列表添加");
-        } catch(Exception error) { message(error.getMessage()); }
+            message(sent ? getString(R.string.action_widget_confirm) : getString(R.string.action_widget_rejected));
+        } catch(Exception error) { failure(error); }
     }
     private void writeBackup(Uri uri) {
         Context context=requireContext().getApplicationContext();
         ActionStore.IO.execute(() -> {
             try(OutputStream output=context.getContentResolver().openOutputStream(uri,"wt")) {
-                if(output == null) throw new IOException("无法写入所选文件");
+                if(output == null) throw new IOException(context.getString(R.string.action_file_write_error));
                 ActionStore.get(context).exportTo(output);
-                message("动作备份已导出");
-            } catch(Exception | OutOfMemoryError error) { message("导出失败："+error.getMessage()); }
+                message(R.string.action_backup_exported);
+            } catch(Exception | OutOfMemoryError error) { failure(R.string.action_backup_export_error,error); }
         });
     }
     private void readBackup(Uri uri) {
         Context context=requireContext().getApplicationContext();
         ActionStore.IO.execute(() -> {
             try(InputStream input=context.getContentResolver().openInputStream(uri)) {
-                if(input == null) throw new IOException("无法读取所选文件");
+                if(input == null) throw new IOException(context.getString(R.string.action_file_read_error));
                 PushbackInputStream stream=new PushbackInputStream(input,1); int first;
                 do { first=stream.read(); } while(first != -1 && Character.isWhitespace(first));
                 if(first != -1) stream.unread(first);
@@ -151,21 +151,27 @@ public class ActionsFragment extends Fragment implements ActionListAdapter.Liste
                     new QuickAction("draft","draft",text,new String[0],false,"root",null,null).validate();
                     main.post(() -> { if(isAdded()) openUriEditor(text); });
                 } else {
-                    int added=ActionStore.get(context).importFrom(stream); message("已导入 "+added+" 个动作");
+                    int added=ActionStore.get(context).importFrom(stream); message(R.string.action_import_count,added);
                     main.post(() -> { if(isAdded() && getView() != null) reload(); });
                 }
-            } catch(Exception | OutOfMemoryError error) { message("导入失败："+error.getMessage()); }
+            } catch(Exception | OutOfMemoryError error) { failure(R.string.action_backup_import_error,error); }
         });
     }
     private void openUriEditor(String uri) {
         Context context=requireContext().getApplicationContext();
         ActionStore.IO.execute(() -> {
             try {
-                String id=ShortcutPayloadStore.save(context,uri,new String[0],null);
-                main.post(() -> { if(isAdded()) startActivity(new Intent(requireContext(),ActionEditorActivity.class).putExtra("draft_payload_id",id)); });
-            } catch(Exception error) { message(error.getMessage()); }
+                String id=ActionDraftStore.create(context,ShortcutPayloadStore.content(uri,new String[0],null,null));
+                main.post(() -> {
+                    if(isAdded()) startActivity(new Intent(requireContext(),ActionEditorActivity.class).putExtra("action_draft_id",id));
+                    else ActionStore.IO.execute(() -> ActionDraftStore.delete(context,id));
+                });
+            } catch(Exception error) { failure(error); }
         });
     }
+    private void message(int resource,Object... arguments) { main.post(() -> { if(isAdded()) Toast.makeText(requireContext(),getString(resource,arguments),Toast.LENGTH_LONG).show(); }); }
+    private void failure(int prefix,Throwable error) { main.post(() -> { if(isAdded()) message(prefix,ActionValidationException.text(requireContext(),error)); }); }
+    private void failure(Throwable error) { main.post(() -> { if(isAdded()) message(ActionValidationException.text(requireContext(),error)); }); }
     private void message(String text) { main.post(() -> { if(isAdded()) Toast.makeText(requireContext(),text,Toast.LENGTH_LONG).show(); }); }
     @Override public void onDestroyView() { generation++; adapter=null; empty=null; super.onDestroyView(); }
 }

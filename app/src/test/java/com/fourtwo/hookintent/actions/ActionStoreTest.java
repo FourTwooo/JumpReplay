@@ -27,6 +27,13 @@ public class ActionStoreTest {
     private QuickAction action(String name,String payload) {
         return new QuickAction(UUID.randomUUID().toString(),name,"demo://host?q=VALUE",new String[]{"VALUE"},false,"root",payload,null);
     }
+    @Test public void localizedAssistantLabelsKeepTheExistingWireMode() throws Exception {
+        for(String label:new String[]{"Shizuku - System Helper","Shizuku - システムアシスタント","Shizuku - 系统助手"}) {
+            QuickAction value=new QuickAction(UUID.randomUUID().toString(),"localized","demo://mode",new String[0],true,label,null,null);
+            value.validate();store.save(value);
+            assertEquals("Shizuku - 系统助手",store.find(value.id).mode);
+        }
+    }
     @Test public void multiMegabyteSnapshotAndTypedExtrasSurviveWithoutLoadingSnapshotsInTheList() throws Exception {
         Intent target=new Intent(Intent.ACTION_VIEW,Uri.parse("demo://host?q=VALUE"));
         byte[] large=new byte[3_000_000]; Arrays.fill(large,(byte)17);

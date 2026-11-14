@@ -1,6 +1,7 @@
 package com.fourtwo.hookintent.actions;
 
 import android.content.*;
+import com.fourtwo.hookintent.R;
 import android.database.Cursor;
 import android.database.sqlite.*;
 import android.os.*;
@@ -131,11 +132,11 @@ public final class ActionStore extends SQLiteOpenHelper {
                 if("format".equals(key)) format=reader.nextString();
                 else if("version".equals(key)) version=reader.nextInt();
                 else if("actions".equals(key)) {
-                    if(entries) throw new IllegalArgumentException("备份包含重复的动作列表");
+                    if(entries) throw new IllegalArgumentException(context.getString(R.string.action_backup_duplicate));
                     entries=true; reader.beginArray();
                     while(reader.hasNext()) {
                         Object value=readJson(reader,0);
-                        if(!(value instanceof JSONObject)) throw new IllegalArgumentException("动作条目无效");
+                        if(!(value instanceof JSONObject)) throw new IllegalArgumentException(context.getString(R.string.action_backup_entry));
                         write(db,QuickAction.fromJson((JSONObject)value),position++); count++;
                     }
                     reader.endArray();
@@ -143,13 +144,13 @@ public final class ActionStore extends SQLiteOpenHelper {
             }
             reader.endObject();
             if(!entries || !"jumpreplay-actions".equals(format) || version != 1
-                    || reader.peek() != android.util.JsonToken.END_DOCUMENT) throw new IllegalArgumentException("不是支持的 JumpReplay 动作备份");
+                    || reader.peek() != android.util.JsonToken.END_DOCUMENT) throw new IllegalArgumentException(context.getString(R.string.action_backup_unsupported));
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
         changed(); return count;
     }
     private Object readJson(android.util.JsonReader reader,int depth) throws Exception {
-        if(depth > 64) throw new IllegalArgumentException("备份结构嵌套过深");
+        if(depth > 64) throw new IllegalArgumentException(context.getString(R.string.action_backup_depth));
         switch(reader.peek()) {
             case BEGIN_OBJECT:
                 JSONObject object=new JSONObject(); reader.beginObject();
@@ -167,12 +168,12 @@ public final class ActionStore extends SQLiteOpenHelper {
                 } catch(NumberFormatException ignored) { return Double.valueOf(number); }
             case BOOLEAN: return reader.nextBoolean();
             case NULL: reader.nextNull(); return JSONObject.NULL;
-            default: throw new IllegalArgumentException("备份 JSON 无效");
+            default: throw new IllegalArgumentException(context.getString(R.string.action_backup_json));
         }
     }
     public int importData(JSONObject data) throws Exception {
         if(!"jumpreplay-actions".equals(data.optString("format")) || data.optInt("version") != 1)
-            throw new IllegalArgumentException("不是支持的 JumpReplay 动作备份");
+            throw new IllegalArgumentException(context.getString(R.string.action_backup_unsupported));
         JSONArray entries=data.getJSONArray("actions"); List<QuickAction> actions=new ArrayList<>();
         for(int i=0;i<entries.length();i++) actions.add(QuickAction.fromJson(entries.getJSONObject(i)));
         SQLiteDatabase db=getWritableDatabase(); db.beginTransaction();
@@ -211,7 +212,7 @@ public final class ActionStore extends SQLiteOpenHelper {
                         .setIcon(icon).setIntent(launchIntent(context,action.id)).build());
             }
             if(!updates.isEmpty()) manager.updateShortcuts(updates);
-            if(!deleted.isEmpty()) manager.disableShortcuts(deleted,"该快捷动作已删除，请重新添加");
+            if(!deleted.isEmpty()) manager.disableShortcuts(deleted,context.getString(R.string.action_shortcut_missing));
         } catch(Exception error) { android.util.Log.w("QuickActions","Cannot refresh pinned shortcuts",error); }
     }
 }

@@ -8,22 +8,31 @@ import java.util.Set;
 /** Replaces placeholders once, without interpreting the replacement as Intent syntax. */
 public final class ShortcutParameterReplacer {
     private ShortcutParameterReplacer() { }
+    public enum Failure { EMPTY_INTENT, EMPTY_PARAMETER, DUPLICATE_PARAMETER, MISSING_PARAMETER, VALUE_COUNT, AUTHORITY_SEPARATOR }
+    /** Preserve legacy messages for existing callers; new UIs can localize the typed reason. */
+    public static final class ValidationException extends IllegalArgumentException {
+        public final Failure reason;
+        public final String parameter;
+        private ValidationException(Failure reason,String parameter,String message) {
+            super(message);this.reason=reason;this.parameter=parameter;
+        }
+    }
 
     public static void validate(String template, String[] names) {
-        if (template == null || template.trim().isEmpty()) throw new IllegalArgumentException("Intent 不能为空");
+        if (template == null || template.trim().isEmpty()) throw new ValidationException(Failure.EMPTY_INTENT,null,"Intent 不能为空");
         Set<String> unique = new HashSet<>();
         if (names == null) return;
         for (String name : names) {
-            if (name == null || name.isEmpty()) throw new IllegalArgumentException("替换参数不能为空");
-            if (!unique.add(name)) throw new IllegalArgumentException("替换参数不能重复：" + name);
-            if (!template.contains(name)) throw new IllegalArgumentException("Intent 中找不到替换参数：" + name);
+            if (name == null || name.isEmpty()) throw new ValidationException(Failure.EMPTY_PARAMETER,null,"替换参数不能为空");
+            if (!unique.add(name)) throw new ValidationException(Failure.DUPLICATE_PARAMETER,name,"替换参数不能重复：" + name);
+            if (!template.contains(name)) throw new ValidationException(Failure.MISSING_PARAMETER,name,"Intent 中找不到替换参数：" + name);
         }
     }
 
     public static String replace(String template, String[] names, String[] values) {
         validate(template, names);
         if (names == null || names.length == 0) return template;
-        if (values == null || names.length != values.length) throw new IllegalArgumentException("替换参数数量不一致");
+        if (values == null || names.length != values.length) throw new ValidationException(Failure.VALUE_COUNT,null,"替换参数数量不一致");
         StringBuilder result = new StringBuilder();
         int intentStart = template.indexOf("#Intent;");
         int queryStart = template.indexOf('?');
@@ -64,7 +73,7 @@ public final class ShortcutParameterReplacer {
             boolean inAuthority = schemeSeparator >= 0 && offset >= schemeSeparator + 3 && offset < authorityEnd;
             if (inAuthority && (value.indexOf('/') >= 0 || value.indexOf('?') >= 0
                     || value.indexOf('#') >= 0 || value.indexOf(';') >= 0)) {
-                throw new IllegalArgumentException("主机参数包含URL结构分隔符");
+                throw new ValidationException(Failure.AUTHORITY_SEPARATOR,null,"主机参数包含URL结构分隔符");
             }
             result.append(inIntentValue || inQueryValue || inPath || inFragment ? encodeValue(value) : value);
             offset += names[match].length();
