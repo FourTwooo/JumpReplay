@@ -31,7 +31,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.util.Pair;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
@@ -42,6 +41,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.utils.LoadingOverlay;
 import com.fourtwo.hookintent.utils.NetworkClient;
@@ -112,12 +112,6 @@ public class SettingsFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_settings, container, false);
-
-        Context context = requireContext();
-        SwitchCompat navigationCapture = view.findViewById(R.id.in_app_navigation_capture_switch);
-        navigationCapture.setChecked(SharedPreferencesUtils.getBoolean(context, Constants.IN_APP_NAVIGATION_CAPTURE));
-        navigationCapture.setOnCheckedChangeListener((button, checked) ->
-                SharedPreferencesUtils.putBoolean(context, Constants.IN_APP_NAVIGATION_CAPTURE, checked));
 
         recyclerView = view.findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -207,8 +201,7 @@ public class SettingsFragment extends Fragment {
     private boolean isBuiltInCategory(String category) {
         return "Intent".equalsIgnoreCase(category)
                 || "Scheme".equalsIgnoreCase(category)
-                || "intent".equalsIgnoreCase(category)
-                || "scheme".equalsIgnoreCase(category);
+                || NavigationCaptureSource.forCategory(category) != null;
     }
 
     private String normalizeFilterGroup(String category) {
@@ -252,7 +245,9 @@ public class SettingsFragment extends Fragment {
 
     private void showColorPickerDialog(Context context, String category) {
         Map<String, String> COLORS = JsonHandler.jsonToMap(SharedPreferencesUtils.getStr(context, Constants.COLORS_CONFIG));
-        int color = COLORS.containsKey(category) ? Color.parseColor(COLORS.get(category)) : Color.GRAY;
+        NavigationCaptureSource source = NavigationCaptureSource.forCategory(category);
+        int color = COLORS.containsKey(category) ? Color.parseColor(COLORS.get(category))
+                : source == null ? Color.GRAY : Color.parseColor(source.defaultColor());
         AmbilWarnaDialog dialog = new AmbilWarnaDialog(AppDialogs.context(context), color, new AmbilWarnaDialog.OnAmbilWarnaListener() {
             @Override
             public void onOk(AmbilWarnaDialog dialog, int color) {
@@ -284,6 +279,15 @@ public class SettingsFragment extends Fragment {
 
         try {
             Map<String, String> colorMap = JsonHandler.jsonToMap(colorsJson);
+            for (String category : new String[]{"Intent", "Scheme"}) {
+                String color = colorMap.remove(category);
+                if (color != null) categoryData.add(new Pair<>(category, color));
+            }
+            for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
+                categoryData.add(new Pair<>(source.category(),
+                        colorMap.getOrDefault(source.category(), source.defaultColor())));
+                colorMap.remove(source.category());
+            }
             for (Map.Entry<String, String> entry : colorMap.entrySet()) {
                 categoryData.add(new Pair<>(entry.getKey(), entry.getValue()));
             }
@@ -304,7 +308,9 @@ public class SettingsFragment extends Fragment {
             filteredData.addAll(dataList);
             filteredData.sort(java.util.Comparator.comparingInt(item -> {
                 String type = String.valueOf(item.get("category"));
-                return "Intent".equals(type) ? 0 : "Scheme".equals(type) ? 1 : 2;
+                if ("Intent".equals(type)) return 0;
+                if ("Scheme".equals(type)) return 1;
+                return NavigationCaptureSource.forCategory(type) == null ? 3 : 2;
             }));
         } else {
             for (Map<String, Object> item : dataList) {
@@ -332,6 +338,7 @@ public class SettingsFragment extends Fragment {
 
     private void classifyData(List<Map<String, Object>> sourceList, List<Map<String, Object>> internalList, List<Map<String, Object>> externalList) {
         for (Map<String, Object> item : sourceList) {
+            if (NavigationCaptureSource.forConfigurationRow(item) != null) continue;
             Boolean isInternal = (Boolean) item.get("internal");
             if (isInternal != null && isInternal) {
                 internalList.add(item);
@@ -390,6 +397,10 @@ public class SettingsFragment extends Fragment {
         List<Map<String, Object>> list = new ArrayList<>();
 
         loadFromPreferences(Constants.INTERNAL_HOOKS_CONFIG, true, list);
+        list.removeIf(item -> NavigationCaptureSource.forConfigurationRow(item) != null);
+        for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
+            list.add(source.configurationRow(requireContext()));
+        }
         loadFromPreferences(Constants.EXTERNAL_HOOKS_CONFIG, false, list);
         return list;
     }

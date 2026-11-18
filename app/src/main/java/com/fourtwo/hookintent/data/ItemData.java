@@ -110,7 +110,8 @@ public class ItemData implements Parcelable {
     }
 
     public String getCategory() {
-        return category;
+        NavigationCaptureSource source = NavigationCaptureSource.fromRecord(category, bundle);
+        return source == null ? category : source.category();
     }
 
     public String getStackTrace() {

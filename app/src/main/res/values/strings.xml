@@ -29,8 +29,6 @@
     <string name="is_root">使用root</string>
     <string name="star">收藏</string>
     <string name="settings">配置</string>
-    <string name="in_app_navigation_capture_title">应用内导航捕获</string>
-    <string name="in_app_navigation_capture_summary">在捕获开启时记录应用内的页面切换和可读取的导航参数。</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="disabled">禁用</string>

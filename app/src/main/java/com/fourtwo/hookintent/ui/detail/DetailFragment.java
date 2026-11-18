@@ -46,7 +46,10 @@ import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.base.LocalDatabaseManager;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.manager.PermissionManager;
+import com.fourtwo.hookintent.replay.ExtrasEditorDialog;
+import com.fourtwo.hookintent.replay.NavigationReplay;
 import com.fourtwo.hookintent.utils.HashUtil;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.tabs.TabLayout;
@@ -154,6 +157,8 @@ public class DetailFragment extends Fragment {
                 Object value = bundle.get(key);
                 dataMap.put(key, value != null ? value.toString() : "null");
             }
+            NavigationCaptureSource source = NavigationCaptureSource.fromRecord(itemData.getCategory(), bundle);
+            if (source != null) dataMap.put("FunctionCall", source.method());
 
             List<Pair<String, String>> dataList = new ArrayList<>();
 
@@ -168,7 +173,7 @@ public class DetailFragment extends Fragment {
 
             List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data",
                     "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS);
-            if (Constants.NAVIGATION_CATEGORY.equals(itemData.getCategory())) {
+            if (source != null) {
                 Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
                 if (arguments != null) {
                     List<String> argumentKeys = new ArrayList<>(arguments.keySet());
@@ -264,10 +269,11 @@ public class DetailFragment extends Fragment {
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menu.clear(); // 清除现有菜单项，避免重复
                 menuInflater.inflate(R.menu.detail_drawer, menu); // 加载菜单
-                menu.findItem(R.id.action_save).setVisible(itemData != null
-                        && ("Intent".equals(itemData.getCategory()) || "Scheme".equals(itemData.getCategory())));
-                menu.findItem(R.id.copy_code).setVisible(itemData == null
-                        || !Constants.NAVIGATION_CATEGORY.equals(itemData.getCategory()));
+                boolean canReplay = replayableItem() != null;
+                boolean navigation = itemData != null
+                        && NavigationCaptureSource.fromRecord(itemData.getCategory(), itemData.getAppBundle()) != null;
+                menu.findItem(R.id.action_save).setVisible(canReplay);
+                menu.findItem(R.id.copy_code).setVisible(canReplay || !navigation);
 
                 // 动态设置收藏按钮图标
                 try {
@@ -293,11 +299,15 @@ public class DetailFragment extends Fragment {
             public boolean onMenuItemSelected(@NonNull MenuItem menuItem) {
                 int itemId = menuItem.getItemId();
                 if (itemId == R.id.action_save) {
+                    ItemData replay = replayableItem();
+                    if (replay == null) return false;
                     try {
-                        String token=DetailPayloadStore.save(requireContext(),itemData);
-                        startActivity(new Intent(requireContext(),com.fourtwo.hookintent.actions.ActionEditorActivity.class)
-                                .putExtra(DetailPayloadStore.EXTRA_TOKEN,token));
-                    } catch(Exception error) { Toast.makeText(requireContext(),error.getMessage(),Toast.LENGTH_LONG).show(); }
+                        String token = replayToken(replay);
+                        startActivity(new Intent(requireContext(), com.fourtwo.hookintent.actions.ActionEditorActivity.class)
+                                .putExtra(DetailPayloadStore.EXTRA_TOKEN, token));
+                    } catch (Exception error) {
+                        Toast.makeText(requireContext(), error.getMessage(), Toast.LENGTH_LONG).show();
+                    }
                     return true;
                 } else if (itemId == R.id.copy_code) {
                     // 获取菜单项的 View 并传递给 showOptionsDialog
@@ -349,22 +359,21 @@ public class DetailFragment extends Fragment {
             return;
         }
 
-        Bundle bundle = itemData.getAppBundle();
-        String Category = itemData.getCategory();
+        ItemData replay = replayableItem();
+        if (replay == null) return;
+        Bundle bundle = replay.getAppBundle();
+        String category = replay.getCategory();
         List<String> options = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
 
-        if (Category.equals("Intent")) {
+        if (category.equals("Intent")) {
             options.add("编辑参数并重放");
-            actions.add(() -> com.fourtwo.hookintent.replay.ExtrasEditorDialog.show(requireActivity(), bundle, edited -> {
+            actions.add(() -> ExtrasEditorDialog.show(requireActivity(), bundle, edited -> {
                 try {
-                    ItemData draft = new ItemData(itemData.getIcon(), itemData.getAppName(), itemData.getItem_from(),
-                            itemData.getItem_data(), itemData.getTimestamp(), itemData.getDataSize(), edited,
-                            itemData.getCategory(), itemData.getStackTrace(), edited.getString("uri", itemData.getUri()));
-                    String draftToken = DetailPayloadStore.save(requireContext(), draft);
-                    Intent editor = new Intent(requireContext(), IntentIntercept.class);
-                    editor.putExtra(DetailPayloadStore.EXTRA_TOKEN, draftToken);
-                    startActivity(editor);
+                    ItemData draft = new ItemData(replay.getIcon(), replay.getAppName(), replay.getItem_from(),
+                            replay.getItem_data(), replay.getTimestamp(), replay.getDataSize(), edited,
+                            replay.getCategory(), replay.getStackTrace(), edited.getString("uri", replay.getUri()));
+                    launchInterceptor(draft);
                 } catch (Exception error) {
                     throw new IllegalStateException("无法打开重放：" + error.getMessage(), error);
                 }
@@ -377,24 +386,24 @@ public class DetailFragment extends Fragment {
             boolean finalHasError = hasError;
             actions.add(() -> showAmCommandDialog(activityCommand, finalHasError, "am命令"));
 
-            String uriCommand = itemData.getUri();
-            Log.d(TAG, "intentCommand: " + uriCommand);
+            String uriCommand = replay.getUri();
+            if (replay == itemData) Log.d(TAG, "intentCommand: " + uriCommand);
 
             options.add("intentUri");
             actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri"));
 
             options.add("转到 意图拦截器");
-            actions.add(this::openInterceptor);
+            actions.add(() -> openInterceptor(replay));
 
-        } else if (Category.equals("Scheme")) {
-            String uriCommand = itemData.getAppBundle().getString("scheme_raw_url");
+        } else if (category.equals("Scheme")) {
+            String uriCommand = bundle.getString("scheme_raw_url");
 
             Log.d(TAG, "schemeCommand: " + uriCommand);
             options.add("schemeUri");
             actions.add(() -> showAmCommandDialog(uriCommand, false, "schemeUri"));
 
             options.add("转到 意图拦截器");
-            actions.add(this::openInterceptor);
+            actions.add(() -> openInterceptor(replay));
         }
 
         // 改用 PopupMenu
@@ -434,13 +443,28 @@ public class DetailFragment extends Fragment {
         }
     }
 
-    private void openInterceptor() {
-        if (itemData == null) return;
+    private ItemData replayableItem() {
+        if (itemData == null) return null;
+        String category = itemData.getCategory();
+        if ("Intent".equals(category) || "Scheme".equals(category)) return itemData;
+        return NavigationReplay.prepare(requireContext(), itemData);
+    }
+
+    private String replayToken(ItemData replay) {
+        if (replay != itemData) return DetailPayloadStore.save(requireContext(), replay);
+        if (payloadToken == null) payloadToken = DetailPayloadStore.save(requireContext(), replay);
+        return payloadToken;
+    }
+
+    private void launchInterceptor(ItemData replay) {
+        Intent intent = new Intent(requireContext(), IntentIntercept.class);
+        intent.putExtra(DetailPayloadStore.EXTRA_TOKEN, replayToken(replay));
+        startActivity(intent);
+    }
+
+    private void openInterceptor(ItemData replay) {
         try {
-            if (payloadToken == null) payloadToken = DetailPayloadStore.save(requireContext(), itemData);
-            Intent intent = new Intent(requireContext(), IntentIntercept.class);
-            intent.putExtra(DetailPayloadStore.EXTRA_TOKEN, payloadToken);
-            startActivity(intent);
+            launchInterceptor(replay);
         } catch (Exception error) {
             Toast.makeText(requireContext(), "无法打开拦截器：" + error.getMessage(), Toast.LENGTH_LONG).show();
         }

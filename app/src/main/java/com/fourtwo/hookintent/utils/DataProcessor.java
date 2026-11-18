@@ -10,6 +10,7 @@ import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -49,6 +50,8 @@ public class DataProcessor {
     public void processBundle(Bundle bundle, DataProcessedCallback callback) {
         if (bundle == null) return;
         String category = bundle.getString("category", "Unknown");
+        NavigationCaptureSource navigation = NavigationCaptureSource.fromRecord(category, bundle);
+        if (navigation != null) category = navigation.category();
         if (filterData(category, bundle)) return;
         String component;
         String targetPackage;
@@ -79,7 +82,7 @@ public class DataProcessor {
         } else {
             targetPackage = bundle.getString("packageName");
             component = bundle.getString("title");
-            if (Constants.NAVIGATION_CATEGORY.equals(category)) {
+            if (navigation != null) {
                 Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
                 dataString = arguments == null || arguments.isEmpty() ? ""
                         : new JSONObject(JsonHandler.toMap(arguments)).toString();

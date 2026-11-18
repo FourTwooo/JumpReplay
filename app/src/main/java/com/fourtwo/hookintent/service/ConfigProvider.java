@@ -10,6 +10,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 
 import java.util.HashMap;
@@ -20,7 +21,7 @@ public class ConfigProvider extends ContentProvider {
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener changes = (preferences, key) -> {
         if (getContext() == null) return;
         Uri changed = Constants.CONFIG_URI;
-        if (Constants.IN_APP_NAVIGATION_CAPTURE.equals(key)) {
+        if (Constants.IN_APP_NAVIGATION_CAPTURE.equals(key) || NavigationCaptureSource.isPreference(key)) {
             changed = Constants.IN_APP_NAVIGATION_URI;
         } else if (Constants.DISABLED_SCHEME.equals(key)) {
             changed = Constants.SCHEME_URI;
@@ -53,8 +54,13 @@ public class ConfigProvider extends ContentProvider {
             configData.put(Constants.DISABLED_SCHEME, DISABLED_SCHEME);
         }
         if (Constants.CONFIG_URI.equals(uri) || Constants.IN_APP_NAVIGATION_URI.equals(uri)) {
-            configData.put(Constants.IN_APP_NAVIGATION_CAPTURE, Boolean.toString(
-                    SharedPreferencesUtils.getBoolean(getContext(), Constants.IN_APP_NAVIGATION_CAPTURE)));
+            boolean anyNavigationEnabled = false;
+            for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
+                boolean enabled = source.isEnabled(getContext());
+                configData.put(source.preference(), Boolean.toString(enabled));
+                anyNavigationEnabled |= enabled;
+            }
+            configData.put(Constants.IN_APP_NAVIGATION_CAPTURE, Boolean.toString(anyNavigationEnabled));
         }
 
         MatrixCursor cursor = new MatrixCursor(new String[]{"key", "value"});

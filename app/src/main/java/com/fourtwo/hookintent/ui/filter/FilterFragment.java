@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.fourtwo.hookintent.utils.StyledInputDialogHelper;
 
@@ -140,7 +141,7 @@ public class FilterFragment extends Fragment {
     }
 
     /**
-     * 过滤分组 = 内建 intent/scheme + Settings category。
+     * 过滤分组包含内建和自定义捕获标签。
      * 这里只自动补，不自动删，避免误删已有过滤规则。
      */
     private boolean syncFilterGroups() {
@@ -153,6 +154,9 @@ public class FilterFragment extends Fragment {
 
         changed |= ensureBuiltInGroup(LEGACY_INTENT_KEY, FIELD_FUNCTION_CALL, FIELD_FROM);
         changed |= ensureBuiltInGroup(LEGACY_SCHEME_KEY, FIELD_FUNCTION_CALL, FIELD_FROM, FIELD_SCHEME);
+        for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
+            changed |= ensureBuiltInGroup(source.category(), FIELD_FUNCTION_CALL, FIELD_FROM);
+        }
 
         for (String groupKey : allowedGroups) {
             if (isBuiltInGroup(groupKey)) {
@@ -241,7 +245,9 @@ public class FilterFragment extends Fragment {
 
     private boolean isBuiltInGroup(String groupKey) {
         return LEGACY_INTENT_KEY.equalsIgnoreCase(groupKey)
-                || LEGACY_SCHEME_KEY.equalsIgnoreCase(groupKey);
+                || LEGACY_SCHEME_KEY.equalsIgnoreCase(groupKey)
+                || Constants.FRAGMENT_CATEGORY.equals(groupKey)
+                || Constants.NAV_CONTROLLER_CATEGORY.equals(groupKey);
     }
 
     private List<String> buildProtocolKeys() {
@@ -253,6 +259,10 @@ public class FilterFragment extends Fragment {
 
         if (jsonData.containsKey(LEGACY_SCHEME_KEY)) {
             result.add(LEGACY_SCHEME_KEY);
+        }
+
+        for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
+            if (jsonData.containsKey(source.category())) result.add(source.category());
         }
 
         List<String> customKeys = new ArrayList<>();

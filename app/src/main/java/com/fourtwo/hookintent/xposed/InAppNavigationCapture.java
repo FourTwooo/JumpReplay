@@ -12,6 +12,7 @@ import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -22,14 +23,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
-import java.util.function.BooleanSupplier;
+import java.util.function.Predicate;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 
 /** Observe destinations within resumed activities without intercepting every View or Intent. */
 public final class InAppNavigationCapture implements Application.ActivityLifecycleCallbacks {
     public interface Sink {
-        void capture(Activity activity, String destination, String kind, Bundle arguments);
+        void capture(Activity activity, String destination, NavigationCaptureSource source, Bundle arguments);
     }
 
     private static final String NAV_CONTROLLER = "androidx.navigation.NavController";
@@ -39,14 +40,14 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     private static final int MAX_FRAGMENTS = 64;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<Activity, ActivityWatch> resumed = new IdentityHashMap<>();
-    private final BooleanSupplier enabled;
+    private final Predicate<NavigationCaptureSource> enabled;
     private final Sink sink;
     private final Map<ClassLoader, FragmentAccess> supportByLoader = new WeakHashMap<>();
     private final Set<Class<?>> navControllers = Collections.newSetFromMap(new WeakHashMap<>());
     private FragmentAccess platform;
     private boolean errorLogged;
 
-    public InAppNavigationCapture(BooleanSupplier enabled, Sink sink) {
+    public InAppNavigationCapture(Predicate<NavigationCaptureSource> enabled, Sink sink) {
         this.enabled = enabled;
         this.sink = sink;
     }
@@ -116,7 +117,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         }
 
         void refresh() {
-            if (!enabled.getAsBoolean()) {
+            if (!enabled.test(NavigationCaptureSource.FRAGMENT)) {
                 stop();
             } else if (!observing) {
                 observer = decor.getViewTreeObserver();
@@ -150,7 +151,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         }
 
         private void onLayout() {
-            if (enabled.getAsBoolean()) scheduleSample(SystemClock.uptimeMillis() + LAYOUT_SAMPLE_MS);
+            if (enabled.test(NavigationCaptureSource.FRAGMENT)) scheduleSample(SystemClock.uptimeMillis() + LAYOUT_SAMPLE_MS);
         }
 
         private void scheduleSample(long when) {
@@ -161,7 +162,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         }
 
         void sample() {
-            if (!observing || !enabled.getAsBoolean()) return;
+            if (!observing || !enabled.test(NavigationCaptureSource.FRAGMENT)) return;
             if (!decor.getGlobalVisibleRect(screen)) return;
             try {
                 long now = SystemClock.uptimeMillis();
@@ -206,7 +207,8 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 }
                 if (access.navHost != null && access.navHost.isInstance(fragment)) continue;
                 String destination = fragment.getClass().getName();
-                boolean fromNav = destination.equals(navFragment) && frame.now < navFragmentUntil;
+                boolean fromNav = enabled.test(NavigationCaptureSource.NAV_CONTROLLER)
+                        && destination.equals(navFragment) && frame.now < navFragmentUntil;
                 state.update(frame, visible, visible ? scalarArguments((Bundle) access.arguments.invoke(fragment)) : null,
                         fromNav, destination);
             }
@@ -251,7 +253,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                     return;
                 }
                 readyAt = 0;
-                emit(activity, destination, "Fragment", args);
+                emit(activity, destination, NavigationCaptureSource.FRAGMENT, args);
             }
         }
     }
@@ -371,7 +373,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         void changed(Object controller, Object destination, Object value) {
             Activity activity = owner.get();
             ActivityWatch watch = resumed.get(activity);
-            if (watch == null || !watch.observing || !enabled.getAsBoolean() || destination == null) {
+            if (watch == null || !enabled.test(NavigationCaptureSource.NAV_CONTROLLER) || destination == null) {
                 previousEntry = null;
                 previousDestination = null;
                 previousArgs = null;
@@ -392,7 +394,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 if (fragment != null && fragment.startsWith(".")) fragment = activity.getPackageName() + fragment;
                 watch.navFragment = fragment;
                 watch.navFragmentUntil = SystemClock.uptimeMillis() + 800;
-                emit(activity, route, "NavController", args);
+                emit(activity, route, NavigationCaptureSource.NAV_CONTROLLER, args);
             } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
                 report(error);
             }
@@ -452,14 +454,14 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         return result;
     }
 
-    private void emit(Activity activity, String destination, String kind, Map<String, Object> args) {
-        if (!enabled.getAsBoolean()) return;
+    private void emit(Activity activity, String destination, NavigationCaptureSource source, Map<String, Object> args) {
+        if (!enabled.test(source)) return;
         Bundle bundle = new Bundle();
         for (Map.Entry<String, Object> entry : args.entrySet()) {
             bundle.putSerializable(entry.getKey(), (java.io.Serializable) entry.getValue());
         }
         try {
-            sink.capture(activity, destination, kind, bundle);
+            sink.capture(activity, destination, source, bundle);
         } catch (RuntimeException | LinkageError error) {
             report(error);
         }

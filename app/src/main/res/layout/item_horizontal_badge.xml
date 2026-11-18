@@ -9,7 +9,11 @@
 
     <TextView
         android:id="@+id/badge_text"
-        android:layout_width="55dp"
+        android:layout_width="wrap_content"
+        android:minWidth="55dp"
+        android:maxWidth="128dp"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:layout_height="25dp"
         android:background="@drawable/badge_background"
         android:fontFamily="monospace"

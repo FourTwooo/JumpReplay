@@ -21,6 +21,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.utils.AppInfoHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.suke.widget.SwitchButton;
@@ -102,7 +103,8 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
             if (COLORS.containsKey(category)) {
                 background.setColor(Color.parseColor(COLORS.get(category)));
             } else {
-                background.setColor(Color.GRAY);
+                NavigationCaptureSource source = NavigationCaptureSource.forCategory(category);
+                background.setColor(source == null ? Color.GRAY : Color.parseColor(source.defaultColor()));
             }
             holder.category.setBackground(background);
         }
@@ -110,7 +112,11 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
         Boolean isOpen = (Boolean) item.get("open");
         holder.switchToggle.setOnCheckedChangeListener(null);
         holder.switchToggle.setChecked(isOpen != null && isOpen);
-        holder.switchToggle.setOnCheckedChangeListener((buttonView, isChecked) -> item.put("open", isChecked));
+        holder.switchToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            item.put("open", isChecked);
+            NavigationCaptureSource source = NavigationCaptureSource.forConfigurationRow(item);
+            if (source != null) source.setEnabled(context, isChecked);
+        });
 
         holder.operate.setOnClickListener(v -> {
             int adapterPosition = holder.getBindingAdapterPosition();

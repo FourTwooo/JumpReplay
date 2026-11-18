@@ -32,6 +32,7 @@ import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.base.DetailPayloadStore;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 
 import java.util.ArrayList;
@@ -67,11 +68,7 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
         holder.dataSize.setText(item.getDataSize());
 
         String category = item.getCategory();
-        if (Constants.NAVIGATION_CATEGORY.equals(category)) {
-            holder.category.setText(R.string.in_app_navigation_capture_title);
-        } else {
-            holder.category.setText(category);
-        }
+        holder.category.setText(category);
 
         Context context = holder.itemView.getContext();
 
@@ -84,8 +81,11 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
         String COLORS_CONFIG = SharedPreferencesUtils.getStr(context, Constants.COLORS_CONFIG);
         Map<String, String> COLORS = JsonHandler.jsonToMap(COLORS_CONFIG);
 
-        if (category != null && COLORS.containsKey(category)) {
-            try { background.setColor(Color.parseColor(COLORS.get(category))); }
+        NavigationCaptureSource source = NavigationCaptureSource.forCategory(category);
+        String color = COLORS.get(category);
+        if (color == null && source != null) color = source.defaultColor();
+        if (color != null) {
+            try { background.setColor(Color.parseColor(color)); }
             catch (IllegalArgumentException e) { background.setColor(Color.GRAY); }
         } else {
             background.setColor(Color.GRAY);
@@ -149,8 +149,7 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
 
     private void showPopupWindow(View view, ItemData item) {
         AlertDialog.Builder builder = AppDialogs.builder(view.getContext());
-        builder.setTitle(Constants.NAVIGATION_CATEGORY.equals(item.getCategory())
-                        ? view.getContext().getString(R.string.in_app_navigation_capture_title) : item.getCategory())
+        builder.setTitle(item.getCategory())
                 .setMessage(String.valueOf(item.getItem_from()) + "\n\n" + String.valueOf(item.getItem_data()))
                 .setPositiveButton("OK", (dialog, which) -> dialog.dismiss())
                 .show();

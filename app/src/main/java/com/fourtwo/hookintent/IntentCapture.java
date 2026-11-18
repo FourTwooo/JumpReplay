@@ -27,6 +27,7 @@ import android.content.pm.ServiceInfo;
 import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.service.MessengerClient;
 import com.fourtwo.hookintent.service.MessengerService;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
@@ -45,6 +46,7 @@ import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +87,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private IntentJournal intentJournal, pendingJournal;
     private final java.util.concurrent.ExecutorService journalWorker = Executors.newSingleThreadExecutor();
     private volatile HookConfigCache systemConfig;
-    private volatile boolean navigationCaptureEnabled;
+    private volatile EnumSet<NavigationCaptureSource> navigationSources = EnumSet.noneOf(NavigationCaptureSource.class);
     private volatile InAppNavigationCapture inAppNavigation;
     private boolean systemProcess;
     private boolean systemHooksInstalled;
@@ -175,21 +177,26 @@ public class IntentCapture implements IXposedHookLoadPackage {
     }
 
     private void reloadNavigationConfig() {
-        boolean enabled;
+        EnumSet<NavigationCaptureSource> sources = EnumSet.noneOf(NavigationCaptureSource.class);
         try {
-            enabled = Boolean.parseBoolean(getConfig(Constants.IN_APP_NAVIGATION_URI)
-                    .get(Constants.IN_APP_NAVIGATION_CAPTURE));
+            Map<String, String> config = getConfig(Constants.IN_APP_NAVIGATION_URI);
+            if (Boolean.parseBoolean(config.get(Constants.FRAGMENT_CAPTURE_ENABLED))) {
+                sources.add(NavigationCaptureSource.FRAGMENT);
+            }
+            if (Boolean.parseBoolean(config.get(Constants.NAV_CONTROLLER_CAPTURE_ENABLED))) {
+                sources.add(NavigationCaptureSource.NAV_CONTROLLER);
+            }
         } catch (RuntimeException error) {
-            enabled = false;
+            sources.clear();
         }
-        if (navigationCaptureEnabled != enabled) {
-            navigationCaptureEnabled = enabled;
+        if (!navigationSources.equals(sources)) {
+            navigationSources = sources;
             navigationCaptureStateChanged();
         }
     }
 
-    private boolean shouldCaptureNavigation() {
-        return navigationCaptureEnabled && getIsHook();
+    private boolean shouldCaptureNavigation(NavigationCaptureSource source) {
+        return navigationSources.contains(source) && getIsHook();
     }
 
     private void navigationCaptureStateChanged() {
@@ -197,12 +204,13 @@ public class IntentCapture implements IXposedHookLoadPackage {
         if (capture != null) capture.onCaptureStateChanged();
     }
 
-    private void captureNavigation(Activity activity, String destination, String kind, Bundle arguments) {
-        if (!shouldCaptureNavigation()) return;
+    private void captureNavigation(Activity activity, String destination,
+            NavigationCaptureSource source, Bundle arguments) {
+        if (!shouldCaptureNavigation(source)) return;
         Bundle record = new Bundle();
-        record.putString("category", Constants.NAVIGATION_CATEGORY);
+        record.putString("category", source.category());
         record.putString("title", destination);
-        record.putString("FunctionCall", kind);
+        record.putString("FunctionCall", source.method());
         record.putString("from", activity.getClass().getName());
         record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
         filterCustomize(record);

@@ -33,8 +33,12 @@ public class SharedPreferencesUtils {
      * @return 参数值 (默认值为 false)
      */
     public static boolean getBoolean(Context context, String key) {
+        return getBoolean(context, key, false);
+    }
+
+    public static boolean getBoolean(Context context, String key, boolean defaultValue) {
         SharedPreferences sharedPreferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE);
-        return sharedPreferences.getBoolean(key, false); // 默认返回 false
+        return sharedPreferences.getBoolean(key, defaultValue);
     }
 
 
