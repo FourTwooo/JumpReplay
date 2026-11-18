@@ -31,6 +31,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.util.Pair;
 import androidx.core.view.MenuProvider;
 import androidx.fragment.app.Fragment;
@@ -111,6 +112,12 @@ public class SettingsFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_settings, container, false);
+
+        Context context = requireContext();
+        SwitchCompat navigationCapture = view.findViewById(R.id.in_app_navigation_capture_switch);
+        navigationCapture.setChecked(SharedPreferencesUtils.getBoolean(context, Constants.IN_APP_NAVIGATION_CAPTURE));
+        navigationCapture.setOnCheckedChangeListener((button, checked) ->
+                SharedPreferencesUtils.putBoolean(context, Constants.IN_APP_NAVIGATION_CAPTURE, checked));
 
         recyclerView = view.findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));

@@ -29,6 +29,8 @@
     <string name="is_root">rootを使用</string>
     <string name="star">お気に入り</string>
     <string name="settings">設定</string>
+    <string name="in_app_navigation_capture_title">アプリ内ナビゲーションのキャプチャ</string>
+    <string name="in_app_navigation_capture_summary">キャプチャ中に、アプリ内の画面遷移と取得可能なナビゲーション引数を記録します。</string>
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="disabled">無効</string>

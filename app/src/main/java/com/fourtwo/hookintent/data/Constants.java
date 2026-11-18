@@ -21,6 +21,10 @@ public final class Constants {
     public static final String AUTHORITY = "com.fourtwo.hookintent.configprovider";
     public static final Uri CONFIG_URI = Uri.parse("content://" + AUTHORITY + "/config");
     public static final Uri SCHEME_URI = Uri.parse("content://" + AUTHORITY + "/scheme");
+    public static final Uri IN_APP_NAVIGATION_URI = Uri.parse("content://" + AUTHORITY + "/in_app_navigation");
+    public static final String IN_APP_NAVIGATION_CAPTURE = "inAppNavigationCapture";
+    public static final String NAVIGATION_CATEGORY = "Navigation";
+    public static final String NAVIGATION_ARGUMENTS = "navigation_arguments";
 
     public static final String INTERNAL_HOOKS_CONFIG = "internalHooksConfig";
     public static final String EXTERNAL_HOOKS_CONFIG = "externalHooksConfig";

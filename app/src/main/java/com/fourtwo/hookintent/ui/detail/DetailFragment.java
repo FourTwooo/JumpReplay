@@ -57,6 +57,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -165,7 +166,18 @@ public class DetailFragment extends Fragment {
 
             dataList.add(new Pair<>("separator", ""));
 
-            List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data", "componentClassName", IntentPayloadCodec.KEY);
+            List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data",
+                    "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS);
+            if (Constants.NAVIGATION_CATEGORY.equals(itemData.getCategory())) {
+                Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
+                if (arguments != null) {
+                    List<String> argumentKeys = new ArrayList<>(arguments.keySet());
+                    Collections.sort(argumentKeys);
+                    for (String key : argumentKeys) {
+                        dataList.add(new Pair<>(key, String.valueOf(arguments.get(key))));
+                    }
+                }
+            }
 
             for (Map.Entry<String, String> entry : dataMap.entrySet()) {
                 if (no_print_keys.contains(entry.getKey())) {
@@ -254,6 +266,8 @@ public class DetailFragment extends Fragment {
                 menuInflater.inflate(R.menu.detail_drawer, menu); // 加载菜单
                 menu.findItem(R.id.action_save).setVisible(itemData != null
                         && ("Intent".equals(itemData.getCategory()) || "Scheme".equals(itemData.getCategory())));
+                menu.findItem(R.id.copy_code).setVisible(itemData == null
+                        || !Constants.NAVIGATION_CATEGORY.equals(itemData.getCategory()));
 
                 // 动态设置收藏按钮图标
                 try {

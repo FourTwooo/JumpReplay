@@ -18,8 +18,14 @@ import java.util.Map;
 public class ConfigProvider extends ContentProvider {
     // Keep a strong reference: SharedPreferences only retains listeners weakly.
     private final android.content.SharedPreferences.OnSharedPreferenceChangeListener changes = (preferences, key) -> {
-        if (getContext() != null) getContext().getContentResolver().notifyChange(
-                Constants.DISABLED_SCHEME.equals(key) ? Constants.SCHEME_URI : Constants.CONFIG_URI, null);
+        if (getContext() == null) return;
+        Uri changed = Constants.CONFIG_URI;
+        if (Constants.IN_APP_NAVIGATION_CAPTURE.equals(key)) {
+            changed = Constants.IN_APP_NAVIGATION_URI;
+        } else if (Constants.DISABLED_SCHEME.equals(key)) {
+            changed = Constants.SCHEME_URI;
+        }
+        getContext().getContentResolver().notifyChange(changed, null);
     };
     @Override
     public boolean onCreate() {
@@ -45,6 +51,10 @@ public class ConfigProvider extends ContentProvider {
             // 如果传递的是 SCHEME_URI，返回禁用的 Scheme 配置
             String DISABLED_SCHEME = SharedPreferencesUtils.getStr(getContext(), Constants.DISABLED_SCHEME);
             configData.put(Constants.DISABLED_SCHEME, DISABLED_SCHEME);
+        }
+        if (Constants.CONFIG_URI.equals(uri) || Constants.IN_APP_NAVIGATION_URI.equals(uri)) {
+            configData.put(Constants.IN_APP_NAVIGATION_CAPTURE, Boolean.toString(
+                    SharedPreferencesUtils.getBoolean(getContext(), Constants.IN_APP_NAVIGATION_CAPTURE)));
         }
 
         MatrixCursor cursor = new MatrixCursor(new String[]{"key", "value"});

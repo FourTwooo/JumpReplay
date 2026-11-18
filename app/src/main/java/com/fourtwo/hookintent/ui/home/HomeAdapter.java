@@ -67,7 +67,11 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
         holder.dataSize.setText(item.getDataSize());
 
         String category = item.getCategory();
-        holder.category.setText(category);
+        if (Constants.NAVIGATION_CATEGORY.equals(category)) {
+            holder.category.setText(R.string.in_app_navigation_capture_title);
+        } else {
+            holder.category.setText(category);
+        }
 
         Context context = holder.itemView.getContext();
 
@@ -145,7 +149,8 @@ public class HomeAdapter extends RecyclerView.Adapter<HomeAdapter.ViewHolder> {
 
     private void showPopupWindow(View view, ItemData item) {
         AlertDialog.Builder builder = AppDialogs.builder(view.getContext());
-        builder.setTitle(item.getCategory())
+        builder.setTitle(Constants.NAVIGATION_CATEGORY.equals(item.getCategory())
+                        ? view.getContext().getString(R.string.in_app_navigation_capture_title) : item.getCategory())
                 .setMessage(String.valueOf(item.getItem_from()) + "\n\n" + String.valueOf(item.getItem_data()))
                 .setPositiveButton("OK", (dialog, which) -> dialog.dismiss())
                 .show();

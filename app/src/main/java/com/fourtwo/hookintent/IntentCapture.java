@@ -14,6 +14,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Binder;
@@ -34,6 +35,7 @@ import com.fourtwo.hookintent.xposed.DurableCaptureOutbox;
 import com.fourtwo.hookintent.xposed.IntentJournal;
 import com.fourtwo.hookintent.xposed.HookConfigCache;
 import com.fourtwo.hookintent.xposed.ActivityCaptureHooks;
+import com.fourtwo.hookintent.xposed.InAppNavigationCapture;
 import android.os.Handler;
 import android.os.Looper;
 import com.fourtwo.hookintent.xposed.ui.FloatWindow;
@@ -83,6 +85,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private IntentJournal intentJournal, pendingJournal;
     private final java.util.concurrent.ExecutorService journalWorker = Executors.newSingleThreadExecutor();
     private volatile HookConfigCache systemConfig;
+    private volatile boolean navigationCaptureEnabled;
+    private volatile InAppNavigationCapture inAppNavigation;
     private boolean systemProcess;
     private boolean systemHooksInstalled;
     private ClassLoader systemClassLoader;
@@ -137,11 +141,71 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 });
             } catch (Exception error) { reportCaptureError(error); }
         }
+        navigationCaptureStateChanged();
         mainHandler.post(() -> {
             for (FloatWindow window : new ArrayList<>(floatWindows.values())) if (window.floatWindowView != null) {
                 window.floatWindowView.setHookState(isHook); window.floatWindowView.refreshJournal();
             }
         });
+    }
+
+    private void installNavigationCapture(Object attached) {
+        if (isHostApp || inAppNavigation != null || !(attached instanceof Application)) return;
+        InAppNavigationCapture capture = new InAppNavigationCapture(
+                this::shouldCaptureNavigation, this::captureNavigation);
+        try {
+            capture.install((Application) attached);
+        } catch (RuntimeException | LinkageError error) {
+            XposedBridge.log("JumpReplay navigation initialization: " + error.getClass().getSimpleName());
+            return;
+        }
+        inAppNavigation = capture;
+        ContentObserver observer = new ContentObserver(mainHandler) {
+            @Override public void onChange(boolean selfChange) {
+                journalWorker.execute(IntentCapture.this::reloadNavigationConfig);
+            }
+        };
+        try {
+            applicationContext.getContentResolver()
+                    .registerContentObserver(Constants.IN_APP_NAVIGATION_URI, false, observer);
+        } catch (RuntimeException error) {
+            XposedBridge.log("JumpReplay navigation config observer: " + error.getClass().getSimpleName());
+        }
+        journalWorker.execute(this::reloadNavigationConfig);
+    }
+
+    private void reloadNavigationConfig() {
+        boolean enabled;
+        try {
+            enabled = Boolean.parseBoolean(getConfig(Constants.IN_APP_NAVIGATION_URI)
+                    .get(Constants.IN_APP_NAVIGATION_CAPTURE));
+        } catch (RuntimeException error) {
+            enabled = false;
+        }
+        if (navigationCaptureEnabled != enabled) {
+            navigationCaptureEnabled = enabled;
+            navigationCaptureStateChanged();
+        }
+    }
+
+    private boolean shouldCaptureNavigation() {
+        return navigationCaptureEnabled && getIsHook();
+    }
+
+    private void navigationCaptureStateChanged() {
+        InAppNavigationCapture capture = inAppNavigation;
+        if (capture != null) capture.onCaptureStateChanged();
+    }
+
+    private void captureNavigation(Activity activity, String destination, String kind, Bundle arguments) {
+        if (!shouldCaptureNavigation()) return;
+        Bundle record = new Bundle();
+        record.putString("category", Constants.NAVIGATION_CATEGORY);
+        record.putString("title", destination);
+        record.putString("FunctionCall", kind);
+        record.putString("from", activity.getClass().getName());
+        record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
+        filterCustomize(record);
     }
 
     private void reportCaptureError(Throwable error) {
@@ -829,6 +893,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
                     applicationContext = (Context) param.args[0];
                     HookStart(loadPackageParam);
                 }
+                installNavigationCapture(param.thisObject);
             }
         });
 
@@ -841,6 +906,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
                     XposedBridge.log(packageName + ": xposed挂载成功 attach");
                     HookStart(loadPackageParam);
                 }
+                installNavigationCapture(param.thisObject);
             }
         });
     }

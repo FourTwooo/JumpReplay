@@ -8,6 +8,7 @@ import android.util.Log;
 import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.Extract;
 import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -78,7 +79,13 @@ public class DataProcessor {
         } else {
             targetPackage = bundle.getString("packageName");
             component = bundle.getString("title");
-            dataString = bundle.getString("data");
+            if (Constants.NAVIGATION_CATEGORY.equals(category)) {
+                Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
+                dataString = arguments == null || arguments.isEmpty() ? ""
+                        : new JSONObject(JsonHandler.toMap(arguments)).toString();
+            } else {
+                dataString = bundle.getString("data");
+            }
         }
         AppInfoHelper.AppInfo appInfo = AppInfoHelper.getAppInfo(context, targetPackage);
         Drawable icon = appInfo.getAppIcon();

@@ -29,6 +29,8 @@
     <string name="is_root">Use root</string>
     <string name="star">Favorites</string>
     <string name="settings">Configuration</string>
+    <string name="in_app_navigation_capture_title">In-app navigation capture</string>
+    <string name="in_app_navigation_capture_summary">Record in-app screen changes and available navigation arguments while capture is active.</string>
     <string name="hello_blank_fragment">Hello blank fragment</string>
     <string name="disabled">Disabled</string>
     <string name="add_link">Create shortcut</string>
