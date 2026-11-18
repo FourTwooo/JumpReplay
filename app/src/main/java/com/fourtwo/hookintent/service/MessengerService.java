@@ -13,13 +13,14 @@ import android.util.Log;
 import androidx.lifecycle.MutableLiveData;
 import com.fourtwo.hookintent.manager.HookStatusManager;
 import com.fourtwo.hookintent.data.CaptureRepository;
+import com.fourtwo.hookintent.replay.NavigationReplayTransport;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/** Intentionally open IPC for injected apps and LSPatch. Validate messages, not application identity. */
+/** Open capture IPC for injected apps and LSPatch, with host-only editor discovery and navigation replay. */
 public class MessengerService extends Service {
     public static final int MSG_IS_HOOK = 1;
     public static final int MSG_SEND_DATA = 3;
@@ -69,6 +70,9 @@ public class MessengerService extends Service {
                         break;
                     case com.fourtwo.hookintent.replay.ExtrasRuntime.DISCOVER:
                         if (msg.sendingUid == android.os.Process.myUid()) discoverEditor(reply, request, msg.getData());
+                        break;
+                    case NavigationReplayTransport.DISCOVER:
+                        if (msg.sendingUid == android.os.Process.myUid()) discoverNavigation(reply, request, msg.getData());
                         break;
                     case MSG_UNREGISTER_CLIENT:
                         if (reply != null) remove(reply.getBinder());
@@ -132,6 +136,34 @@ public class MessengerService extends Service {
         Message response = Message.obtain(null, MSG_REPLY); response.setData(data);
         try { reply.send(response); } catch (RemoteException ignored) { }
     }
+    private void discoverNavigation(Messenger reply, int request, Bundle query) {
+        if (reply == null) return;
+        IBinder endpoint = null;
+        try {
+            NavigationReplayTransport.Source source = NavigationReplayTransport.Source.installed(this, query);
+            for (Client client : clients.values()) {
+                if (source.uid != client.uid
+                        || !source.packageName.equals(client.info.getString("packageName"))
+                        || !source.processName.equals(client.info.getString("processName"))) continue;
+                IBinder candidate = client.info.getBinder(NavigationReplayTransport.ENDPOINT);
+                if (candidate == null || !candidate.isBinderAlive()) continue;
+                if (endpoint != null && !endpoint.equals(candidate)) {
+                    endpoint = null;
+                    break;
+                }
+                endpoint = candidate;
+            }
+        } catch (Exception ignored) { }
+        Bundle data = new Bundle();
+        data.putInt("requestType", NavigationReplayTransport.DISCOVER);
+        data.putInt("requestId", request);
+        data.putInt("resultCode", endpoint == null ? 0 : 1);
+        if (endpoint != null) data.putBinder(NavigationReplayTransport.ENDPOINT, endpoint);
+        Message response = Message.obtain(null, MSG_REPLY);
+        response.setData(data);
+        try { reply.send(response); } catch (RemoteException ignored) { }
+    }
+
     public List<Bundle> getConnectedClients() {
         List<Bundle> result = new ArrayList<>();
         for (Client client : clients.values()) result.add(new Bundle(client.info));

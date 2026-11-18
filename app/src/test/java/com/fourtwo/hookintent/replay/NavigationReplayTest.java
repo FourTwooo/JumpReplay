@@ -1,12 +1,12 @@
 package com.fourtwo.hookintent.replay;
 
 import android.app.Application;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
-import android.os.Build;
 import android.os.Bundle;
 
 import com.fourtwo.hookintent.base.DetailPayloadStore;
@@ -21,90 +21,130 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThrows;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(application = Application.class, sdk = 33)
 public class NavigationReplayTest {
-    private static final String WECHAT = "com.tencent.mm";
-    private static final String LAUNCHER = "com.tencent.mm.ui.LauncherUI";
-    private static final String CHATTING = "com.tencent.mm.ui.chatting.ChattingUIFragment";
+    private static final String FIRST = "example.first";
+    private static final String SECOND = "example.second";
+    private static final String HOST = "HostActivity";
 
-    @Test public void verifiedLegacyCaptureCreatesASeparateReplayableDraft() {
-        Context context = installWeChat(3200L, true);
-        Bundle record = fragmentRecord();
-        ItemData capture = capture(Constants.NAVIGATION_CATEGORY, record);
+    @Test public void savedRouteAppliesTypedMappingsToLaterRecords() {
+        Context context = install(FIRST, true, null);
+        ItemData first = capture(Constants.FRAGMENT_CATEGORY, FIRST, "Content", "42");
+        Map<String, String> mappings = new LinkedHashMap<>();
+        mappings.put("id", "screen_id");
+        mappings.put("enabled", "display");
+        String template = explicit(FIRST).putExtra("screen_id", 0).putExtra("sort", "latest")
+                .toUri(Intent.URI_INTENT_SCHEME);
 
-        ItemData draft = NavigationReplay.prepare(context, capture);
+        assertNull(NavigationReplay.prepare(context, first));
+        NavigationReplay.saveBinding(context, first, template, mappings);
+        assertEquals(mappings, NavigationReplay.getBinding(context, first).getArgumentToExtra());
+
+        ItemData later = capture(Constants.FRAGMENT_CATEGORY, FIRST, "Content", "89");
+        ItemData draft = NavigationReplay.prepare(context, later);
         assertNotNull(draft);
-        assertFalse(record.containsKey(IntentPayloadCodec.KEY));
+        assertFalse(later.getAppBundle().containsKey(IntentPayloadCodec.KEY));
+        assertEquals(Constants.FRAGMENT_CATEGORY, later.getCategory());
         assertEquals("Intent", draft.getCategory());
         ItemData restored = DetailPayloadStore.load(context, DetailPayloadStore.save(context, draft));
         Intent target = IntentPayloadCodec.decode(restored.getAppBundle());
-        assertEquals(WECHAT, target.getComponent().getPackageName());
-        assertEquals(LAUNCHER, target.getComponent().getClassName());
-        assertNull(target.getAction());
-        assertEquals(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP, target.getFlags());
-        assertEquals("sample-conversation", target.getStringExtra("Main_User"));
-        assertFalse(target.getBooleanExtra("Intro_Is_Muti_Talker", true));
-        assertEquals(2, target.getExtras().size());
-        assertEquals(record.getInt("source_app_uid"), restored.getAppBundle().getInt("source_app_uid"));
+        assertEquals(explicit(FIRST).getComponent(), target.getComponent());
+        assertEquals(89, target.getIntExtra("screen_id", -1));
+        assertEquals("latest", target.getStringExtra("sort"));
+        assertEquals(true, target.getBooleanExtra("display", false));
+        assertEquals(3, target.getExtras().size());
+        assertEquals(1_700_000_000_000L, restored.getAppBundle().getLong("source_last_update"));
     }
 
-    @Test public void limitsReplayToTheVerifiedDestinationAndInstallation() {
-        Context context = installWeChat(3201L, true);
-        Bundle record = fragmentRecord();
-        assertNull(NavigationReplay.prepare(context, capture(Constants.FRAGMENT_CATEGORY, record)));
+    @Test public void rulesAreGenericAndMatchTheExactSourceDestination() {
+        Context context = install(FIRST, true, null);
+        install(SECOND, true, null);
+        ItemData fragment = capture(Constants.FRAGMENT_CATEGORY, FIRST, "SameDestination", "13");
+        ItemData controller = capture(Constants.NAV_CONTROLLER_CATEGORY, SECOND, "SameDestination", "29");
+        NavigationReplay.saveBinding(context, fragment, explicit(FIRST).toUri(Intent.URI_INTENT_SCHEME),
+                Collections.singletonMap("id", "value"));
+        assertNull(NavigationReplay.prepare(context, controller));
+        assertNull(NavigationReplay.prepare(context, capture(Constants.FRAGMENT_CATEGORY, FIRST, "Other", "13")));
+        assertNull(NavigationReplay.prepare(context, capture(Constants.NAV_CONTROLLER_CATEGORY, FIRST, "SameDestination", "13")));
 
-        installWeChat(3200L, false);
-        assertNull(NavigationReplay.prepare(context, capture(Constants.FRAGMENT_CATEGORY, record)));
-
-        installWeChat(3200L, true);
-        assertNull(NavigationReplay.prepare(context, capture(Constants.NAV_CONTROLLER_CATEGORY, record)));
-        record.putInt("source_app_uid", 10264);
-        assertNull(NavigationReplay.prepare(context, capture(Constants.FRAGMENT_CATEGORY, record)));
+        NavigationReplay.saveBinding(context, controller, explicit(SECOND).toUri(Intent.URI_INTENT_SCHEME),
+                Collections.singletonMap("id", "different_key"));
+        Bundle second = NavigationReplay.prepare(context, controller).getAppBundle();
+        assertEquals("29", IntentPayloadCodec.decode(second).getStringExtra("different_key"));
+        NavigationReplay.removeBinding(context, fragment);
+        assertNull(NavigationReplay.prepare(context, fragment));
+        assertNotNull(NavigationReplay.prepare(context, controller));
     }
 
-    private Context installWeChat(long version, boolean exported) {
+    @Test public void inaccessibleOrInvalidRulesCannotReplaceAnExistingRoute() {
+        Context context = install(FIRST, true, null);
+        install(SECOND, false, null);
+        ItemData first = capture(Constants.FRAGMENT_CATEGORY, FIRST, "Content", "42");
+        ItemData second = capture(Constants.FRAGMENT_CATEGORY, SECOND, "Content", "42");
+        String template = explicit(FIRST).putExtra("value", 1).toUri(Intent.URI_INTENT_SCHEME);
+        Map<String, String> valid = Collections.singletonMap("id", "value");
+        NavigationReplay.saveBinding(context, first, template, valid);
+
+        assertThrows(IllegalArgumentException.class, () -> NavigationReplay.saveBinding(context, first,
+                explicit(SECOND).toUri(Intent.URI_INTENT_SCHEME), valid));
+        assertThrows(IllegalArgumentException.class, () -> NavigationReplay.saveBinding(context, second,
+                explicit(SECOND).toUri(Intent.URI_INTENT_SCHEME), valid));
+        assertThrows(IllegalArgumentException.class, () -> NavigationReplay.saveBinding(context, first,
+                template, Collections.singletonMap("missing", "value")));
+        assertThrows(IllegalArgumentException.class, () -> NavigationReplay.saveBinding(context, first,
+                template, Collections.singletonMap("enabled", "value")));
+        assertEquals(valid, NavigationReplay.getBinding(context, first).getArgumentToExtra());
+
+        install(FIRST, true, "example.permission.RESTRICTED");
+        assertNull(NavigationReplay.prepare(context, first));
+    }
+
+    private static Intent explicit(String packageName) {
+        return new Intent("example.OPEN").setComponent(new ComponentName(packageName, packageName + ".Entry"));
+    }
+
+    private static Context install(String packageName, boolean exported, String permission) {
         Context context = RuntimeEnvironment.getApplication();
         PackageInfo info = new PackageInfo();
-        info.packageName = WECHAT;
-        info.setLongVersionCode(version);
-        info.lastUpdateTime = 1734000000L;
+        info.packageName = packageName;
+        info.lastUpdateTime = 1_700_000_000_000L;
         info.applicationInfo = new ApplicationInfo();
-        info.applicationInfo.packageName = WECHAT;
-        info.applicationInfo.uid = 10263;
-        ActivityInfo launcher = new ActivityInfo();
-        launcher.name = LAUNCHER;
-        launcher.packageName = WECHAT;
-        launcher.applicationInfo = info.applicationInfo;
-        launcher.exported = exported;
-        info.activities = new ActivityInfo[]{launcher};
+        info.applicationInfo.packageName = packageName;
+        info.applicationInfo.uid = FIRST.equals(packageName) ? 10263 : 10264;
+        ActivityInfo entry = new ActivityInfo();
+        entry.name = packageName + ".Entry";
+        entry.packageName = packageName;
+        entry.applicationInfo = info.applicationInfo;
+        entry.exported = exported;
+        entry.permission = permission;
+        info.activities = new ActivityInfo[]{entry};
         Shadows.shadowOf(context.getPackageManager()).installPackage(info);
         return context;
     }
 
-    private Bundle fragmentRecord() {
+    private static ItemData capture(String category, String packageName, String destination, String id) {
         Bundle arguments = new Bundle();
-        arguments.putString("Chat_User", "sample-conversation");
-        arguments.putString("internal", "only used by the Fragment");
+        arguments.putString("id", id);
+        arguments.putBoolean("enabled", true);
+        arguments.putString("internal", "Only the navigation record sees this");
         Bundle record = new Bundle();
-        record.putString("category", Constants.NAVIGATION_CATEGORY);
-        record.putString("FunctionCall", Constants.FRAGMENT_CATEGORY);
-        record.putString("packageName", WECHAT);
-        record.putString("from", LAUNCHER);
-        record.putString("title", CHATTING);
-        record.putInt("capture_sdk", Build.VERSION.SDK_INT);
-        record.putInt("source_app_uid", 10263);
-        record.putLong("source_last_update", 1734000000L);
+        record.putString("category", category);
+        record.putString("packageName", packageName);
+        record.putString("from", HOST);
+        record.putString("title", destination);
+        record.putLong("source_last_update", 1L);
         record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
-        return record;
-    }
-
-    private ItemData capture(String category, Bundle record) {
-        return new ItemData(null, "WeChat", CHATTING, "", "", "", record, category, "", "");
+        return new ItemData(null, packageName, destination, "", "", "", record, category, "", "");
     }
 }

@@ -41,8 +41,13 @@ public final class ExtrasEditorDialog {
     private ExtrasEditorDialog() { }
 
     public static void show(FragmentActivity activity, Bundle captureRecord, Consumer<Bundle> onSaved) {
+        show(activity, captureRecord, R.string.extras_editor_title, R.string.extras_save, onSaved);
+    }
+
+    public static void show(FragmentActivity activity, Bundle captureRecord, int title,
+            int confirmation, Consumer<Bundle> onSaved) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
-        new Editor(activity, captureRecord, onSaved).show();
+        new Editor(activity, captureRecord, title, confirmation, onSaved).show();
     }
 
     private static final class Location {
@@ -55,6 +60,7 @@ public final class ExtrasEditorDialog {
         final Context context;
         final Bundle draft;
         final Consumer<Bundle> onSaved;
+        final int title, confirmation;
         final List<Location> trail = new ArrayList<>();
         final List<JSONObject> nodes = new ArrayList<>();
         final NodesAdapter adapter = new NodesAdapter();
@@ -70,10 +76,12 @@ public final class ExtrasEditorDialog {
         boolean closed, busy, opened;
         int generation;
 
-        Editor(FragmentActivity activity, Bundle record, Consumer<Bundle> onSaved) {
+        Editor(FragmentActivity activity, Bundle record, int title, int confirmation, Consumer<Bundle> onSaved) {
             this.activity = activity;
             this.context = AppDialogs.context(activity);
             this.draft = new Bundle(record);
+            this.title = title;
+            this.confirmation = confirmation;
             this.onSaved = onSaved;
         }
 
@@ -119,9 +127,9 @@ public final class ExtrasEditorDialog {
             list.setClipToPadding(false);
             list.setPadding(0, 0, 0, dp(12));
             content.addView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-            dialog = AppDialogs.builder(context).setTitle(R.string.extras_editor_title).setView(content)
+            dialog = AppDialogs.builder(context).setTitle(title).setView(content)
                     .setNegativeButton(R.string.extras_cancel, null)
-                    .setPositiveButton(R.string.extras_save, null).create();
+                    .setPositiveButton(confirmation, null).create();
             dialog.setOnDismissListener(unused -> close());
             dialog.setOnKeyListener((unused, code, event) -> {
                 if (code == KeyEvent.KEYCODE_BACK && trail.size() > 1) {

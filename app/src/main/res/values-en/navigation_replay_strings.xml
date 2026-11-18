@@ -1,0 +1,14 @@
+<resources>
+    <string name="navigation_replay_options">Replay options</string>
+    <string name="navigation_replay_in_app">Edit arguments and replay in app</string>
+    <string name="navigation_replay_external">Edit arguments and replay with the bound entry</string>
+    <string name="navigation_binding_title">Bind a launch entry</string>
+    <string name="navigation_binding_uri">Intent URI or scheme</string>
+    <string name="navigation_binding_mapping">Navigation parameter=launch parameter (one per line, optional)</string>
+    <string name="navigation_binding_remove">Remove binding</string>
+    <string name="navigation_binding_invalid_mapping">Enter a different navigation parameter on each line as navigation parameter=launch parameter.</string>
+    <string name="navigation_replay_edit_title">Edit navigation arguments</string>
+    <string name="navigation_replay_start">Replay</string>
+    <string name="navigation_replay_missing_launcher">The target app has no launcher entry.</string>
+    <string name="navigation_replay_error">Navigation replay failed: %1$s</string>
+</resources>

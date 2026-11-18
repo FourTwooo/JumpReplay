@@ -14,3 +14,11 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
 }
+
+dependencies {
+    implementation 'androidx.activity:activity:1.6.0'
+    implementation 'androidx.core:core:1.9.0'
+    implementation 'androidx.lifecycle:lifecycle-livedata:2.4.1'
+    implementation 'androidx.navigation:navigation-fragment:2.5.2'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.7.10'
+}

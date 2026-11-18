@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_fixture_graph"
+    app:startDestination="@id/nav_fixture_home">
+
+    <fragment
+        android:id="@+id/nav_fixture_home"
+        android:name="com.fourtwo.hookintent.fixture.NavigationFixtureActivity$Home">
+        <action
+            android:id="@+id/nav_fixture_open_detail"
+            app:destination="@id/nav_fixture_detail" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/nav_fixture_detail"
+        android:name="com.fourtwo.hookintent.fixture.NavigationFixtureActivity$Detail">
+        <argument android:name="value" app:argType="string" />
+    </fragment>
+</navigation>

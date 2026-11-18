@@ -28,6 +28,7 @@ import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
+import com.fourtwo.hookintent.replay.NavigationReplayTransport;
 import com.fourtwo.hookintent.service.MessengerClient;
 import com.fourtwo.hookintent.service.MessengerService;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
@@ -153,9 +154,9 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     private void installNavigationCapture(Object attached) {
         if (isHostApp || inAppNavigation != null || !(attached instanceof Application)) return;
-        InAppNavigationCapture capture = new InAppNavigationCapture(
-                this::shouldCaptureNavigation, this::captureNavigation);
+        InAppNavigationCapture capture;
         try {
+            capture = new InAppNavigationCapture(this::shouldCaptureNavigation, this::captureNavigation);
             capture.install((Application) attached);
         } catch (RuntimeException | LinkageError error) {
             XposedBridge.log("JumpReplay navigation initialization: " + error.getClass().getSimpleName());
@@ -205,7 +206,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
     }
 
     private void captureNavigation(Activity activity, String destination,
-            NavigationCaptureSource source, Bundle arguments) {
+            NavigationCaptureSource source, Bundle arguments, Bundle descriptor) {
         if (!shouldCaptureNavigation(source)) return;
         Bundle record = new Bundle();
         record.putString("category", source.category());
@@ -213,7 +214,33 @@ public class IntentCapture implements IXposedHookLoadPackage {
         record.putString("FunctionCall", source.method());
         record.putString("from", activity.getClass().getName());
         record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
-        filterCustomize(record);
+        if (descriptor == null) {
+            filterCustomize(record);
+            return;
+        }
+        journalWorker.execute(() -> {
+            if (!shouldCaptureNavigation(source)) return;
+            try {
+                Bundle sealed = NavigationReplayTransport.seal(applicationContext, descriptor);
+                if (sealed != null) {
+                    record.putBundle(Constants.NAVIGATION_REPLAY, sealed);
+                    record.putString("FunctionCall", "navigate");
+                }
+            } catch (Exception unavailable) {
+                XposedBridge.log("JumpReplay navigation descriptor: " + unavailable.getClass().getSimpleName());
+            }
+            filterCustomize(record);
+        });
+    }
+
+    private void replayNavigation(Bundle descriptor, Bundle arguments,
+            java.util.function.Consumer<Exception> callback) {
+        InAppNavigationCapture capture = inAppNavigation;
+        if (capture == null) {
+            callback.accept(new IllegalStateException("应用内导航尚未初始化"));
+            return;
+        }
+        capture.replay(descriptor, arguments, callback);
     }
 
     private void reportCaptureError(Throwable error) {
@@ -822,6 +849,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
             catch (Exception ignored) { }
             client = new MessengerClient(applicationContext);
             client.enableExtrasEditing(loadPackageParam.classLoader);
+            client.enableNavigationReplay(this::replayNavigation);
             try { outbox = new DurableCaptureOutbox(applicationContext, client, error -> XposedBridge.log("JumpReplay transport retry: " + error)); }
             catch (Exception error) { reportCaptureError(error); }
             client.setConnectionCallback(new MessengerClient.ConnectionCallback() {

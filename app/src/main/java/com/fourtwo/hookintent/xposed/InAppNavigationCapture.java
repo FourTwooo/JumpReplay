@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -30,7 +31,8 @@ import de.robv.android.xposed.XposedBridge;
 /** Observe destinations within resumed activities without intercepting every View or Intent. */
 public final class InAppNavigationCapture implements Application.ActivityLifecycleCallbacks {
     public interface Sink {
-        void capture(Activity activity, String destination, NavigationCaptureSource source, Bundle arguments);
+        void capture(Activity activity, String destination, NavigationCaptureSource source, Bundle arguments,
+                Bundle replayDescriptor);
     }
 
     private static final String NAV_CONTROLLER = "androidx.navigation.NavController";
@@ -42,6 +44,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     private final Map<Activity, ActivityWatch> resumed = new IdentityHashMap<>();
     private final Predicate<NavigationCaptureSource> enabled;
     private final Sink sink;
+    private final JetpackNavigationReplay jetpackReplay;
     private final Map<ClassLoader, FragmentAccess> supportByLoader = new WeakHashMap<>();
     private final Set<Class<?>> navControllers = Collections.newSetFromMap(new WeakHashMap<>());
     private FragmentAccess platform;
@@ -50,6 +53,13 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     public InAppNavigationCapture(Predicate<NavigationCaptureSource> enabled, Sink sink) {
         this.enabled = enabled;
         this.sink = sink;
+        jetpackReplay = new JetpackNavigationReplay(main,
+                () -> enabled.test(NavigationCaptureSource.NAV_CONTROLLER),
+                activity -> activity != null && resumed.containsKey(activity));
+    }
+
+    public void replay(Bundle descriptor, Bundle arguments, Consumer<Exception> result) {
+        jetpackReplay.replay(descriptor, arguments, result);
     }
 
     public void install(Application application) {
@@ -80,6 +90,10 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
 
     @Override public void onActivityPaused(Activity activity) { stopWatching(activity); }
     @Override public void onActivityDestroyed(Activity activity) { stopWatching(activity); }
+    @Override public void onActivityPreCreated(Activity activity, Bundle state) {
+        installNavController(activity.getClass().getClassLoader());
+    }
+
     @Override public void onActivityCreated(Activity activity, Bundle state) {
         installNavController(activity.getClass().getClassLoader());
     }
@@ -253,7 +267,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                     return;
                 }
                 readyAt = 0;
-                emit(activity, destination, NavigationCaptureSource.FRAGMENT, args);
+                emit(activity, destination, NavigationCaptureSource.FRAGMENT, args, null);
             }
         }
     }
@@ -312,7 +326,11 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         try {
             Method addListener = controllerClass.getMethod("addOnDestinationChangedListener", listenerClass);
             Method backStackEntry = optionalMethod(controllerClass, "getCurrentBackStackEntry");
-            Map<Object, Boolean> watchedControllers = new WeakHashMap<>();
+            try {
+                jetpackReplay.install(controllerClass);
+            } catch (ReflectiveOperationException | RuntimeException | LinkageError unavailable) {
+                // Keep destination observation available on versions without these overloads.
+            }
             XposedBridge.hookAllConstructors(controllerClass, new XC_MethodHook() {
                 @Override protected void afterHookedMethod(MethodHookParam param) {
                     if (param.hasThrowable() || param.args.length == 0 || !(param.args[0] instanceof Context)) return;
@@ -320,7 +338,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                     if (activity == null) return;
                     Object controller = param.thisObject;
                     main.post(() -> {
-                        if (watchedControllers.put(controller, Boolean.TRUE) == null) {
+                        if (jetpackReplay.register(controller, activity)) {
                             observeNavController(controller, activity, listenerClass, addListener, backStackEntry);
                         }
                     });
@@ -377,6 +395,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 previousEntry = null;
                 previousDestination = null;
                 previousArgs = null;
+                jetpackReplay.observe(controller, destination, value, null);
                 return;
             }
             try {
@@ -386,7 +405,10 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 if (route == null) route = label;
                 if (route == null) route = destination.getClass().getName();
                 Map<String, Object> args = scalarArguments(value instanceof Bundle ? (Bundle) value : null);
-                if (entry == previousEntry && route.equals(previousDestination) && args.equals(previousArgs)) return;
+                if (entry == previousEntry && route.equals(previousDestination) && args.equals(previousArgs)) {
+                    jetpackReplay.observe(controller, destination, value, null);
+                    return;
+                }
                 previousEntry = entry;
                 previousDestination = route;
                 previousArgs = args;
@@ -394,7 +416,10 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 if (fragment != null && fragment.startsWith(".")) fragment = activity.getPackageName() + fragment;
                 watch.navFragment = fragment;
                 watch.navFragmentUntil = SystemClock.uptimeMillis() + 800;
-                emit(activity, route, NavigationCaptureSource.NAV_CONTROLLER, args);
+                String destinationLabel = route;
+                jetpackReplay.observe(controller, destination, value,
+                        descriptor -> emit(activity, destinationLabel, NavigationCaptureSource.NAV_CONTROLLER,
+                                args, descriptor));
             } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
                 report(error);
             }
@@ -454,14 +479,15 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         return result;
     }
 
-    private void emit(Activity activity, String destination, NavigationCaptureSource source, Map<String, Object> args) {
+    private void emit(Activity activity, String destination, NavigationCaptureSource source,
+            Map<String, Object> args, Bundle replayDescriptor) {
         if (!enabled.test(source)) return;
         Bundle bundle = new Bundle();
         for (Map.Entry<String, Object> entry : args.entrySet()) {
             bundle.putSerializable(entry.getKey(), (java.io.Serializable) entry.getValue());
         }
         try {
-            sink.capture(activity, destination, source, bundle);
+            sink.capture(activity, destination, source, bundle, replayDescriptor);
         } catch (RuntimeException | LinkageError error) {
             report(error);
         }

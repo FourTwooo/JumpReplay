@@ -158,7 +158,9 @@ public class DetailFragment extends Fragment {
                 dataMap.put(key, value != null ? value.toString() : "null");
             }
             NavigationCaptureSource source = NavigationCaptureSource.fromRecord(itemData.getCategory(), bundle);
-            if (source != null) dataMap.put("FunctionCall", source.method());
+            if (source != null && !bundle.containsKey(Constants.NAVIGATION_REPLAY)) {
+                dataMap.put("FunctionCall", source.method());
+            }
 
             List<Pair<String, String>> dataList = new ArrayList<>();
 
@@ -172,7 +174,8 @@ public class DetailFragment extends Fragment {
             dataList.add(new Pair<>("separator", ""));
 
             List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data",
-                    "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS);
+                    "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS,
+                    Constants.NAVIGATION_REPLAY);
             if (source != null) {
                 Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
                 if (arguments != null) {
@@ -273,7 +276,7 @@ public class DetailFragment extends Fragment {
                 boolean navigation = itemData != null
                         && NavigationCaptureSource.fromRecord(itemData.getCategory(), itemData.getAppBundle()) != null;
                 menu.findItem(R.id.action_save).setVisible(canReplay);
-                menu.findItem(R.id.copy_code).setVisible(canReplay || !navigation);
+                if (navigation) menu.findItem(R.id.copy_code).setTitle(R.string.navigation_replay_options);
 
                 // 动态设置收藏按钮图标
                 try {
@@ -360,14 +363,28 @@ public class DetailFragment extends Fragment {
         }
 
         ItemData replay = replayableItem();
-        if (replay == null) return;
-        Bundle bundle = replay.getAppBundle();
-        String category = replay.getCategory();
+        Bundle capture = itemData.getAppBundle();
+        NavigationCaptureSource navigation = NavigationCaptureSource.fromRecord(itemData.getCategory(), capture);
+        if (replay == null && navigation == null) return;
+        Bundle bundle = replay == null ? Bundle.EMPTY : replay.getAppBundle();
+        String category = replay == null ? "" : replay.getCategory();
         List<String> options = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
 
+        if (navigation != null) {
+            Bundle descriptor = capture.getBundle(Constants.NAVIGATION_REPLAY);
+            ItemData record = itemData;
+            if (descriptor != null) {
+                options.add(getString(R.string.navigation_replay_in_app));
+                actions.add(() -> NavigationReplayDialogs.editInApp(requireActivity(), record, descriptor));
+            }
+            options.add(getString(R.string.navigation_binding_title));
+            actions.add(() -> NavigationReplayDialogs.editBinding(requireActivity(), record,
+                    () -> { if (isAdded()) requireActivity().invalidateOptionsMenu(); }));
+        }
+
         if (category.equals("Intent")) {
-            options.add("编辑参数并重放");
+            options.add(navigation == null ? "编辑参数并重放" : getString(R.string.navigation_replay_external));
             actions.add(() -> ExtrasEditorDialog.show(requireActivity(), bundle, edited -> {
                 try {
                     ItemData draft = new ItemData(replay.getIcon(), replay.getAppName(), replay.getItem_from(),
@@ -384,13 +401,13 @@ public class DetailFragment extends Fragment {
 
             options.add("am命令");
             boolean finalHasError = hasError;
-            actions.add(() -> showAmCommandDialog(activityCommand, finalHasError, "am命令"));
+            actions.add(() -> showAmCommandDialog(activityCommand, finalHasError, "am命令", bundle));
 
             String uriCommand = replay.getUri();
             if (replay == itemData) Log.d(TAG, "intentCommand: " + uriCommand);
 
             options.add("intentUri");
-            actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri"));
+            actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri", bundle));
 
             options.add("转到 意图拦截器");
             actions.add(() -> openInterceptor(replay));
@@ -400,14 +417,14 @@ public class DetailFragment extends Fragment {
 
             Log.d(TAG, "schemeCommand: " + uriCommand);
             options.add("schemeUri");
-            actions.add(() -> showAmCommandDialog(uriCommand, false, "schemeUri"));
+            actions.add(() -> showAmCommandDialog(uriCommand, false, "schemeUri", bundle));
 
             options.add("转到 意图拦截器");
             actions.add(() -> openInterceptor(replay));
         }
 
         // 改用 PopupMenu
-        PopupMenu popupMenu = new PopupMenu(requireContext(), anchorView);
+        PopupMenu popupMenu = new PopupMenu(requireContext(), anchorView == null ? requireView() : anchorView);
         for (int i = 0; i < options.size(); i++) {
             popupMenu.getMenu().add(Menu.NONE, i, i, options.get(i));
         }
@@ -476,7 +493,7 @@ public class DetailFragment extends Fragment {
      * @param optionName 类型
      */
     @SuppressLint("SetTextI18n")
-    private void showAmCommandDialog(String amCommand, boolean hasError, String optionName) {
+    private void showAmCommandDialog(String amCommand, boolean hasError, String optionName, Bundle replayRecord) {
         final String originalText = amCommand;
         // 使用 LayoutInflater 加载自定义视图
         AlertDialog.Builder dialogBuilder = AppDialogs.builder(requireContext());
@@ -515,8 +532,8 @@ public class DetailFragment extends Fragment {
                     String mode = dropdownSpinner.getSelectedItem().toString();
                     boolean privileged = enableFeatureCheckbox.isChecked();
                     suCodeButton.setEnabled(false);
-                    com.fourtwo.hookintent.replay.ReplayTasks.fromText(requireContext(), itemData.getAppBundle(), text,
-                            "intentUri".equals(optionName) ? IntentPayloadCodec.decode(itemData.getAppBundle()) : null,
+                    com.fourtwo.hookintent.replay.ReplayTasks.fromText(requireContext(), replayRecord, text,
+                            "intentUri".equals(optionName) ? IntentPayloadCodec.decode(replayRecord) : null,
                             originalText, (target, error) -> {
                                 if (!isAdded() || !suCodeButton.isAttachedToWindow()) return;
                                 suCodeButton.setEnabled(true);

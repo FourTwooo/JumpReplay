@@ -14,6 +14,7 @@ import android.os.RemoteException;
 import android.util.Log;
 import androidx.annotation.Nullable;
 import com.fourtwo.hookintent.base.DataConverter;
+import com.fourtwo.hookintent.replay.NavigationReplayTransport;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -32,6 +33,7 @@ public class MessengerClient {
     private PassiveCallback passiveCallback;
     private ConnectionCallback connectionCallback;
     private com.fourtwo.hookintent.replay.ExtrasRuntime extrasRuntime;
+    private IBinder navigationReplayEndpoint;
     private final Messenger incoming = new Messenger(new Handler(Looper.getMainLooper()) {
         @Override public void handleMessage(Message msg) {
             if (msg.what == MessengerService.MSG_REPLY) {
@@ -73,6 +75,7 @@ public class MessengerClient {
                     info.putInt("editor_version", 2);
                     info.putBinder("editor_endpoint", extrasRuntime.binder());
                 }
+                if (navigationReplayEndpoint != null) info.putBinder(NavigationReplayTransport.ENDPOINT, navigationReplayEndpoint);
                 register.setData(info);
                 service.send(register);
                 if (connectionCallback != null) connectionCallback.onConnected();
@@ -97,6 +100,9 @@ public class MessengerClient {
     /** Enable before registering; editor availability is independent of the capture switch. */
     public void enableExtrasEditing(ClassLoader loader) {
         extrasRuntime = new com.fourtwo.hookintent.replay.ExtrasRuntime(context, loader);
+    }
+    public void enableNavigationReplay(NavigationReplayTransport.Executor executor) {
+        navigationReplayEndpoint = NavigationReplayTransport.endpoint(context, executor);
     }
     public void rememberExtrasLoaders(Intent intent) {
         if (extrasRuntime != null) extrasRuntime.remember(intent);
