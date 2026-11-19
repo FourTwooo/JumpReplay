@@ -2,12 +2,19 @@ package com.fourtwo.hookintent;
 
 import android.app.Application;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
 import android.net.Uri;
 import android.widget.EditText;
+import android.widget.TextView;
+import androidx.recyclerview.widget.RecyclerView;
+import com.fourtwo.hookintent.adapter.IntentInterceptAdapter;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
 import org.robolectric.Shadows;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
@@ -23,6 +30,33 @@ public class IntentEntryActivitiesTest {
             assertNotNull(editor);
             editor.setText("");
             assertEquals("", editor.getText().toString());
+        }
+    }
+
+    @Test public void interceptorListsAnExplicitTargetWithoutAnIntentFilter() {
+        PackageInfo target = new PackageInfo();
+        target.packageName = "example.match.target";
+        target.applicationInfo = new ApplicationInfo();
+        target.applicationInfo.packageName = target.packageName;
+        ActivityInfo entry = new ActivityInfo();
+        entry.applicationInfo = target.applicationInfo;
+        entry.packageName = target.packageName;
+        entry.name = target.packageName + ".Entry";
+        entry.exported = true;
+        target.activities = new ActivityInfo[]{entry};
+        Shadows.shadowOf(RuntimeEnvironment.getApplication().getPackageManager()).installPackage(target);
+
+        Intent incoming = new Intent().putExtra("DetailData",
+                "intent:#Intent;component=" + entry.packageName + "/" + entry.name + ";end");
+        try (ActivityController<IntentIntercept> controller = Robolectric.buildActivity(IntentIntercept.class,
+                incoming).setup()) {
+            RecyclerView list = controller.get().findViewById(R.id.recycler_view);
+            IntentInterceptAdapter matches = (IntentInterceptAdapter) list.getAdapter();
+            assertEquals(1, matches.getItemCount());
+            IntentInterceptAdapter.ViewHolder row = matches.createViewHolder(list, matches.getItemViewType(0));
+            matches.bindViewHolder(row, 0);
+            TextView details = row.itemView.findViewById(R.id.app_details);
+            assertEquals(entry.packageName + "\n" + entry.name, details.getText().toString());
         }
     }
 

@@ -692,17 +692,6 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     }
 
     /**
-     * 移除多余字段的 Intent
-     */
-    private Intent stripUnwantedFields(Intent intent) {
-        // 移除可能被系统附加的字段
-        intent.setComponent(null); // 移除 Component
-        intent.setSelector(null);  // 移除 Selector
-        intent.setFlags(0);        // 移除多余的 Flags
-        return intent;
-    }
-
-    /**
      * 动态加载符合的应用列表
      */
     private void loadMatchingApps(Intent intent) {
@@ -710,10 +699,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         String currentPackageName = getPackageName();
 
         // 查询符合的应用列表
-        Intent queryIntent = new Intent(intent);
-        queryIntent.setComponent(null);
-        queryIntent.setSelector(null);
-        List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(queryIntent, PackageManager.MATCH_DEFAULT_ONLY);
+        List<ResolveInfo> resolveInfoList = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
 
         // 转换为 IntentMatchItem 列表
         List<IntentMatchItem> items = new ArrayList<>();
