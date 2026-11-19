@@ -6,14 +6,14 @@
     <string name="library_declared_tab">App activities</string>
     <string name="library_choose_app">Choose app</string>
     <string name="library_current_app">Change app · %1$s</string>
-    <string name="library_search">Search apps, components or parameters</string>
+    <string name="library_search">Search</string>
     <string name="library_clear">Clear Intent cache</string>
     <string name="library_clear_message">Delete the saved Intent examples and Fragment associations? Original capture records are kept.</string>
     <string name="library_more">Load more</string>
     <string name="library_empty">New Intents appear here after you capture them.</string>
     <string name="library_cache_off">Automatic caching is off. App activities still shows declared entries.</string>
     <string name="library_no_match">No matching entries</string>
-    <string name="library_no_activities">No Activity declarations are available for this app</string>
+    <string name="library_no_activities">No activities or captured Intents for this app</string>
     <string name="library_read_error">Could not load the Intent library</string>
     <string name="library_write_error">Could not change the Intent cache</string>
     <string name="library_delivered">Delivery observed</string>
@@ -50,5 +50,18 @@
     <plurals name="library_occurrences">
         <item quantity="one">%d observation</item>
         <item quantity="other">%d observations</item>
+    </plurals>
+    <string name="library_search_apps">Search apps</string>
+    <string name="library_search_activities">Search app activities</string>
+    <string name="library_no_apps">No apps to display</string>
+    <string name="library_origin_declared">System declaration</string>
+    <string name="library_origin_captured">Captured</string>
+    <string name="library_unresolved_activity">Unresolved Activity</string>
+    <string name="library_activity_details">Activity details</string>
+    <string name="library_app_version">Version %1$s</string>
+    <string name="library_return_apps">Back to apps</string>
+    <plurals name="library_sample_count">
+        <item quantity="one">%d example</item>
+        <item quantity="other">%d examples</item>
     </plurals>
 </resources>

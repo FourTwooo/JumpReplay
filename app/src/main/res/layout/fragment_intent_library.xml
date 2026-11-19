@@ -1,82 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/screen_bg"
-    android:orientation="vertical">
+    android:background="@color/screen_bg">
 
-    <com.google.android.material.switchmaterial.SwitchMaterial
-        android:id="@+id/library_enabled"
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/library_rows"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp" />
+
+    <TextView
+        android:id="@+id/library_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="52dp"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:text="@string/library_cache_enabled"
-        android:textColor="@color/screen_text" />
-
-    <com.google.android.material.tabs.TabLayout
-        android:id="@+id/library_tabs"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/screen_bg"
-        app:tabIndicatorColor="@color/screen_primary"
-        app:tabSelectedTextColor="@color/screen_primary"
-        app:tabTextColor="@color/screen_secondary">
-
-        <com.google.android.material.tabs.TabItem
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/library_observed_tab" />
-
-        <com.google.android.material.tabs.TabItem
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/library_declared_tab" />
-
-    </com.google.android.material.tabs.TabLayout>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/library_apps_back"
-        style="@style/Widget.MaterialComponents.Button.TextButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:text="@string/library_choose_app"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:padding="28dp"
+        android:textColor="@color/screen_secondary"
         android:visibility="gone" />
 
-    <androidx.appcompat.widget.AppCompatEditText
-        android:id="@+id/library_search"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:hint="@string/library_search"
-        android:inputType="text"
-        android:maxLines="1"
-        android:singleLine="true" />
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/library_rows"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:padding="8dp" />
-
-        <TextView
-            android:id="@+id/library_empty"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:padding="28dp"
-            android:textColor="@color/screen_secondary" />
-
-    </FrameLayout>
-</LinearLayout>
+</FrameLayout>

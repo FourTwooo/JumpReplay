@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/library_search"
+        android:icon="@drawable/library_search"
+        android:title="@string/library_search"
+        app:actionViewClass="androidx.appcompat.widget.SearchView"
+        app:showAsAction="ifRoom|collapseActionView" />
+
+    <item
+        android:id="@+id/library_enabled"
+        android:checkable="true"
+        android:title="@string/library_cache_enabled"
+        app:showAsAction="never" />
+
+    <item
+        android:id="@+id/library_clear"
+        android:title="@string/library_clear"
+        app:showAsAction="never" />
+
+</menu>

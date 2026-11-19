@@ -6,12 +6,14 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
+import android.net.Uri;
 import android.os.Bundle;
 
 import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,6 +29,7 @@ import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
@@ -75,12 +78,111 @@ public class IntentLibraryTest {
         ingest(library, delivered("third", 8, update));
         assertEquals(1, library.observations(TARGET, 7).size());
         assertEquals(update, library.observations(TARGET, 8).get(0).destinationLastUpdate);
+        assertEquals(2, library.observationsForApp(TARGET).size());
         library.setEnabled(false);
         ingest(library, delivered("ignored", 8, update));
         assertEquals("third", library.observations(TARGET, 8).get(0).parameters.get(0).example);
         library.clear();
         assertTrue(library.observations(TARGET, 7).isEmpty());
         assertTrue(library.observations(TARGET, 8).isEmpty());
+    }
+
+    @Test public void installedApplicationsExposeVersionsAndUnresolvedObservationsStayWithTheirSource() {
+        Context context = RuntimeEnvironment.getApplication();
+        install(context, TARGET, 7, INSTALLED);
+        install(context, SENDER, 22, INSTALLED);
+        IntentLibrary library = IntentLibrary.get(context);
+        library.setEnabled(true);
+        Intent unspecific = new Intent("example.UNRESOLVED")
+                .setData(Uri.parse("jumpreplay-unresolved://detail?field=one"));
+        Bundle sent = DataConverter.convertIntentToBundle(unspecific);
+        sent.putString("uri", unspecific.toUri(Intent.URI_INTENT_SCHEME));
+        sent.putString("packageName", SENDER);
+        sent.putString("FunctionCall", "Instrumentation.execStartActivity");
+        ingest(library, sent, delivered("known-target", 7, INSTALLED));
+
+        List<IntentLibrary.Observation> sender = library.observationsForApp(SENDER);
+        assertEquals(1, sender.size());
+        assertEquals("", sender.get(0).destinationPackage);
+        assertEquals(SENDER, sender.get(0).sourcePackage);
+        assertEquals(1, library.observationsForApp(TARGET).size());
+        assertTrue(library.observationsForApp("example.unrelated").isEmpty());
+        PackageActivityCatalog.App installed = PackageActivityCatalog.applications(context).stream()
+                .filter(app -> TARGET.equals(app.packageName)).findFirst().orElseThrow(AssertionError::new);
+        assertEquals(7, installed.versionCode);
+        assertEquals("version-7", installed.versionName);
+        assertEquals(TARGET, installed.applicationInfo.packageName);
+    }
+
+    @Test public void groupsDeclaredCapturedAndAliasedActivitiesWithoutDroppingHistoricalActivities() throws Exception {
+        String aliasName = TARGET + ".PublicEntry";
+        String historicalActivity = TARGET + ".RemovedActivity";
+        PackageActivityCatalog.Entry direct = declaration(TARGET_ACTIVITY, null);
+        PackageActivityCatalog.Entry alias = declaration(aliasName, TARGET_ACTIVITY);
+        IntentLibrary.Observation ordinary = observed(1, TARGET_ACTIVITY, null, "");
+        IntentLibrary.Observation legacyAlias = observed(2, TARGET_ACTIVITY,
+                new Intent("example.OPEN").setClassName(TARGET, aliasName).toUri(Intent.URI_INTENT_SCHEME), "");
+        IntentLibrary.Observation historical = observed(3, historicalActivity, null, "");
+        IntentLibrary.Observation firstRoute = observed(4, "", null, "jumpreplay-unresolved://detail?field=one");
+        IntentLibrary.Observation secondRoute = observed(5, "", null, "jumpreplay-unresolved://detail?field=two");
+        List<PackageActivityCatalog.Activity> groups = PackageActivityCatalog.merge(
+                Arrays.asList(alias, direct, declaration(TARGET + ".UnopenedActivity", null)),
+                Arrays.asList(secondRoute, firstRoute, historical, legacyAlias, ordinary));
+
+        assertEquals(5, groups.size());
+        assertEquals(Collections.singletonList(ordinary), group(groups, TARGET_ACTIVITY).observations);
+        assertEquals(Collections.singletonList(legacyAlias), group(groups, aliasName).observations);
+        assertEquals(alias, group(groups, aliasName).declaration);
+        assertTrue(group(groups, TARGET + ".UnopenedActivity").observations.isEmpty());
+        assertNull(group(groups, historicalActivity).declaration);
+        assertEquals(Collections.singletonList(historical), group(groups, historicalActivity).observations);
+        assertEquals(Arrays.asList(secondRoute, firstRoute), group(groups, "").observations);
+        assertEquals("example.OPEN", group(groups, "").action);
+    }
+
+    @Test public void distinctAliasesKeepTheirCapturedSamplesSeparate() {
+        Context context = RuntimeEnvironment.getApplication();
+        install(context, TARGET, 7, INSTALLED);
+        IntentLibrary library = IntentLibrary.get(context);
+        library.setEnabled(true);
+        String firstAlias = TARGET + ".PublicEntry";
+        String secondAlias = TARGET + ".OtherPublicEntry";
+        ingest(library, delivered("direct", 7, INSTALLED), addressedToAlias("through-first", firstAlias),
+                addressedToAlias("through-second", secondAlias));
+
+        List<IntentLibrary.Observation> observed = library.observationsForApp(TARGET);
+        assertEquals(3, observed.size());
+        List<PackageActivityCatalog.Activity> groups = PackageActivityCatalog.merge(
+                Arrays.asList(declaration(TARGET_ACTIVITY, null), declaration(firstAlias, TARGET_ACTIVITY),
+                        declaration(secondAlias, TARGET_ACTIVITY)), observed);
+        assertEquals("direct", group(groups, TARGET_ACTIVITY).observations.get(0).parameters.get(0).example);
+        assertEquals("through-first", group(groups, firstAlias).observations.get(0).parameters.get(0).example);
+        assertEquals("through-second", group(groups, secondAlias).observations.get(0).parameters.get(0).example);
+    }
+
+    private static Bundle addressedToAlias(String topic, String alias) {
+        Bundle record = delivered(topic, 7, INSTALLED);
+        Intent original = new Intent("example.OPEN").setClassName(TARGET, alias).putExtra("topic", topic);
+        record.putString("component", alias);
+        record.putString("uri", original.toUri(Intent.URI_INTENT_SCHEME));
+        return record;
+    }
+
+    private static PackageActivityCatalog.Entry declaration(String name, String aliasTarget) {
+        return new PackageActivityCatalog.Entry(TARGET, name, aliasTarget, true, true, null, false,
+                "version-7", 7, INSTALLED);
+    }
+
+    private static IntentLibrary.Observation observed(long id, String name, String intentUri, String data)
+            throws Exception {
+        return new IntentLibrary.Observation(id, new JSONObject().put("package", TARGET).put("activity", name)
+                .put("delivered", true).put("action", "example.OPEN").put("data", data)
+                .put("uri", intentUri == null ? JSONObject.NULL : intentUri).put("extras", new JSONArray()), 1,
+                INSTALLED);
+    }
+
+    private static PackageActivityCatalog.Activity group(List<PackageActivityCatalog.Activity> groups, String name) {
+        return groups.stream().filter(group -> group.name.equals(name)).findFirst().orElseThrow(AssertionError::new);
     }
 
     @Test public void explicitOutgoingRequestUsesDestinationVersionAndKeepsSenderSeparate() {

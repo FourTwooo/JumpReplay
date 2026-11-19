@@ -6,14 +6,14 @@
     <string name="library_declared_tab">アプリの Activity</string>
     <string name="library_choose_app">アプリを選択</string>
     <string name="library_current_app">アプリを変更 · %1$s</string>
-    <string name="library_search">アプリ・コンポーネント・パラメーターを検索</string>
+    <string name="library_search">検索</string>
     <string name="library_clear">Intent キャッシュを消去</string>
     <string name="library_clear_message">保存した Intent のサンプルと Fragment の関連付けを削除しますか？元の捕捉記録は残ります。</string>
     <string name="library_more">さらに表示</string>
     <string name="library_empty">新しく捕捉した Intent がここに表示されます。</string>
     <string name="library_cache_off">自動保存はオフです。「アプリの Activity」では宣言された入口を確認できます。</string>
     <string name="library_no_match">一致する項目がありません</string>
-    <string name="library_no_activities">このアプリに読み取れる Activity 宣言はありません</string>
+    <string name="library_no_activities">このアプリの Activity や捕捉記録はありません</string>
     <string name="library_read_error">Intent ライブラリを読み込めませんでした</string>
     <string name="library_write_error">Intent キャッシュを変更できませんでした</string>
     <string name="library_delivered">受信を観測</string>
@@ -49,5 +49,17 @@
     <string name="library_unknown_version">バージョン不明</string>
     <plurals name="library_occurrences">
         <item quantity="other">%d 回</item>
+    </plurals>
+    <string name="library_search_apps">アプリを検索</string>
+    <string name="library_search_activities">アプリの Activity を検索</string>
+    <string name="library_no_apps">表示できるアプリはありません</string>
+    <string name="library_origin_declared">システムで宣言</string>
+    <string name="library_origin_captured">捕捉記録</string>
+    <string name="library_unresolved_activity">未特定の Activity</string>
+    <string name="library_activity_details">Activity の詳細</string>
+    <string name="library_app_version">バージョン %1$s</string>
+    <string name="library_return_apps">アプリ一覧に戻る</string>
+    <plurals name="library_sample_count">
+        <item quantity="other">サンプル %d 件</item>
     </plurals>
 </resources>

@@ -6,14 +6,14 @@
     <string name="library_declared_tab">应用活动</string>
     <string name="library_choose_app">选择应用</string>
     <string name="library_current_app">更换应用 · %1$s</string>
-    <string name="library_search">搜索应用、组件或参数</string>
+    <string name="library_search">搜索</string>
     <string name="library_clear">清除 Intent 缓存</string>
     <string name="library_clear_message">删除数据库里的 Intent 样例和 Fragment 对应关系？捕获列表里的原始记录会保留。</string>
     <string name="library_more">加载更多</string>
     <string name="library_empty">开启捕获后，新抓到的 Intent 会出现在这里。</string>
     <string name="library_cache_off">自动记录已关闭。可以在「应用活动」查看系统声明的入口。</string>
     <string name="library_no_match">没有找到匹配的条目</string>
-    <string name="library_no_activities">此应用没有可读取的 Activity 声明</string>
+    <string name="library_no_activities">此应用暂无活动或捕获记录</string>
     <string name="library_read_error">读取 Intent 数据库失败</string>
     <string name="library_write_error">无法修改 Intent 缓存</string>
     <string name="library_delivered">已观察到接收</string>
@@ -50,5 +50,16 @@
     <plurals name="library_occurrences">
         <item quantity="other">%d 次</item>
     </plurals>
-    <item name="library_clear" type="id" />
+    <string name="library_search_apps">搜索应用</string>
+    <string name="library_search_activities">搜索应用活动</string>
+    <string name="library_no_apps">没有可查看的应用</string>
+    <string name="library_origin_declared">系统声明</string>
+    <string name="library_origin_captured">捕获记录</string>
+    <string name="library_unresolved_activity">未识别的 Activity</string>
+    <string name="library_activity_details">活动详情</string>
+    <string name="library_app_version">版本 %1$s</string>
+    <string name="library_return_apps">返回应用列表</string>
+    <plurals name="library_sample_count">
+        <item quantity="other">%d 条样例</item>
+    </plurals>
 </resources>

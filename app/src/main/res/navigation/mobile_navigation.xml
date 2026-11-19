@@ -25,6 +25,14 @@
     <fragment android:id="@+id/nav_actions" android:name="com.fourtwo.hookintent.actions.ActionsFragment" android:label="@string/actions_title" tools:layout="@layout/fragment_actions" />
     <fragment android:id="@+id/nav_intent_library" android:name="com.fourtwo.hookintent.library.IntentLibraryFragment" android:label="@string/intent_library_title" tools:layout="@layout/fragment_intent_library" />
     <fragment
+        android:id="@+id/nav_intent_library_activities"
+        android:name="com.fourtwo.hookintent.library.IntentLibraryFragment"
+        android:label="{libraryAppLabel}"
+        tools:layout="@layout/fragment_intent_library">
+        <argument android:name="libraryAppPackage" app:argType="string" />
+        <argument android:name="libraryAppLabel" app:argType="string" />
+    </fragment>
+    <fragment
         android:id="@+id/nav_star"
         android:name="com.fourtwo.hookintent.ui.star.StarFragment"
         android:label="@string/menu_gallery"

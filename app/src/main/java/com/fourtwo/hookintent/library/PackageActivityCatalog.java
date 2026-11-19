@@ -10,12 +10,19 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.os.Build;
 
+import org.json.JSONArray;
+
+import java.net.URISyntaxException;
 import java.text.Collator;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 /** Uses Android's installed package index. Only launcher filters are queried here. */
 final class PackageActivityCatalog {
@@ -24,17 +31,20 @@ final class PackageActivityCatalog {
     static List<App> applications(Context context) {
         PackageManager manager = context.getPackageManager();
         List<App> apps = new ArrayList<>();
-        for (ApplicationInfo info : manager.getInstalledApplications(0)) {
-            apps.add(new App(info.packageName, manager.getApplicationLabel(info).toString()));
+        for (PackageInfo pkg : manager.getInstalledPackages(0)) {
+            ApplicationInfo info = pkg.applicationInfo;
+            String label = info == null ? pkg.packageName : manager.getApplicationLabel(info).toString();
+            apps.add(new App(pkg.packageName, label, pkg.versionName, versionCode(pkg), info));
         }
-        apps.sort((first, second) -> Collator.getInstance().compare(first.label, second.label));
+        Collator collator = Collator.getInstance();
+        apps.sort(Comparator.comparing((App app) -> app.label, collator).thenComparing(app -> app.packageName));
         return apps;
     }
 
     static List<Entry> activities(Context context, String packageName) throws PackageManager.NameNotFoundException {
         PackageManager manager = context.getPackageManager();
         PackageInfo pkg = manager.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES | DISABLED);
-        long version = Build.VERSION.SDK_INT >= 28 ? pkg.getLongVersionCode() : pkg.versionCode;
+        long version = versionCode(pkg);
         Intent launcher = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER).setPackage(packageName);
         Set<String> launcherActivities = new HashSet<>();
         for (ResolveInfo match : manager.queryIntentActivities(launcher, DISABLED)) {
@@ -55,12 +65,96 @@ final class PackageActivityCatalog {
         return entries;
     }
 
-    static final class App {
-        final String packageName, label;
+    static List<Activity> merge(List<Entry> declared, List<IntentLibrary.Observation> observed) {
+        Map<String, Entry> declarations = new LinkedHashMap<>();
+        Map<String, List<IntentLibrary.Observation>> byActivity = new TreeMap<>();
+        Map<String, List<IntentLibrary.Observation>> unresolved = new LinkedHashMap<>();
+        boolean hasAliases = false;
+        for (Entry entry : declared) {
+            String name = className(entry.packageName, entry.name);
+            declarations.put(name, entry);
+            byActivity.put(name, new ArrayList<>());
+            hasAliases |= entry.aliasTarget != null;
+        }
+        for (IntentLibrary.Observation observation : observed) {
+            if (observation.destinationPackage.isEmpty() || observation.activity.isEmpty()) {
+                String route = new JSONArray().put(observation.action).put(IntentLibrary.uriShape(observation.data))
+                        .put(observation.mimeType).toString();
+                unresolved.computeIfAbsent(route, ignored -> new ArrayList<>()).add(observation);
+                continue;
+            }
+            String name = className(observation.destinationPackage, observation.activity);
+            if (hasAliases && observation.delivered) name = observedAlias(declarations, observation, name);
+            byActivity.computeIfAbsent(name, ignored -> new ArrayList<>()).add(observation);
+        }
+        List<Activity> activities = new ArrayList<>();
+        for (Map.Entry<String, List<IntentLibrary.Observation>> group : byActivity.entrySet()) {
+            String name = group.getKey();
+            activities.add(new Activity(name, declarations.get(name), group.getValue(), "", ""));
+        }
+        for (List<IntentLibrary.Observation> samples : unresolved.values()) {
+            IntentLibrary.Observation latest = samples.get(0);
+            activities.add(new Activity("", null, samples, latest.action, latest.data));
+        }
+        return activities;
+    }
 
-        App(String packageName, String label) {
+    private static String observedAlias(Map<String, Entry> declarations, IntentLibrary.Observation observation,
+            String activity) {
+        String requestedPackage = observation.componentPackage;
+        String requestedClass = observation.componentClass;
+        if (requestedClass.isEmpty() && observation.intentUri != null) {
+            try {
+                ComponentName component = Intent.parseUri(observation.intentUri, Intent.URI_INTENT_SCHEME).getComponent();
+                if (component != null) {
+                    requestedPackage = component.getPackageName();
+                    requestedClass = component.getClassName();
+                }
+            } catch (URISyntaxException | RuntimeException ignored) {
+                return activity;
+            }
+        }
+        if (!observation.destinationPackage.equals(requestedPackage)) return activity;
+        String requested = className(requestedPackage, requestedClass);
+        Entry declaration = declarations.get(requested);
+        return declaration != null && declaration.aliasTarget != null
+                && activity.equals(className(requestedPackage, declaration.aliasTarget)) ? requested : activity;
+    }
+
+    private static String className(String packageName, String name) {
+        return name.startsWith(".") ? packageName + name : name;
+    }
+
+    private static long versionCode(PackageInfo info) {
+        return Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode;
+    }
+
+    static final class App {
+        final String packageName, label, versionName;
+        final long versionCode;
+        final ApplicationInfo applicationInfo;
+
+        App(String packageName, String label, String versionName, long versionCode, ApplicationInfo applicationInfo) {
             this.packageName = packageName;
             this.label = label;
+            this.versionName = versionName;
+            this.versionCode = versionCode;
+            this.applicationInfo = applicationInfo;
+        }
+    }
+
+    static final class Activity {
+        final String name, action, data;
+        final Entry declaration;
+        final List<IntentLibrary.Observation> observations;
+
+        private Activity(String name, Entry declaration, List<IntentLibrary.Observation> observations,
+                String action, String data) {
+            this.name = name;
+            this.declaration = declaration;
+            this.observations = Collections.unmodifiableList(observations);
+            this.action = action;
+            this.data = data;
         }
     }
 

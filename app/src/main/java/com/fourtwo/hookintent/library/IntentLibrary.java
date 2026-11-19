@@ -145,6 +145,14 @@ public final class IntentLibrary {
                 new String[]{destinationPackage, String.valueOf(destinationVersionCode)}, "100");
     }
 
+    List<Observation> observationsForApp(String packageName) {
+        if (packageName.isEmpty() || !new File(store.getDatabaseName()).isFile()) return Collections.emptyList();
+        List<Observation> observations = query("package_name=? OR package_name=''", new String[]{packageName}, null);
+        observations.removeIf(observation -> observation.destinationPackage.isEmpty()
+                && !packageName.equals(observation.sourcePackage));
+        return observations;
+    }
+
     private List<Observation> query(String selection, String[] args, String limit) {
         List<Observation> values = new ArrayList<>();
         try (Cursor rows = store.getReadableDatabase().query("observations",
@@ -226,6 +234,7 @@ public final class IntentLibrary {
         }
         JSONArray qualifiers = new JSONArray(categorySet);
         JSONObject payload = new JSONObject().put("package", destination).put("activity", activity)
+                .put("componentPackage", componentPackage).put("componentClass", componentClass)
                 .put("targetCode", destinationVersion.code).put("targetName", destinationVersion.name)
                 .put("targetUpdated", destinationVersion.updated)
                 .put("source", source).put("sourceCode", sourceVersion.code).put("sourceName", sourceVersion.name)
@@ -237,6 +246,9 @@ public final class IntentLibrary {
                 .put(destinationVersion.updated).put(source).put(sourceVersion.code).put(sourceVersion.updated)
                 .put(delivered).put(requestedPackage).put(action).put(uriShape(data)).put(type).put(flags)
                 .put(qualifiers).put(shapes);
+        String addressedClass = componentClass.startsWith(".") ? componentPackage + componentClass : componentClass;
+        if (delivered && destination.equals(componentPackage) && !addressedClass.isEmpty()
+                && !activity.equals(addressedClass)) shape.put(addressedClass);
 
         long timestamp = System.currentTimeMillis();
         String shapeKey = shape.toString();
@@ -306,7 +318,7 @@ public final class IntentLibrary {
         return expectedUpdate == 0 || expectedUpdate == current.updated ? current : new Version(-1, "", expectedUpdate);
     }
 
-    private static JSONArray uriShape(String data) {
+    static JSONArray uriShape(String data) {
         Uri uri = Uri.parse(data);
         TreeSet<String> queryKeys = new TreeSet<>();
         if (uri.isHierarchical()) queryKeys.addAll(uri.getQueryParameterNames());
@@ -413,6 +425,7 @@ public final class IntentLibrary {
         public final long id, destinationVersionCode, destinationLastUpdate, sourceVersionCode, sourceLastUpdate, seenAt;
         public final String destinationPackage, activity, destinationVersionName, sourcePackage, sourceVersionName;
         public final String action, data, mimeType, intentUri;
+        final String componentPackage, componentClass;
         public final int flags, count;
         public final boolean delivered, parametersComplete;
         public final List<Parameter> parameters;
@@ -424,6 +437,8 @@ public final class IntentLibrary {
             this.seenAt = seenAt;
             destinationPackage = data.optString("package");
             activity = data.optString("activity");
+            componentPackage = data.optString("componentPackage");
+            componentClass = data.optString("componentClass");
             destinationVersionCode = data.optLong("targetCode", -1);
             destinationVersionName = data.optString("targetName");
             destinationLastUpdate = data.optLong("targetUpdated");
