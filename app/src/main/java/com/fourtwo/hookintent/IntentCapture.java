@@ -224,7 +224,9 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 Bundle sealed = NavigationReplayTransport.seal(applicationContext, descriptor);
                 if (sealed != null) {
                     record.putBundle(Constants.NAVIGATION_REPLAY, sealed);
-                    record.putString("FunctionCall", "navigate");
+                    String method = source == NavigationCaptureSource.FRAGMENT
+                            ? descriptor.getString("method", source.method()) : "navigate";
+                    record.putString("FunctionCall", method);
                 }
             } catch (Exception unavailable) {
                 XposedBridge.log("JumpReplay navigation descriptor: " + unavailable.getClass().getSimpleName());

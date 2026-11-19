@@ -33,7 +33,7 @@ public final class NavigationReplayTransport {
     private static final int RESULT = 204;
     private static final int REQUEST_ID = 1;
     private static final long DELIVERY_TIMEOUT_MS = 3_000;
-    private static final long RESULT_TIMEOUT_MS = 14_000;
+    private static final long RESULT_TIMEOUT_MS = 18_000;
     private static final String DESCRIPTOR = "descriptor";
     private static final String ARGUMENTS = "arguments";
     private static final String ERROR = "error";

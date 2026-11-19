@@ -16,6 +16,7 @@ import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -45,6 +46,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     private final Predicate<NavigationCaptureSource> enabled;
     private final Sink sink;
     private final JetpackNavigationReplay jetpackReplay;
+    private final FragmentHostReplay fragmentReplay;
     private final Map<ClassLoader, FragmentAccess> supportByLoader = new WeakHashMap<>();
     private final Set<Class<?>> navControllers = Collections.newSetFromMap(new WeakHashMap<>());
     private FragmentAccess platform;
@@ -56,10 +58,25 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         jetpackReplay = new JetpackNavigationReplay(main,
                 () -> enabled.test(NavigationCaptureSource.NAV_CONTROLLER),
                 activity -> activity != null && resumed.containsKey(activity));
+        fragmentReplay = new FragmentHostReplay(main,
+                activity -> resumed.containsKey(activity) && enabled.test(NavigationCaptureSource.FRAGMENT),
+                () -> resumed.keySet(), this::resampleForFragmentReplay);
     }
 
     public void replay(Bundle descriptor, Bundle arguments, Consumer<Exception> result) {
-        jetpackReplay.replay(descriptor, arguments, result);
+        if (FragmentHostReplay.handles(descriptor)) {
+            fragmentReplay.replay(descriptor, arguments, result);
+        } else {
+            jetpackReplay.replay(descriptor, arguments, result);
+        }
+    }
+
+    private void resampleForFragmentReplay(Activity activity) {
+        ActivityWatch watch = resumed.get(activity);
+        if (watch == null) return;
+        boolean alreadyObserving = watch.observing;
+        watch.refresh();
+        if (alreadyObserving && watch.observing) watch.sample();
     }
 
     public void install(Application application) {
@@ -131,9 +148,13 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         }
 
         void refresh() {
-            if (!enabled.test(NavigationCaptureSource.FRAGMENT)) {
+            boolean capturing = enabled.test(NavigationCaptureSource.FRAGMENT);
+            if (!capturing && !fragmentReplay.waitingFor(activity)) {
                 stop();
-            } else if (!observing) {
+                return;
+            }
+            if (capturing) fragmentReplay.install(activity);
+            if (!observing) {
                 observer = decor.getViewTreeObserver();
                 if (!observer.isAlive()) return;
                 ClassLoader loader = activity.getClass().getClassLoader();
@@ -162,10 +183,13 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
             navFragmentUntil = 0;
             scheduledAt = Long.MAX_VALUE;
             main.removeCallbacks(sample);
+            fragmentReplay.forget(activity);
         }
 
         private void onLayout() {
-            if (enabled.test(NavigationCaptureSource.FRAGMENT)) scheduleSample(SystemClock.uptimeMillis() + LAYOUT_SAMPLE_MS);
+            if (enabled.test(NavigationCaptureSource.FRAGMENT) || fragmentReplay.waitingFor(activity)) {
+                scheduleSample(SystemClock.uptimeMillis() + LAYOUT_SAMPLE_MS);
+            }
         }
 
         private void scheduleSample(long when) {
@@ -176,17 +200,38 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         }
 
         void sample() {
-            if (!observing || !enabled.test(NavigationCaptureSource.FRAGMENT)) return;
-            if (!decor.getGlobalVisibleRect(screen)) return;
+            if (!observing) return;
+            boolean capturing = enabled.test(NavigationCaptureSource.FRAGMENT);
+            if (!capturing && !fragmentReplay.waitingFor(activity)) {
+                stop();
+                return;
+            }
+            if (!decor.getGlobalVisibleRect(screen)) {
+                fragmentReplay.forget(activity);
+                return;
+            }
             try {
                 long now = SystemClock.uptimeMillis();
-                Frame frame = new Frame(now, !initialized);
+                Frame frame = new Frame(now, !initialized || !capturing);
                 inspectManager(support, frame);
                 inspectManager(platform, frame);
                 states.keySet().retainAll(frame.seen.keySet());
-                initialized = true;
+                initialized = capturing;
+                if (frame.complete) {
+                    fragmentReplay.observe(activity, frame.visible);
+                } else {
+                    fragmentReplay.forget(activity);
+                }
+                for (FragmentChange change : frame.changes) {
+                    Bundle descriptor = frame.complete
+                            ? fragmentReplay.capture(activity, change.destination, change.arguments) : null;
+                    emit(activity, change.destination, NavigationCaptureSource.FRAGMENT, change.arguments,
+                            descriptor);
+                }
                 scheduleSample(frame.nextSample);
+                if (!capturing && !fragmentReplay.waitingFor(activity)) stop();
             } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
+                fragmentReplay.forget(activity);
                 report(error);
             }
         }
@@ -198,12 +243,19 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
 
         private void inspectFragments(FragmentAccess access, Object manager, Frame frame,
                 boolean parentHidden, int depth) throws ReflectiveOperationException {
-            if (manager == null || depth == 8) return;
+            if (manager == null) return;
             List<?> fragments = (List<?>) access.fragments.invoke(manager);
             if (fragments == null) return;
+            if (depth == 8) {
+                if (!fragments.isEmpty()) frame.complete = false;
+                return;
+            }
             for (Object fragment : fragments) {
                 if (fragment == null) continue;
-                if (frame.seen.size() >= MAX_FRAGMENTS) return;
+                if (frame.seen.size() >= MAX_FRAGMENTS) {
+                    frame.complete = false;
+                    return;
+                }
                 frame.seen.put(fragment, Boolean.TRUE);
                 View view = (View) access.view.invoke(fragment);
                 boolean hidden = parentHidden || Boolean.TRUE.equals(access.hidden.invoke(fragment));
@@ -221,10 +273,14 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 }
                 if (access.navHost != null && access.navHost.isInstance(fragment)) continue;
                 String destination = fragment.getClass().getName();
+                Map<String, Object> arguments = null;
+                if (visible) {
+                    arguments = scalarArguments((Bundle) access.arguments.invoke(fragment));
+                    frame.visible.computeIfAbsent(destination, unused -> new ArrayList<>()).add(arguments);
+                }
                 boolean fromNav = enabled.test(NavigationCaptureSource.NAV_CONTROLLER)
                         && destination.equals(navFragment) && frame.now < navFragmentUntil;
-                state.update(frame, visible, visible ? scalarArguments((Bundle) access.arguments.invoke(fragment)) : null,
-                        fromNav, destination);
+                state.update(frame, visible, arguments, fromNav, destination);
             }
         }
 
@@ -267,15 +323,28 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                     return;
                 }
                 readyAt = 0;
-                emit(activity, destination, NavigationCaptureSource.FRAGMENT, args, null);
+                frame.changes.add(new FragmentChange(destination, args));
             }
+        }
+    }
+
+    private static final class FragmentChange {
+        final String destination;
+        final Map<String, Object> arguments;
+
+        FragmentChange(String destination, Map<String, Object> arguments) {
+            this.destination = destination;
+            this.arguments = arguments;
         }
     }
 
     private static final class Frame {
         final Map<Object, Boolean> seen = new IdentityHashMap<>();
+        final Map<String, List<Map<String, Object>>> visible = new LinkedHashMap<>();
+        final List<FragmentChange> changes = new ArrayList<>();
         final long now;
         final boolean baseline;
+        boolean complete = true;
         long nextSample = Long.MAX_VALUE;
 
         Frame(long now, boolean baseline) {
