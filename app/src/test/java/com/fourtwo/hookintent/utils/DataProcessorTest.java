@@ -3,7 +3,9 @@ package com.fourtwo.hookintent.utils;
 import android.app.Application;
 import android.os.Bundle;
 import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
+import org.json.JSONObject;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -109,4 +111,50 @@ public class DataProcessorTest {
         assertEquals(2, records.size());
         assertNull(processor.getLastError());
     }
+
+    @Test public void preservesArgumentsAndLabelsForHistoricalNavigationRecords() throws Exception {
+        DataProcessor processor = new DataProcessor(RuntimeEnvironment.getApplication());
+        ArrayList<ItemData> records = new ArrayList<>();
+        for (String category : Arrays.asList("NavController", "ViewPager")) {
+            Bundle arguments = new Bundle();
+            arguments.putInt("position", 1);
+            processor.processBundle(navigationRecord(category, arguments), records::add);
+        }
+        assertEquals(2, records.size());
+        assertEquals("NavController", records.get(0).getCategory());
+        assertEquals("ViewPager", records.get(1).getCategory());
+        for (ItemData record : records) {
+            assertEquals("example.app.Page", record.getItem_from());
+            assertEquals(1, new JSONObject(record.getItem_data()).getInt("position"));
+        }
+    }
+
+    @Test public void keepsPagerReplayInputsSeparateFromFragmentArguments() {
+        DataProcessor processor = new DataProcessor(RuntimeEnvironment.getApplication());
+        Bundle record = navigationRecord("Fragment", Bundle.EMPTY);
+        Bundle editedArguments = new Bundle();
+        editedArguments.putInt("position", 1);
+        Bundle replay = new Bundle();
+        replay.putBundle("arguments", editedArguments);
+        record.putBundle(Constants.NAVIGATION_REPLAY, replay);
+        ArrayList<ItemData> records = new ArrayList<>();
+        processor.processBundle(record, records::add);
+        ItemData processed = records.get(0);
+        assertEquals("Fragment", processed.getCategory());
+        assertEquals("example.app.Page", processed.getItem_from());
+        assertEquals("", processed.getItem_data());
+        assertEquals(1, processed.getAppBundle().getBundle(Constants.NAVIGATION_REPLAY)
+                .getBundle("arguments").getInt("position"));
+    }
+
+    private Bundle navigationRecord(String category, Bundle arguments) {
+        Bundle record = new Bundle();
+        record.putString("category", category);
+        record.putString("title", "example.app.Page");
+        record.putString("packageName", "example.app");
+        record.putString("time", "2026-11-10 12:00:00");
+        record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
+        return record;
+    }
+
 }

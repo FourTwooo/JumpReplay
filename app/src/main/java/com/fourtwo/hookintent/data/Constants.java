@@ -24,8 +24,6 @@ public final class Constants {
     public static final Uri IN_APP_NAVIGATION_URI = Uri.parse("content://" + AUTHORITY + "/in_app_navigation");
     public static final String IN_APP_NAVIGATION_CAPTURE = "inAppNavigationCapture";
     public static final String FRAGMENT_CAPTURE_ENABLED = "fragmentCapture";
-    public static final String NAV_CONTROLLER_CAPTURE_ENABLED = "navigationControllerCapture";
-    public static final String VIEW_PAGER_CAPTURE_ENABLED = "viewPagerCapture";
     public static final String FRAGMENT_CATEGORY = "Fragment";
     public static final String NAV_CONTROLLER_CATEGORY = "NavController";
     public static final String VIEW_PAGER_CATEGORY = "ViewPager";

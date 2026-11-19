@@ -82,7 +82,7 @@ public class DataProcessor {
         } else {
             targetPackage = bundle.getString("packageName");
             component = bundle.getString("title");
-            if (navigation != null) {
+            if (navigation != null || NavigationCaptureSource.isHistoricalRecord(category, bundle)) {
                 Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
                 dataString = arguments == null || arguments.isEmpty() ? ""
                         : new JSONObject(JsonHandler.toMap(arguments)).toString();

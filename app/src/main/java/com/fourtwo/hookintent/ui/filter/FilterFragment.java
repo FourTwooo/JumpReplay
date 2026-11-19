@@ -105,9 +105,10 @@ public class FilterFragment extends Fragment {
     private void reloadAndRender() {
         if (!loadFilterData()) return;
 
-        boolean changed = syncFilterGroups();
+        Set<String> configuredGroups = getSettingsGroupKeys();
+        boolean changed = syncFilterGroups(configuredGroups);
 
-        List<String> protocolKeys = buildProtocolKeys();
+        List<String> protocolKeys = buildProtocolKeys(configuredGroups);
         if (currentProtocol == null || !protocolKeys.contains(currentProtocol)) {
             currentProtocol = protocolKeys.isEmpty() ? null : protocolKeys.get(0);
         }
@@ -144,13 +145,8 @@ public class FilterFragment extends Fragment {
      * 过滤分组包含内建和自定义捕获标签。
      * 这里只自动补，不自动删，避免误删已有过滤规则。
      */
-    private boolean syncFilterGroups() {
+    private boolean syncFilterGroups(Set<String> configuredGroups) {
         boolean changed = false;
-
-        Set<String> allowedGroups = new LinkedHashSet<>();
-        allowedGroups.add(LEGACY_INTENT_KEY);
-        allowedGroups.add(LEGACY_SCHEME_KEY);
-        allowedGroups.addAll(getSettingsGroupKeys());
 
         changed |= ensureBuiltInGroup(LEGACY_INTENT_KEY, FIELD_FUNCTION_CALL, FIELD_FROM);
         changed |= ensureBuiltInGroup(LEGACY_SCHEME_KEY, FIELD_FUNCTION_CALL, FIELD_FROM, FIELD_SCHEME);
@@ -158,7 +154,7 @@ public class FilterFragment extends Fragment {
             changed |= ensureBuiltInGroup(source.category(), FIELD_FUNCTION_CALL, FIELD_FROM);
         }
 
-        for (String groupKey : allowedGroups) {
+        for (String groupKey : configuredGroups) {
             if (isBuiltInGroup(groupKey)) {
                 continue;
             }
@@ -199,11 +195,11 @@ public class FilterFragment extends Fragment {
         return true;
     }
 
-    private List<String> getSettingsGroupKeys() {
+    private Set<String> getSettingsGroupKeys() {
         Set<String> result = new LinkedHashSet<>();
         collectGroupKeysFromPreference(Constants.INTERNAL_HOOKS_CONFIG, result);
         collectGroupKeysFromPreference(Constants.EXTERNAL_HOOKS_CONFIG, result);
-        return new ArrayList<>(result);
+        return result;
     }
 
     private void collectGroupKeysFromPreference(String prefKey, Set<String> out) {
@@ -214,6 +210,8 @@ public class FilterFragment extends Fragment {
 
         List<Map<String, Object>> records = JsonHandler.deserializeHookedRecords(config);
         for (Map<String, Object> item : records) {
+            if (Constants.INTERNAL_HOOKS_CONFIG.equals(prefKey)
+                    && NavigationCaptureSource.isRetiredConfigurationRow(item)) continue;
             String rawCategory = (String) item.get("category");
             String normalized = normalizeGroupKey(rawCategory);
             if (normalized != null && !normalized.isEmpty()) {
@@ -251,7 +249,7 @@ public class FilterFragment extends Fragment {
         return source != null && source.category().equals(groupKey);
     }
 
-    private List<String> buildProtocolKeys() {
+    private List<String> buildProtocolKeys(Set<String> configuredGroups) {
         List<String> result = new ArrayList<>();
 
         if (jsonData.containsKey(LEGACY_INTENT_KEY)) {
@@ -268,7 +266,8 @@ public class FilterFragment extends Fragment {
 
         List<String> customKeys = new ArrayList<>();
         for (String key : jsonData.keySet()) {
-            if (!isBuiltInGroup(key)) {
+            if (!isBuiltInGroup(key) && (!NavigationCaptureSource.isRetiredCategory(key)
+                    || configuredGroups.contains(key))) {
                 customKeys.add(key);
             }
         }

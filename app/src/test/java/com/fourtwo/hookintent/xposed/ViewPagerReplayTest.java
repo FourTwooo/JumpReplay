@@ -99,6 +99,22 @@ public class ViewPagerReplayTest {
         assertEquals(1, fixture.pager.actualSelections);
     }
 
+    @Test public void fragmentAssociationRequiresTheSameLivePagerSelection() throws Exception {
+        Fixture fixture = new Fixture();
+        Bundle record = fixture.captureSelection();
+        assertTrue(fixture.engine.matchesSelection(fixture.activity, fixture.pager, record));
+
+        fixture.pager.setCurrentItem(2);
+        assertFalse(fixture.engine.matchesSelection(fixture.activity, fixture.pager, record));
+        fixture.pager.setCurrentItem(1);
+        fixture.pager.getAdapter().count = 4;
+        assertFalse(fixture.engine.matchesSelection(fixture.activity, fixture.pager, record));
+
+        fixture.pager.getAdapter().count = 3;
+        fixture.engine.forget(fixture.activity);
+        assertFalse(fixture.engine.matchesSelection(fixture.activity, fixture.pager, record));
+    }
+
     private static Bundle position(int position) {
         Bundle result = new Bundle();
         result.putInt(ViewPagerReplay.POSITION, position);
@@ -159,7 +175,7 @@ public class ViewPagerReplayTest {
         boolean capturing = true;
         final ViewPagerReplay engine = new ViewPagerReplay(new Handler(Looper.getMainLooper()),
                 owner -> capturing && owner == activity, () -> List.of(activity),
-                (owner, view, before, after, record) -> captured.add(record));
+                (owner, view, record) -> captured.add(record));
 
         Fixture() {
             FrameLayout container = new FrameLayout(activity);

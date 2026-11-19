@@ -27,10 +27,10 @@ import java.util.function.Supplier;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 
-/** Records explicit page selections on live pagers, including compatible copies of the widget. */
+/** Observes explicit pager selections that may supply a Fragment replay action. */
 final class ViewPagerReplay {
     interface Sink {
-        void capture(Activity activity, View pager, int fromPosition, int position, Bundle descriptor);
+        void capture(Activity activity, View pager, Bundle descriptor);
     }
 
     static final String POSITION = "position";
@@ -80,6 +80,30 @@ final class ViewPagerReplay {
         return descriptor != null && MECHANISM.equals(descriptor.getString("mechanism"));
     }
 
+    boolean matchesSelection(Activity activity, View pager, Bundle descriptor) {
+        if (!active(activity) || !capturing.test(activity) || pager == null
+                || watched.get(pager) != activity || !visibleIn(activity, pager) || !handles(descriptor)
+                || !activity.getClass().getName().equals(descriptor.getString("host"))
+                || !pager.getClass().getName().equals(descriptor.getString("pager"))) return false;
+        try {
+            int id = descriptor.getInt("view_id", View.NO_ID);
+            if (id > 0) {
+                if (pager.getId() != id) return false;
+            } else {
+                String path = descriptor.getString("view_path");
+                if (path == null || !path.equals(pathTo(decor(activity), pager))) return false;
+            }
+            Bundle arguments = descriptor.getBundle("arguments");
+            State actual = state(pager, access(pager.getClass()));
+            return arguments != null && actual != null
+                    && actual.position == arguments.getInt(POSITION, -1)
+                    && actual.adapter.equals(descriptor.getString("adapter"))
+                    && actual.count == descriptor.getInt("page_count");
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+            return false;
+        }
+    }
+
     private void install(Class<?> type) {
         for (Class<?> owner = type; owner != null && owner != ViewGroup.class; owner = owner.getSuperclass()) {
             try {
@@ -127,13 +151,13 @@ final class ViewPagerReplay {
                 Selection selection = (Selection) param.getObjectExtra(CALL);
                 if (selection == null) return;
                 activeCalls.remove(selection.view);
-                if (!param.hasThrowable()) save(selection);
+                if (!param.hasThrowable()) offerSelection(selection);
             }
         });
         hooked.add(method);
     }
 
-    private void save(Selection selection) {
+    private void offerSelection(Selection selection) {
         Activity activity = selection.activity;
         View view = selection.view;
         if (!active(activity) || !capturing.test(activity) || !visibleIn(activity, view)) return;
@@ -142,9 +166,9 @@ final class ViewPagerReplay {
             if (actual == null || actual.position != selection.position
                     || !selection.before.adapter.equals(actual.adapter) || selection.before.count != actual.count) return;
             Bundle descriptor = describe(selection);
-            if (descriptor != null) sink.capture(activity, view, selection.before.position, actual.position, descriptor);
+            if (descriptor != null) sink.capture(activity, view, descriptor);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
-            // A selection whose outcome or host cannot be verified stays out of the replay archive.
+            // A selection whose outcome or host cannot be verified cannot supply a replay action.
         }
     }
 

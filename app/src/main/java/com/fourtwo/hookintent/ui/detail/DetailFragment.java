@@ -156,8 +156,10 @@ public class DetailFragment extends Fragment {
                 Object value = bundle.get(key);
                 dataMap.put(key, value != null ? value.toString() : "null");
             }
-            NavigationCaptureSource source = NavigationCaptureSource.fromRecord(itemData.getCategory(), bundle);
-            if (source != null && !bundle.containsKey(Constants.NAVIGATION_REPLAY)) {
+            String category = itemData.getCategory();
+            NavigationCaptureSource source = NavigationCaptureSource.fromRecord(category, bundle);
+            Bundle replay = source == null ? null : bundle.getBundle(Constants.NAVIGATION_REPLAY);
+            if (source != null && replay == null) {
                 dataMap.put("FunctionCall", source.method());
             }
 
@@ -170,15 +172,16 @@ public class DetailFragment extends Fragment {
                 }
             }
 
+            appendPagerTransition(dataList, replay);
             dataList.add(new Pair<>("separator", ""));
-            if (source != null && !bundle.containsKey(Constants.NAVIGATION_REPLAY)) {
-                NavigationReplayDiagnostics.append(requireContext(), dataList, source, bundle);
+            if (source != null && replay == null) {
+                NavigationReplayDiagnostics.append(requireContext(), dataList, bundle);
             }
 
             List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data",
                     "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS,
                     Constants.NAVIGATION_REPLAY, Constants.NAVIGATION_REPLAY_DIAGNOSTICS);
-            if (source != null) {
+            if (source != null || NavigationCaptureSource.isHistoricalRecord(category, bundle)) {
                 Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
                 if (arguments != null) {
                     List<String> argumentKeys = new ArrayList<>(arguments.keySet());
@@ -210,6 +213,17 @@ public class DetailFragment extends Fragment {
 
 
         return view;
+    }
+
+    private void appendPagerTransition(List<Pair<String, String>> rows, Bundle descriptor) {
+        if (descriptor == null || !"view_pager".equals(descriptor.getString("mechanism"))) return;
+        Bundle arguments = descriptor.getBundle("arguments");
+        int source = descriptor.getInt("source_position", -1);
+        int target = arguments == null ? -1 : arguments.getInt("position", -1);
+        if (source >= 0 && target >= 0) {
+            rows.add(new Pair<>(getString(R.string.navigation_replay_pager_transition),
+                    getString(R.string.navigation_replay_page_range, source, target)));
+        }
     }
 
     private void enableFullCopy(TextView textView) {
@@ -281,7 +295,7 @@ public class DetailFragment extends Fragment {
                 MenuItem replayMenu = menu.findItem(R.id.copy_code);
                 if (navigation) replayMenu.setTitle(R.string.navigation_replay_options);
                 replayMenu.setVisible(canReplay || (navigation
-                        && itemData.getAppBundle().containsKey(Constants.NAVIGATION_REPLAY)));
+                        && itemData.getAppBundle().getBundle(Constants.NAVIGATION_REPLAY) != null));
 
                 // 动态设置收藏按钮图标
                 try {

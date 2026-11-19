@@ -8,20 +8,17 @@ import androidx.core.util.Pair;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.data.Constants;
-import com.fourtwo.hookintent.data.NavigationCaptureSource;
 
 import java.util.List;
 
 final class NavigationReplayDiagnostics {
     private NavigationReplayDiagnostics() {}
 
-    static void append(Context context, List<Pair<String, String>> rows,
-                       NavigationCaptureSource source, Bundle record) {
+    static void append(Context context, List<Pair<String, String>> rows, Bundle record) {
         Bundle diagnostics = record.getBundle(Constants.NAVIGATION_REPLAY_DIAGNOSTICS);
         if (diagnostics == null || diagnostics.isEmpty()) {
-            int message = source == NavigationCaptureSource.FRAGMENT
-                    ? R.string.navigation_replay_diagnostic_legacy : R.string.navigation_replay_unavailable;
-            rows.add(new Pair<>(context.getString(R.string.navigation_replay_options), context.getString(message)));
+            rows.add(new Pair<>(context.getString(R.string.navigation_replay_options),
+                    context.getString(R.string.navigation_replay_diagnostic_legacy)));
             return;
         }
         add(context, rows, diagnostics.getString("observation"), R.string.navigation_replay_diagnostic_observation);

@@ -1,6 +1,5 @@
 package com.fourtwo.hookintent.fixture;
 
-import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -14,12 +13,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
-import androidx.navigation.NavController;
-import androidx.navigation.fragment.NavHostFragment;
 
 import java.io.Serializable;
 
-/** Drives Jetpack and direct Fragment navigation for device replay checks. */
+/** Drives Fragment navigation for device replay checks. */
 public final class NavigationFixtureActivity extends FragmentActivity {
     @Override protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
@@ -30,12 +27,6 @@ public final class NavigationFixtureActivity extends FragmentActivity {
                     .commitNow();
         }
         if (state != null && state.getBoolean("typed_panel_visible")) setPanelVisibility(View.VISIBLE);
-        if (state == null) openDeepLink(getIntent());
-    }
-
-    @Override protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        openDeepLink(intent);
     }
 
     @Override protected void onSaveInstanceState(@NonNull Bundle state) {
@@ -70,33 +61,11 @@ public final class NavigationFixtureActivity extends FragmentActivity {
         return count;
     }
 
-    private void openDeepLink(Intent intent) {
-        if (!Intent.ACTION_VIEW.equals(intent.getAction()) || !"jumpreplay-fixture".equals(intent.getScheme())) return;
-        String value = intent.getStringExtra("launchValue");
-        if (value == null) return;
-        NavHostFragment host = (NavHostFragment) getSupportFragmentManager()
-                .findFragmentById(R.id.navigation_fixture_host);
-        NavController controller = host.getNavController();
-        controller.popBackStack(R.id.nav_fixture_home, false);
-        openDetail(controller, value);
-    }
-
-    private static void openDetail(NavController controller, String value) {
-        Bundle arguments = new Bundle();
-        arguments.putString("value", value);
-        controller.navigate(R.id.nav_fixture_open_detail, arguments);
-    }
-
     public static final class Home extends Fragment {
         @Override public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                 @Nullable Bundle state) {
             LinearLayout buttons = new LinearLayout(requireContext());
             buttons.setOrientation(LinearLayout.VERTICAL);
-            Button navigation = new Button(requireContext());
-            navigation.setText("Open navigation detail");
-            navigation.setOnClickListener(view -> openDetail(NavHostFragment.findNavController(this), "initial"));
-            buttons.addView(navigation);
-
             Button transaction = new Button(requireContext());
             transaction.setText("Open Fragment detail");
             transaction.setOnClickListener(view -> {
@@ -208,16 +177,6 @@ public final class NavigationFixtureActivity extends FragmentActivity {
             TextView label = new TextView(requireContext());
             label.setGravity(Gravity.CENTER);
             label.setText("Fragment detail: " + requireArguments().getString("value"));
-            return label;
-        }
-    }
-
-    public static final class Detail extends Fragment {
-        @Override public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                @Nullable Bundle state) {
-            TextView label = new TextView(requireContext());
-            label.setGravity(Gravity.CENTER);
-            label.setText("Navigation detail: " + requireArguments().getString("value"));
             return label;
         }
     }

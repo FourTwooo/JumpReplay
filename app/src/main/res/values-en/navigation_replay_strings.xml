@@ -1,7 +1,7 @@
 <resources>
     <string name="navigation_replay_options">Replay options</string>
     <string name="navigation_replay_in_app">Edit arguments and replay in app</string>
-    <string name="navigation_replay_unavailable">This record has no replayable navigation call.</string>
+    <string name="navigation_replay_pager_transition">Page selection</string>
     <string name="navigation_replay_edit_title">Edit navigation arguments</string>
     <string name="navigation_replay_start">Replay</string>
     <string name="navigation_replay_missing_launcher">The target app has no launcher entry.</string>

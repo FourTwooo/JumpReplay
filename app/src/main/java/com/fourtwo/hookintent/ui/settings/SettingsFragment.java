@@ -289,7 +289,9 @@ public class SettingsFragment extends Fragment {
                 colorMap.remove(source.category());
             }
             for (Map.Entry<String, String> entry : colorMap.entrySet()) {
-                categoryData.add(new Pair<>(entry.getKey(), entry.getValue()));
+                String category = entry.getKey();
+                if (NavigationCaptureSource.isRetiredCategory(category) && !isCategoryReferenced(category)) continue;
+                categoryData.add(new Pair<>(category, entry.getValue()));
             }
         } catch (Exception e) {
             Log.e(TAG, "解析颜色配置失败: " + e.getMessage());
@@ -397,7 +399,8 @@ public class SettingsFragment extends Fragment {
         List<Map<String, Object>> list = new ArrayList<>();
 
         loadFromPreferences(Constants.INTERNAL_HOOKS_CONFIG, true, list);
-        list.removeIf(item -> NavigationCaptureSource.forConfigurationRow(item) != null);
+        list.removeIf(item -> NavigationCaptureSource.forConfigurationRow(item) != null
+                || NavigationCaptureSource.isRetiredConfigurationRow(item));
         for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
             list.add(source.configurationRow(requireContext()));
         }
