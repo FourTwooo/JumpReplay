@@ -284,7 +284,7 @@ public class DetailFragment extends Fragment {
         }
 
         nativeReplay = null;
-        updateReplayAction(view, navigationRecord() != null);
+        updateReplayStatus(view, navigationRecord() != null);
         requireActivity().addMenuProvider(new MenuProvider() {
             boolean isStarred = false; // 是否已收藏的状态
 
@@ -292,6 +292,7 @@ public class DetailFragment extends Fragment {
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menu.clear(); // 清除现有菜单项，避免重复
                 menuInflater.inflate(R.menu.detail_drawer, menu); // 加载菜单
+                menu.findItem(R.id.detail_replay_action).setVisible(replayAction() != null);
                 ItemData replay = replayableItem();
                 boolean intent = replay != null && "Intent".equals(replay.getCategory());
                 boolean scheme = replay != null && "Scheme".equals(replay.getCategory());
@@ -399,7 +400,7 @@ public class DetailFragment extends Fragment {
         if (record == null || view == null) return;
         int request = ++nativeLookupRequest;
         nativeReplay = null;
-        updateReplayAction(view, true);
+        updateReplayStatus(view, true);
         Context context = requireContext().getApplicationContext();
         android.app.Activity host = requireActivity();
         NATIVE_LOOKUP.execute(() -> {
@@ -413,43 +414,44 @@ public class DetailFragment extends Fragment {
             host.runOnUiThread(() -> {
                 if (getView() != view || request != nativeLookupRequest) return;
                 nativeReplay = result;
-                updateReplayAction(view, false);
+                updateReplayStatus(view, false);
                 if (result != null) host.invalidateOptionsMenu();
             });
         });
     }
 
-    private void updateReplayAction(View view, boolean checkingNative) {
-        View area = view.findViewById(R.id.detail_replay_area);
-        Button button = view.findViewById(R.id.detail_replay_button);
-        TextView status = view.findViewById(R.id.detail_replay_status);
+    private Runnable replayAction() {
         ItemData replay = replayableItem();
-        Bundle record = navigationRecord();
-        Bundle descriptor = localReplayDescriptor();
-        Intent nativeIntent = nativeReplay;
-        Runnable action = null;
-        String reason = null;
         if (replay != null) {
-            action = "Intent".equals(replay.getCategory())
+            return "Intent".equals(replay.getCategory())
                     ? () -> editIntentAndReplay(replay, replay.getAppBundle(), replay.getUri())
                     : () -> openInterceptor(replay);
-        } else if (descriptor != null) {
-            action = () -> NavigationReplayDialogs.editInApp(requireActivity(), itemData, descriptor);
-        } else if (nativeIntent != null) {
-            action = () -> editIntentAndReplay(itemData, DataConverter.convertIntentToBundle(nativeIntent),
-                    nativeIntent.toUri(Intent.URI_INTENT_SCHEME));
-        } else if (record != null) {
-            reason = checkingNative ? getString(R.string.detail_replay_checking)
-                    : getString(R.string.detail_replay_unavailable,
-                            NavigationReplayDiagnostics.summary(requireContext(), record));
         }
 
-        area.setVisibility(action != null || reason != null ? View.VISIBLE : View.GONE);
-        button.setVisibility(action != null ? View.VISIBLE : View.GONE);
-        Runnable replayAction = action;
-        button.setOnClickListener(replayAction == null ? null : ignored -> replayAction.run());
-        status.setVisibility(reason != null ? View.VISIBLE : View.GONE);
+        Bundle descriptor = localReplayDescriptor();
+        if (descriptor != null) {
+            return () -> NavigationReplayDialogs.editInApp(requireActivity(), itemData, descriptor);
+        }
+
+        Intent nativeIntent = nativeReplay;
+        return nativeIntent == null ? null
+                : () -> editIntentAndReplay(itemData, DataConverter.convertIntentToBundle(nativeIntent),
+                        nativeIntent.toUri(Intent.URI_INTENT_SCHEME));
+    }
+
+    private void updateReplayStatus(View view, boolean checkingNative) {
+        TextView status = view.findViewById(R.id.detail_replay_status);
+        Bundle record = navigationRecord();
+        if (record == null || replayAction() != null) {
+            status.setVisibility(View.GONE);
+            return;
+        }
+
+        String reason = checkingNative ? getString(R.string.detail_replay_checking)
+                : getString(R.string.detail_replay_unavailable,
+                        NavigationReplayDiagnostics.summary(requireContext(), record));
         status.setText(reason);
+        status.setVisibility(View.VISIBLE);
     }
 
     private void editIntentAndReplay(ItemData source, Bundle record, String originalUri) {
@@ -466,6 +468,12 @@ public class DetailFragment extends Fragment {
     }
 
     private boolean handleReplayMenu(int id) {
+        if (id == R.id.detail_replay_action) {
+            Runnable action = replayAction();
+            if (action == null) return false;
+            action.run();
+            return true;
+        }
         if (id == R.id.detail_generate_replay_intent) {
             Bundle descriptor = localReplayDescriptor();
             if (descriptor == null) return false;

@@ -11,6 +11,14 @@
         app:tint="@color/white"
         app:showAsAction="ifRoom" />
 
+    <item
+        android:id="@+id/detail_replay_action"
+        android:icon="@drawable/detail_replay"
+        android:orderInCategory="1"
+        android:title="@string/detail_replay_edit"
+        android:visible="false"
+        app:showAsAction="always" />
+
     <item android:id="@+id/action_save" android:title="@string/action_save" app:showAsAction="never" />
 
     <item android:id="@+id/detail_copy_intent_uri"
