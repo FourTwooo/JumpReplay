@@ -9,6 +9,7 @@ import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.database.sqlite.SQLiteStatement;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -30,16 +31,20 @@ import org.json.JSONObject;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Consumer;
 
 /** An opt-in index of Intent observations independent of the capture archive. */
 public final class IntentLibrary {
@@ -147,15 +152,27 @@ public final class IntentLibrary {
 
     List<Observation> observationsForApp(String packageName) {
         if (packageName.isEmpty() || !new File(store.getDatabaseName()).isFile()) return Collections.emptyList();
-        List<Observation> observations = query("package_name=? OR package_name=''", new String[]{packageName}, null);
-        observations.removeIf(observation -> observation.destinationPackage.isEmpty()
-                && !packageName.equals(observation.sourcePackage));
+        return observationsForApp(store.getReadableDatabase(), packageName);
+    }
+
+    private static List<Observation> observationsForApp(SQLiteDatabase db, String packageName) {
+        List<Observation> observations = query(db, "package_name=? OR package_name=''", new String[]{packageName}, null);
+        observations.removeIf(observation -> !belongsToApp(observation, packageName));
         return observations;
     }
 
+    private static boolean belongsToApp(Observation observation, String packageName) {
+        return packageName.equals(observation.destinationPackage.isEmpty()
+                ? observation.sourcePackage : observation.destinationPackage);
+    }
+
     private List<Observation> query(String selection, String[] args, String limit) {
+        return query(store.getReadableDatabase(), selection, args, limit);
+    }
+
+    private static List<Observation> query(SQLiteDatabase db, String selection, String[] args, String limit) {
         List<Observation> values = new ArrayList<>();
-        try (Cursor rows = store.getReadableDatabase().query("observations",
+        try (Cursor rows = db.query("observations",
                 new String[]{"id", "payload", "hits", "seen_at"}, selection, args, null, null,
                 "seen_at DESC, id DESC", limit)) {
             while (rows.moveToNext()) {
@@ -173,15 +190,101 @@ public final class IntentLibrary {
         changes.postValue(true);
     }
 
-    void clear() {
+    void deleteApps(Collection<String> selectedPackages) {
+        Set<String> packages = new HashSet<>(selectedPackages);
+        packages.remove(null);
+        packages.remove("");
+        if (packages.isEmpty()) return;
+        deleteFromCache(db -> {
+            for (String packageName : packages) {
+                String[] args = {packageName};
+                db.delete("observations", "package_name=?", args);
+                db.delete("fragment_evidence", "package_name=?", args);
+            }
+            List<Long> unassigned = new ArrayList<>();
+            try (Cursor rows = db.query("observations", new String[]{"id", "payload"}, "package_name=''",
+                    null, null, null, null)) {
+                while (rows.moveToNext()) {
+                    try {
+                        if (packages.contains(new JSONObject(rows.getString(1)).optString("source"))) {
+                            unassigned.add(rows.getLong(0));
+                        }
+                    } catch (JSONException error) { Log.w(TAG, "Cannot identify the source of a cached Intent", error); }
+                }
+            }
+            deleteObservationIds(db, unassigned);
+        });
+    }
+
+    void deleteActivities(String packageName, Collection<PackageActivityCatalog.Activity> selected) {
+        if (packageName.isEmpty() || selected.isEmpty()) return;
+        List<PackageActivityCatalog.Activity> groups = new ArrayList<>();
+        Set<String> keys = new HashSet<>();
+        for (PackageActivityCatalog.Activity activity : selected) {
+            if (activity.declaration != null ? packageName.equals(activity.declaration.packageName)
+                    : activity.observations.stream().anyMatch(sample -> belongsToApp(sample, packageName))) {
+                groups.add(activity);
+                keys.add(activity.selectionKey);
+            }
+        }
+        if (groups.isEmpty()) return;
+        List<PackageActivityCatalog.Entry> declarations = activityDeclarations(packageName);
+        deleteFromCache(db -> {
+            for (PackageActivityCatalog.Activity activity : groups) {
+                // An alias owns its own address; evidence of its target belongs to the actual Activity.
+                if (!activity.name.isEmpty()) db.delete("fragment_evidence", "package_name=? AND activity=?",
+                        new String[]{packageName, activity.name});
+            }
+            // Regroup under the write transaction so newly captured shapes in a selected row are included.
+            // Preserve the original selection if a package update changed or removed one of its aliases.
+            if (declarations != null) {
+                groups.addAll(PackageActivityCatalog.merge(declarations, observationsForApp(db, packageName)));
+            }
+            Set<Long> ids = new HashSet<>();
+            for (PackageActivityCatalog.Activity activity : groups) {
+                if (!keys.contains(activity.selectionKey)) continue;
+                for (Observation sample : activity.observations) {
+                    if (belongsToApp(sample, packageName)) ids.add(sample.id);
+                }
+            }
+            deleteObservationIds(db, ids);
+        });
+    }
+
+    private List<PackageActivityCatalog.Entry> activityDeclarations(String packageName) {
+        try {
+            return PackageActivityCatalog.activities(context, packageName);
+        } catch (PackageManager.NameNotFoundException missing) {
+            return null;
+        }
+    }
+
+    private static void deleteObservationIds(SQLiteDatabase db, Collection<Long> ids) {
+        if (ids.isEmpty()) return;
+        try (SQLiteStatement delete = db.compileStatement("DELETE FROM observations WHERE id=?")) {
+            for (long id : ids) {
+                delete.bindLong(1, id);
+                delete.executeUpdateDelete();
+            }
+        }
+    }
+
+    private void deleteFromCache(Consumer<SQLiteDatabase> operation) {
+        if (!new File(store.getDatabaseName()).isFile()) return;
         SQLiteDatabase db = store.getWritableDatabase();
         db.beginTransaction();
         try {
-            db.delete("observations", null, null);
-            db.delete("fragment_evidence", null, null);
+            operation.accept(db);
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
         changes.postValue(true);
+    }
+
+    void clear() {
+        deleteFromCache(db -> {
+            db.delete("observations", null, null);
+            db.delete("fragment_evidence", null, null);
+        });
     }
 
     private boolean observe(SQLiteDatabase db, Bundle record, Map<String, Version> versions) throws Exception {

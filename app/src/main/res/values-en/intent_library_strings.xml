@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="intent_library_title">Intent library</string>
+    <string name="intent_library_title">App activities</string>
     <string name="library_cache_enabled">Save new Intent captures to the library</string>
     <string name="library_observed_tab">Observed</string>
     <string name="library_declared_tab">App activities</string>
     <string name="library_choose_app">Choose app</string>
     <string name="library_current_app">Change app · %1$s</string>
     <string name="library_search">Search</string>
-    <string name="library_clear">Clear Intent cache</string>
+    <string name="library_clear">Clear the entire Intent cache</string>
     <string name="library_clear_message">Delete the saved Intent examples and Fragment associations? Original capture records are kept.</string>
     <string name="library_more">Load more</string>
     <string name="library_empty">New Intents appear here after you capture them.</string>
     <string name="library_cache_off">Automatic caching is off. App activities still shows declared entries.</string>
     <string name="library_no_match">No matching entries</string>
     <string name="library_no_activities">No activities or captured Intents for this app</string>
-    <string name="library_read_error">Could not load the Intent library</string>
+    <string name="library_read_error">Could not load app activities</string>
     <string name="library_write_error">Could not change the Intent cache</string>
     <string name="library_delivered">Delivery observed</string>
     <string name="library_requested">Launch requested</string>
@@ -63,5 +63,19 @@
     <plurals name="library_sample_count">
         <item quantity="one">%d example</item>
         <item quantity="other">%d examples</item>
+    </plurals>
+    <string name="library_clear_selected">Clear selected caches</string>
+    <string name="library_select_all">Select all results</string>
+    <string name="library_selected_cleared">Selected caches cleared</string>
+    <plurals name="library_selected_count">
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <plurals name="library_clear_selected_apps_message">
+        <item quantity="one">Clear the Intent cache for %1$d selected app? Original captures are kept.</item>
+        <item quantity="other">Clear the Intent cache for %1$d selected apps? Original captures are kept.</item>
+    </plurals>
+    <plurals name="library_clear_selected_activities_message">
+        <item quantity="one">Clear the Intent cache for %1$d selected activity? Original captures are kept.</item>
+        <item quantity="other">Clear the Intent cache for %1$d selected activities? Original captures are kept.</item>
     </plurals>
 </resources>

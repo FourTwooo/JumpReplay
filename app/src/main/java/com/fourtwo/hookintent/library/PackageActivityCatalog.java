@@ -90,11 +90,12 @@ final class PackageActivityCatalog {
         List<Activity> activities = new ArrayList<>();
         for (Map.Entry<String, List<IntentLibrary.Observation>> group : byActivity.entrySet()) {
             String name = group.getKey();
-            activities.add(new Activity(name, declarations.get(name), group.getValue(), "", ""));
+            activities.add(new Activity("activity:" + name, name, declarations.get(name), group.getValue(), "", ""));
         }
-        for (List<IntentLibrary.Observation> samples : unresolved.values()) {
+        for (Map.Entry<String, List<IntentLibrary.Observation>> group : unresolved.entrySet()) {
+            List<IntentLibrary.Observation> samples = group.getValue();
             IntentLibrary.Observation latest = samples.get(0);
-            activities.add(new Activity("", null, samples, latest.action, latest.data));
+            activities.add(new Activity("route:" + group.getKey(), "", null, samples, latest.action, latest.data));
         }
         return activities;
     }
@@ -144,12 +145,13 @@ final class PackageActivityCatalog {
     }
 
     static final class Activity {
-        final String name, action, data;
+        final String selectionKey, name, action, data;
         final Entry declaration;
         final List<IntentLibrary.Observation> observations;
 
-        private Activity(String name, Entry declaration, List<IntentLibrary.Observation> observations,
+        private Activity(String selectionKey, String name, Entry declaration, List<IntentLibrary.Observation> observations,
                 String action, String data) {
+            this.selectionKey = selectionKey;
             this.name = name;
             this.declaration = declaration;
             this.observations = Collections.unmodifiableList(observations);

@@ -2,32 +2,50 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
+    android:background="@drawable/library_row_background"
     android:gravity="center_vertical"
     android:minHeight="64dp"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:paddingStart="16dp"
     android:paddingTop="10dp"
     android:paddingEnd="16dp"
     android:paddingBottom="10dp">
 
-    <TextView
-        android:id="@+id/library_row_title"
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="2"
-        android:textColor="@color/screen_text"
-        android:textSize="15sp" />
+        android:layout_weight="1"
+        android:orientation="vertical">
 
-    <TextView
-        android:id="@+id/library_row_summary"
-        android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/library_row_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="2"
+            android:textColor="@color/screen_text"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/library_row_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:maxLines="3"
+            android:textColor="@color/screen_secondary"
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+    <androidx.appcompat.widget.AppCompatCheckBox
+        android:id="@+id/library_row_selected"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:ellipsize="end"
-        android:maxLines="3"
-        android:textColor="@color/screen_secondary"
-        android:textSize="12sp" />
+        android:layout_marginStart="8dp"
+        android:clickable="false"
+        android:focusable="false"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
 
 </LinearLayout>

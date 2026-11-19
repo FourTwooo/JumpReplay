@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item android:id="@android:id/mask" android:drawable="@android:color/white" />
+    <item>
+        <selector>
+            <item android:state_activated="true" android:drawable="@color/screen_surface" />
+            <item android:drawable="@android:color/transparent" />
+        </selector>
+    </item>
+</ripple>

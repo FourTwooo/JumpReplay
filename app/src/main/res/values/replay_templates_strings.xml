@@ -1,5 +1,5 @@
 <resources>
-    <string name="replay_templates_title">重放模板</string>
+    <string name="replay_templates_title">重放</string>
     <string name="replay_templates_save">保存重放模板</string>
     <string name="replay_templates_empty">还没有重放模板。可以从可重放的 Fragment 记录生成，也可以导入别人分享的模板。</string>
     <string name="replay_templates_import">导入模板</string>

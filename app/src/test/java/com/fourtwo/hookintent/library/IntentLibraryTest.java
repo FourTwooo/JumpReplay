@@ -160,6 +160,85 @@ public class IntentLibraryTest {
         assertEquals("through-second", group(groups, secondAlias).observations.get(0).parameters.get(0).example);
     }
 
+    @Test public void selectedAppsClearAllTheirVersionsAndUnassignedRoutesOnly() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        String other = "example.other";
+        String otherActivity = other + ".MainActivity";
+        install(context, TARGET, 7, INSTALLED);
+        install(context, SENDER, 7, INSTALLED);
+        install(context, other, 7, INSTALLED);
+        IntentLibrary library = IntentLibrary.get(context);
+        library.setEnabled(true);
+        Bundle outgoing = captured(new Intent("example.OPEN").setClassName(other, otherActivity));
+        outgoing.putString("packageName", TARGET);
+        outgoing.putString("FunctionCall", "Instrumentation.execStartActivity");
+        ingest(library, delivered("older", 6, INSTALLED - 1_000), delivered("current", 7, INSTALLED),
+                unresolved(TARGET, "first", 0), unresolved(other, "second", 0), outgoing,
+                delivery(SENDER, SENDER + ".MainActivity", new Intent("example.OPEN"), 7, INSTALLED));
+        library.ingest(Collections.emptyList(), Arrays.asList(evidence(TARGET, TARGET_ACTIVITY),
+                evidence(SENDER, SENDER + ".MainActivity"), evidence(other, otherActivity)), 12001);
+        assertEquals(3, library.observationsForApp(TARGET).size());
+        assertEquals(1, library.observationsForApp(SENDER).size());
+        assertEquals(2, library.observationsForApp(other).size());
+        assertEquals(1, library.fragmentEvidence(TARGET, TARGET_ACTIVITY, FRAGMENT, 7, INSTALLED).size());
+        assertEquals(1, library.fragmentEvidence(SENDER, SENDER + ".MainActivity", SENDER + ".ViewFragment", 7,
+                INSTALLED).size());
+
+        library.deleteApps(Arrays.asList(TARGET, SENDER));
+        assertTrue(library.observationsForApp(TARGET).isEmpty());
+        assertTrue(library.observationsForApp(SENDER).isEmpty());
+        assertTrue(library.fragmentEvidence(TARGET, TARGET_ACTIVITY, FRAGMENT, 7, INSTALLED).isEmpty());
+        assertTrue(library.fragmentEvidence(SENDER, SENDER + ".MainActivity", SENDER + ".ViewFragment", 7,
+                INSTALLED).isEmpty());
+        assertEquals(2, library.observationsForApp(other).size());
+        assertEquals(1, library.fragmentEvidence(other, otherActivity, other + ".ViewFragment", 7, INSTALLED).size());
+    }
+
+    @Test public void activitySelectionRefreshesGroupsAndPreservesSiblingActivityEvidence() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        String alias = TARGET + ".PublicEntry";
+        String sibling = TARGET + ".OtherActivity";
+        install(context, TARGET, 7, INSTALLED, declaration(TARGET_ACTIVITY, null), declaration(alias, TARGET_ACTIVITY),
+                declaration(sibling, null));
+        install(context, SENDER, 7, INSTALLED);
+        List<PackageActivityCatalog.Entry> declarations = PackageActivityCatalog.activities(context, TARGET);
+        IntentLibrary library = IntentLibrary.get(context);
+        library.setEnabled(true);
+        ingest(library, delivered("direct", 7, INSTALLED), addressedToAlias("through-alias", alias),
+                unresolved(TARGET, "original", 0), unresolved(SENDER, "other-app", 0),
+                delivery(TARGET, sibling, new Intent("example.OTHER"), 7, INSTALLED));
+        library.ingest(Collections.emptyList(), Arrays.asList(evidence(TARGET, TARGET_ACTIVITY),
+                evidence(TARGET, sibling)), 12001);
+        List<PackageActivityCatalog.Activity> before = PackageActivityCatalog.merge(declarations,
+                library.observationsForApp(TARGET));
+        PackageActivityCatalog.Activity selectedAlias = group(before, alias);
+        PackageActivityCatalog.Activity selectedRoute = group(before, "");
+        assertEquals(1, selectedAlias.observations.size());
+        assertEquals(1, selectedRoute.observations.size());
+        Bundle lateAlias = addressedToAlias("arrived-later", alias);
+        lateAlias.putInt("flags", Intent.FLAG_ACTIVITY_NEW_TASK);
+        ingest(library, lateAlias, unresolved(TARGET, "different-value", Intent.FLAG_ACTIVITY_NEW_TASK));
+        List<PackageActivityCatalog.Activity> refreshed = PackageActivityCatalog.merge(declarations,
+                library.observationsForApp(TARGET));
+        assertEquals(2, group(refreshed, alias).observations.size());
+        assertEquals(2, group(refreshed, "").observations.size());
+        assertEquals(selectedRoute.selectionKey, group(refreshed, "").selectionKey);
+
+        library.deleteActivities(TARGET, Arrays.asList(selectedAlias, selectedRoute));
+        List<PackageActivityCatalog.Activity> remaining = PackageActivityCatalog.merge(declarations,
+                library.observationsForApp(TARGET));
+        assertEquals(2, library.observationsForApp(TARGET).size());
+        assertEquals(1, library.observationsForApp(SENDER).size());
+        assertTrue(group(remaining, alias).observations.isEmpty());
+        assertEquals(1, library.fragmentEvidence(TARGET, TARGET_ACTIVITY, FRAGMENT, 7, INSTALLED).size());
+        assertEquals(1, library.fragmentEvidence(TARGET, sibling, FRAGMENT, 7, INSTALLED).size());
+
+        library.deleteActivities(TARGET, Collections.singletonList(group(remaining, TARGET_ACTIVITY)));
+        assertEquals(sibling, library.observationsForApp(TARGET).get(0).activity);
+        assertTrue(library.fragmentEvidence(TARGET, TARGET_ACTIVITY, FRAGMENT, 7, INSTALLED).isEmpty());
+        assertEquals(1, library.fragmentEvidence(TARGET, sibling, FRAGMENT, 7, INSTALLED).size());
+    }
+
     private static Bundle addressedToAlias(String topic, String alias) {
         Bundle record = delivered(topic, 7, INSTALLED);
         Intent original = new Intent("example.OPEN").setClassName(TARGET, alias).putExtra("topic", topic);
@@ -213,20 +292,7 @@ public class IntentLibraryTest {
         Context context = RuntimeEnvironment.getApplication();
         install(context, TARGET, 7, INSTALLED);
         IntentLibrary library = IntentLibrary.get(context);
-        Bundle record = new Bundle();
-        record.putString("category", Constants.FRAGMENT_CATEGORY);
-        record.putString("packageName", TARGET);
-        record.putString("from", TARGET_ACTIVITY);
-        record.putString("title", FRAGMENT);
-        Bundle args = new Bundle();
-        args.putString("fragmentTopic", "topic-value");
-        record.putBundle(Constants.NAVIGATION_ARGUMENTS, args);
-        String uri = new Intent("example.OPEN").setClassName(TARGET, TARGET_ACTIVITY)
-                .putExtra("topic", "topic-value").toUri(Intent.URI_INTENT_SCHEME);
-        record.putString(ObservedFragmentIntent.RECORD_KEY, new JSONObject().put("package", TARGET)
-                .put("activity", TARGET_ACTIVITY).put("fragment", FRAGMENT).put("version", 7)
-                .put("updated", INSTALLED).put("uri", uri)
-                .put("bindings", new JSONObject().put("topic", "fragmentTopic")).toString());
+        Bundle record = evidence(TARGET, TARGET_ACTIVITY);
 
         library.setEnabled(true);
         library.ingest(Collections.emptyList(), Collections.singletonList(record), 12002);
@@ -243,10 +309,15 @@ public class IntentLibraryTest {
     }
 
     private static Bundle delivered(String topic, int version, long update) {
-        Bundle record = raw(topic);
-        record.putString("packageName", TARGET);
+        return delivery(TARGET, TARGET_ACTIVITY, new Intent("example.OPEN")
+                .setClassName(TARGET, TARGET_ACTIVITY).putExtra("topic", topic), version, update);
+    }
+
+    private static Bundle delivery(String packageName, String activity, Intent original, int version, long update) {
+        Bundle record = captured(original);
+        record.putString("packageName", packageName);
         record.putString("FunctionCall", "Activity.performCreate");
-        record.putString("from", TARGET_ACTIVITY);
+        record.putString("from", activity);
         record.putLong("source_last_update", update);
         record.putLong("library_destination_version_code", version);
         record.putString("library_destination_version_name", "version-" + version);
@@ -255,9 +326,39 @@ public class IntentLibraryTest {
     }
 
     private static Bundle raw(String topic) {
-        Intent original = new Intent("example.OPEN").setClassName(TARGET, TARGET_ACTIVITY).putExtra("topic", topic);
+        return captured(new Intent("example.OPEN").setClassName(TARGET, TARGET_ACTIVITY).putExtra("topic", topic));
+    }
+
+    private static Bundle captured(Intent original) {
         Bundle record = DataConverter.convertIntentToBundle(original);
         record.putString("uri", original.toUri(Intent.URI_INTENT_SCHEME));
+        return record;
+    }
+
+    private static Bundle unresolved(String source, String value, int flags) {
+        Bundle record = captured(new Intent("example.UNRESOLVED").setFlags(flags)
+                .setData(Uri.parse("jumpreplay-unresolved://detail?field=" + value)));
+        record.putString("packageName", source);
+        record.putString("FunctionCall", "Instrumentation.execStartActivity");
+        return record;
+    }
+
+    private static Bundle evidence(String packageName, String activity) throws Exception {
+        Bundle record = new Bundle();
+        String fragment = packageName + ".ViewFragment";
+        record.putString("category", Constants.FRAGMENT_CATEGORY);
+        record.putString("packageName", packageName);
+        record.putString("from", activity);
+        record.putString("title", fragment);
+        Bundle args = new Bundle();
+        args.putString("fragmentTopic", "topic-value");
+        record.putBundle(Constants.NAVIGATION_ARGUMENTS, args);
+        String uri = new Intent("example.OPEN").setClassName(packageName, activity)
+                .putExtra("topic", "topic-value").toUri(Intent.URI_INTENT_SCHEME);
+        record.putString(ObservedFragmentIntent.RECORD_KEY, new JSONObject().put("package", packageName)
+                .put("activity", activity).put("fragment", fragment).put("version", 7)
+                .put("updated", INSTALLED).put("uri", uri)
+                .put("bindings", new JSONObject().put("topic", "fragmentTopic")).toString());
         return record;
     }
 
@@ -269,7 +370,8 @@ public class IntentLibraryTest {
         library.ingest(data, Collections.emptyList(), -1);
     }
 
-    private static void install(Context context, String name, int version, long update) {
+    private static void install(Context context, String name, int version, long update,
+            PackageActivityCatalog.Entry... entries) {
         PackageInfo pkg = new PackageInfo();
         pkg.packageName = name;
         pkg.versionCode = version;
@@ -279,13 +381,17 @@ public class IntentLibraryTest {
         pkg.applicationInfo.packageName = name;
         pkg.applicationInfo.enabled = true;
         pkg.applicationInfo.uid = 12001;
-        ActivityInfo activity = new ActivityInfo();
-        activity.name = name + ".MainActivity";
-        activity.packageName = name;
-        activity.applicationInfo = pkg.applicationInfo;
-        activity.exported = true;
-        activity.enabled = true;
-        pkg.activities = new ActivityInfo[]{activity};
+        pkg.activities = new ActivityInfo[Math.max(1, entries.length)];
+        for (int i = 0; i < pkg.activities.length; i++) {
+            ActivityInfo activity = new ActivityInfo();
+            activity.name = entries.length == 0 ? name + ".MainActivity" : entries[i].name;
+            activity.targetActivity = entries.length == 0 ? null : entries[i].aliasTarget;
+            activity.packageName = name;
+            activity.applicationInfo = pkg.applicationInfo;
+            activity.exported = true;
+            activity.enabled = true;
+            pkg.activities[i] = activity;
+        }
         shadowOf(context.getPackageManager()).installPackage(pkg);
     }
 }

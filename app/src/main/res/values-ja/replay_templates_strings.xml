@@ -1,5 +1,5 @@
 <resources>
-    <string name="replay_templates_title">再実行テンプレート</string>
+    <string name="replay_templates_title">再実行</string>
     <string name="replay_templates_save">再実行テンプレートを保存</string>
     <string name="replay_templates_empty">再実行できる Fragment の記録からテンプレートを作成するか、共有されたテンプレートをインポートできます。</string>
     <string name="replay_templates_import">テンプレートをインポート</string>

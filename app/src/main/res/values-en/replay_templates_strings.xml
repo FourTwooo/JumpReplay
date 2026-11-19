@@ -1,5 +1,5 @@
 <resources>
-    <string name="replay_templates_title">Replay templates</string>
+    <string name="replay_templates_title">Replay</string>
     <string name="replay_templates_save">Save replay template</string>
     <string name="replay_templates_empty">Generate a template from a replayable Fragment capture or import a shared template.</string>
     <string name="replay_templates_import">Import template</string>

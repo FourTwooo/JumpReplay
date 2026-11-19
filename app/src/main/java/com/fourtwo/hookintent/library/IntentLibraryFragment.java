@@ -12,17 +12,24 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.view.ActionMode;
 import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.AccessibilityDelegateCompat;
 import androidx.core.view.MenuProvider;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Lifecycle;
 import androidx.navigation.fragment.NavHostFragment;
@@ -36,15 +43,29 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public final class IntentLibraryFragment extends Fragment {
     private static final String ARG_PACKAGE = "libraryAppPackage";
     private static final String ARG_LABEL = "libraryAppLabel";
     private static final String STATE_QUERY = "library_query";
     private static final String STATE_SEARCH = "library_search_open";
+    private static final AccessibilityDelegateCompat ROW_SELECTION_ACCESSIBILITY = new AccessibilityDelegateCompat() {
+        @Override public void onInitializeAccessibilityNodeInfo(@NonNull View host,
+                @NonNull AccessibilityNodeInfoCompat info) {
+            super.onInitializeAccessibilityNodeInfo(host, info);
+            CompoundButton box = host.findViewById(R.id.library_row_selected);
+            if (box.getVisibility() == View.VISIBLE) {
+                info.setCheckable(true);
+                info.setChecked(box.isChecked());
+            }
+        }
+    };
 
     private IntentLibrary library;
     private RecyclerView recycler;
@@ -61,6 +82,14 @@ public final class IntentLibraryFragment extends Fragment {
     private int generation;
     private List<PackageActivityCatalog.App> apps = Collections.emptyList();
     private List<PackageActivityCatalog.Activity> activities = Collections.emptyList();
+    private final Set<String> selected = new LinkedHashSet<>();
+    private ActionMode selectionMode;
+    private boolean clearingSelection;
+    private final OnBackPressedCallback selectionBack = new OnBackPressedCallback(false) {
+        @Override public void handleOnBackPressed() {
+            if (selectionMode != null) selectionMode.finish();
+        }
+    };
 
     public IntentLibraryFragment() {
         super(R.layout.fragment_intent_library);
@@ -83,15 +112,16 @@ public final class IntentLibraryFragment extends Fragment {
         recycler.setLayoutManager(new LinearLayoutManager(requireContext()));
         RecyclerView.Adapter<?> rows;
         if (packageName == null) {
-            appRows = new AppRows(this::openApp);
+            appRows = new AppRows(this::openApp, this::toggleSelection);
             rows = appRows;
         } else {
-            activityRows = new ActivityRows();
+            activityRows = new ActivityRows(this::toggleSelection);
             rows = activityRows;
         }
         rows.setStateRestorationPolicy(RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY);
         recycler.setAdapter(rows);
         empty = view.findViewById(R.id.library_empty);
+        requireActivity().getOnBackPressedDispatcher().addCallback(getViewLifecycleOwner(), selectionBack);
         renderRows();
         installMenu();
         if (packageName != null) {
@@ -114,6 +144,7 @@ public final class IntentLibraryFragment extends Fragment {
     }
 
     @Override public void onDestroyView() {
+        if (selectionMode != null) selectionMode.finish();
         generation++;
         recycler.setAdapter(null);
         recycler = null;
@@ -204,6 +235,108 @@ public final class IntentLibraryFragment extends Fragment {
         if (recycler != null) recycler.scrollToPosition(0);
     }
 
+    private boolean toggleSelection(String key) {
+        if (key == null || !isResumed()) return false;
+        if (clearingSelection) return true;
+        if (selectionMode == null) {
+            if (search != null) search.clearFocus();
+            selectionMode = ((AppCompatActivity) requireActivity()).startSupportActionMode(selectionActions);
+            if (selectionMode == null) return false;
+            selectionBack.setEnabled(true);
+        }
+        if (!selected.add(key)) selected.remove(key);
+        updateSelection();
+        return true;
+    }
+
+    private final ActionMode.Callback selectionActions = new ActionMode.Callback() {
+        @Override public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+            mode.getMenuInflater().inflate(R.menu.intent_library_selection, menu);
+            return true;
+        }
+
+        @Override public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+            menu.findItem(R.id.library_clear_selected).setEnabled(!clearingSelection && !selected.isEmpty());
+            menu.findItem(R.id.library_select_all).setEnabled(!clearingSelection);
+            return true;
+        }
+
+        @Override public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+            if (clearingSelection) return true;
+            if (item.getItemId() == R.id.library_clear_selected) {
+                confirmClearSelection(mode);
+                return true;
+            }
+            if (item.getItemId() == R.id.library_select_all) {
+                if (appRows != null) appRows.selectAll(selected);
+                if (activityRows != null) activityRows.selectAll(selected);
+                updateSelection();
+                return true;
+            }
+            return false;
+        }
+
+        @Override public void onDestroyActionMode(ActionMode mode) {
+            if (selectionMode != mode) return;
+            selectionMode = null;
+            selected.clear();
+            clearingSelection = false;
+            selectionBack.setEnabled(false);
+            updateSelection();
+        }
+    };
+
+    private void updateSelection() {
+        if (selectionMode != null && selected.isEmpty()) {
+            selectionMode.finish();
+            return;
+        }
+        Set<String> selection = selectionMode == null ? null : selected;
+        if (appRows != null) appRows.setSelection(selection);
+        if (activityRows != null) activityRows.setSelection(selection);
+        if (selectionMode != null) {
+            int count = selected.size();
+            selectionMode.setTitle(getResources().getQuantityString(R.plurals.library_selected_count, count, count));
+            selectionMode.invalidate();
+        }
+    }
+
+    private void confirmClearSelection(ActionMode mode) {
+        if (selected.isEmpty()) return;
+        boolean clearingApps = packageName == null;
+        List<String> packages = new ArrayList<>(selected);
+        List<PackageActivityCatalog.Activity> entries = new ArrayList<>();
+        if (!clearingApps) {
+            for (PackageActivityCatalog.Activity activity : activities) {
+                if (selected.contains(activity.selectionKey)) entries.add(activity);
+            }
+        }
+        int count = clearingApps ? packages.size() : entries.size();
+        if (count == 0) return;
+        CharSequence message = getResources().getQuantityString(clearingApps
+                ? R.plurals.library_clear_selected_apps_message
+                : R.plurals.library_clear_selected_activities_message, count, count);
+        AppDialogs.builder(requireContext()).setTitle(R.string.library_clear_selected)
+                .setMessage(message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.delete, (dialog, which) -> {
+                    clearingSelection = true;
+                    mode.invalidate();
+                    changeCache(() -> {
+                        if (clearingApps) library.deleteApps(packages);
+                        else library.deleteActivities(packageName, entries);
+                    }, () -> {
+                        if (selectionMode == mode) mode.finish();
+                        Toast.makeText(requireContext(), R.string.library_selected_cleared, Toast.LENGTH_SHORT).show();
+                    }, () -> {
+                        if (selectionMode == mode) {
+                            clearingSelection = false;
+                            mode.invalidate();
+                        }
+                    });
+                }).show();
+    }
+
     private void loadRows() {
         int request = ++generation;
         Context context = requireContext().getApplicationContext();
@@ -243,6 +376,15 @@ public final class IntentLibraryFragment extends Fragment {
     private void finishLoading(boolean failed) {
         loaded = true;
         loadFailed = failed;
+        if (!failed && selectionMode != null) {
+            Set<String> existing = new LinkedHashSet<>();
+            if (packageName == null) {
+                for (PackageActivityCatalog.App app : apps) existing.add(app.packageName);
+            } else {
+                for (PackageActivityCatalog.Activity activity : activities) existing.add(activity.selectionKey);
+            }
+            if (selected.retainAll(existing)) updateSelection();
+        }
         renderRows();
     }
 
@@ -277,6 +419,10 @@ public final class IntentLibraryFragment extends Fragment {
 
     private void openApp(PackageActivityCatalog.App app) {
         if (!isResumed()) return;
+        if (selectionMode != null) {
+            toggleSelection(app.packageName);
+            return;
+        }
         Bundle arguments = new Bundle();
         arguments.putString(ARG_PACKAGE, app.packageName);
         arguments.putString(ARG_LABEL, app.label);
@@ -322,7 +468,7 @@ public final class IntentLibraryFragment extends Fragment {
             int count = activity.observations.size();
             summary.append(getResources().getQuantityString(R.plurals.library_sample_count, count, count));
         }
-        return new Row(title, summary.toString(), () -> showActivity(activity));
+        return new Row(title, summary.toString(), () -> showActivity(activity), activity.selectionKey);
     }
 
     private void showActivity(PackageActivityCatalog.Activity activity) {
@@ -331,7 +477,7 @@ public final class IntentLibraryFragment extends Fragment {
         details.setLayoutManager(new LinearLayoutManager(context));
         details.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
-        ActivityRows rows = new ActivityRows();
+        ActivityRows rows = new ActivityRows(key -> false);
         details.setAdapter(rows);
         StringBuilder metadata = new StringBuilder();
         if (activity.declaration != null) {
@@ -445,6 +591,10 @@ public final class IntentLibraryFragment extends Fragment {
     }
 
     private void changeCache(Runnable action, Runnable onSuccess) {
+        changeCache(action, onSuccess, null);
+    }
+
+    private void changeCache(Runnable action, Runnable onSuccess, Runnable onFailure) {
         Context context = requireContext();
         View requestView = getView();
         IntentLibrary.UI_IO.execute(() -> {
@@ -457,6 +607,7 @@ public final class IntentLibraryFragment extends Fragment {
                 ContextCompat.getMainExecutor(context).execute(() -> {
                     if (getView() == requestView) {
                         Toast.makeText(context, R.string.library_write_error, Toast.LENGTH_LONG).show();
+                        if (onFailure != null) onFailure.run();
                     }
                 });
             }
@@ -476,17 +627,38 @@ public final class IntentLibraryFragment extends Fragment {
 
     private static String shortClass(String name) { return name.substring(name.lastIndexOf('.') + 1); }
 
+    private static void bindSelection(View row, CompoundButton box, @Nullable Set<String> selection, String key) {
+        boolean choosing = selection != null && key != null;
+        boolean checked = choosing && selection.contains(key);
+        box.setVisibility(choosing ? View.VISIBLE : View.GONE);
+        box.setChecked(checked);
+        row.setActivated(checked);
+        row.setSelected(checked);
+    }
+
     private static final class AppRows extends RecyclerView.Adapter<AppRows.Holder> {
         private final Consumer<PackageActivityCatalog.App> open;
+        private final Predicate<String> select;
         private List<PackageActivityCatalog.App> rows = Collections.emptyList();
+        private Set<String> selection;
 
-        AppRows(Consumer<PackageActivityCatalog.App> open) {
+        AppRows(Consumer<PackageActivityCatalog.App> open, Predicate<String> select) {
             this.open = open;
+            this.select = select;
         }
 
         void submit(List<PackageActivityCatalog.App> result) {
             rows = result;
             notifyDataSetChanged();
+        }
+
+        void setSelection(@Nullable Set<String> selection) {
+            this.selection = selection;
+            notifyDataSetChanged();
+        }
+
+        void selectAll(Set<String> selected) {
+            for (PackageActivityCatalog.App app : rows) selected.add(app.packageName);
         }
 
         @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
@@ -505,12 +677,15 @@ public final class IntentLibraryFragment extends Fragment {
             holder.packageName.setText(app.packageName);
             holder.version.setText(app.versionCode < 0 ? context.getString(R.string.library_unknown_version)
                     : context.getString(R.string.library_app_version, version(context, app.versionName, app.versionCode)));
+            bindSelection(holder.itemView, holder.selected, selection, app.packageName);
             holder.itemView.setOnClickListener(view -> open.accept(app));
+            holder.itemView.setOnLongClickListener(view -> select.test(app.packageName));
         }
 
         static final class Holder extends RecyclerView.ViewHolder {
             final ImageView icon;
             final TextView title, packageName, version;
+            final CompoundButton selected;
 
             Holder(View view) {
                 super(view);
@@ -518,6 +693,8 @@ public final class IntentLibraryFragment extends Fragment {
                 title = view.findViewById(R.id.library_app_title);
                 packageName = view.findViewById(R.id.library_app_package);
                 version = view.findViewById(R.id.library_app_version);
+                selected = view.findViewById(R.id.library_row_selected);
+                ViewCompat.setAccessibilityDelegate(view, ROW_SELECTION_ACCESSIBILITY);
             }
         }
     }
@@ -525,19 +702,39 @@ public final class IntentLibraryFragment extends Fragment {
     private static final class Row {
         final String title, summary;
         final Runnable click;
+        final String selectionKey;
         Row(String title, String summary, Runnable click) {
+            this(title, summary, click, null);
+        }
+        Row(String title, String summary, Runnable click, String selectionKey) {
             this.title = title;
             this.summary = summary;
             this.click = click;
+            this.selectionKey = selectionKey;
         }
     }
 
     private static final class ActivityRows extends RecyclerView.Adapter<ActivityRows.Holder> {
+        private final Predicate<String> select;
         private List<Row> rows = Collections.emptyList();
+        private Set<String> selection;
+
+        ActivityRows(Predicate<String> select) {
+            this.select = select;
+        }
 
         void submit(List<Row> next) {
             rows = next;
             notifyDataSetChanged();
+        }
+
+        void setSelection(@Nullable Set<String> selection) {
+            this.selection = selection;
+            notifyDataSetChanged();
+        }
+
+        void selectAll(Set<String> selected) {
+            for (Row row : rows) if (row.selectionKey != null) selected.add(row.selectionKey);
         }
 
         @NonNull @Override public Holder onCreateViewHolder(@NonNull ViewGroup parent, int type) {
@@ -555,16 +752,25 @@ public final class IntentLibraryFragment extends Fragment {
             holder.summary.setMaxLines(row.click == null ? Integer.MAX_VALUE : 3);
             holder.summary.setEllipsize(row.click == null ? null : TextUtils.TruncateAt.END);
             holder.summary.setTextIsSelectable(row.click == null && !row.summary.isEmpty());
-            holder.itemView.setOnClickListener(row.click == null ? null : view -> row.click.run());
+            bindSelection(holder.itemView, holder.selected, selection, row.selectionKey);
+            holder.itemView.setOnClickListener(row.click == null ? null : view -> {
+                if (selection != null && row.selectionKey != null) select.test(row.selectionKey);
+                else row.click.run();
+            });
             holder.itemView.setClickable(row.click != null);
+            holder.itemView.setOnLongClickListener(row.selectionKey == null ? null : view -> select.test(row.selectionKey));
+            holder.itemView.setLongClickable(row.selectionKey != null);
         }
 
         static final class Holder extends RecyclerView.ViewHolder {
             final TextView title, summary;
+            final CompoundButton selected;
             Holder(View view) {
                 super(view);
                 title = view.findViewById(R.id.library_row_title);
                 summary = view.findViewById(R.id.library_row_summary);
+                selected = view.findViewById(R.id.library_row_selected);
+                ViewCompat.setAccessibilityDelegate(view, ROW_SELECTION_ACCESSIBILITY);
             }
         }
     }

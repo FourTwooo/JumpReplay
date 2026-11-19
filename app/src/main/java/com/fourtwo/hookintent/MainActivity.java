@@ -101,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        supportRequestWindowFeature(android.view.Window.FEATURE_ACTION_MODE_OVERLAY);
         super.onCreate(savedInstanceState);
         com.fourtwo.hookintent.utils.RootServiceApi.warmUp(this);
 
