@@ -83,19 +83,26 @@
         app:layout_constraintTop_toBottomOf="@id/class_name" />
 
 
-    <!-- Switch Button -->
-    <com.suke.widget.SwitchButton
-        app:sb_checked_color="@color/screen_control_active"
+    <androidx.appcompat.widget.SwitchCompat
         android:id="@+id/switch_toggle"
-        android:layout_width="60dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="10dp"
-        android:layout_marginEnd="10dp"
+        android:layout_width="54dp"
+        android:layout_height="48dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:gravity="center_vertical"
+        android:paddingStart="5dp"
+        android:paddingEnd="5dp"
+        android:thumb="@drawable/settings_switch_thumb"
+        app:showText="false"
+        app:splitTrack="false"
+        app:switchMinWidth="44dp"
+        app:thumbTint="@color/settings_switch_thumb_tint"
+        app:track="@drawable/settings_switch_track"
+        app:trackTint="@color/settings_switch_track_tint"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@id/method_name"
-        app:layout_constraintBottom_toBottomOf="@id/package_name"
-        app:layout_constraintVertical_bias="0.5"
-    tools:ignore="MissingConstraints,UseSwitchCompatOrMaterialXml" />
+        app:layout_constraintBottom_toBottomOf="@id/package_name" />
 
     <ImageView
         android:id="@+id/operate"

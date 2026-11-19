@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="about_version_name">Version %1$s</string>
+    <string name="about_description">Capture, intercept and replay Android intents and URI schemes with Xposed.</string>
+    <string name="about_project_section">Project</string>
+    <string name="about_repository">GitHub repository</string>
+    <string name="about_releases">Releases</string>
+    <string name="about_demos">Demo videos</string>
+    <string name="about_feedback">Report an issue</string>
+    <string name="about_support_section">Community and license</string>
+    <string name="about_community">QQ community</string>
+    <string name="about_copy_group">Copy group number</string>
+    <string name="about_join_group">Join QQ group</string>
+    <string name="about_license">Open-source license</string>
+    <string name="about_open_link_failed">Could not open the link</string>
+</resources>

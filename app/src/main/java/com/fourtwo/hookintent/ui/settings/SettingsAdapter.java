@@ -1,11 +1,9 @@
 package com.fourtwo.hookintent.ui.settings;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.View;
@@ -15,6 +13,7 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -24,7 +23,6 @@ import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.utils.AppInfoHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
-import com.suke.widget.SwitchButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -112,6 +110,8 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
         Boolean isOpen = (Boolean) item.get("open");
         holder.switchToggle.setOnCheckedChangeListener(null);
         holder.switchToggle.setChecked(isOpen != null && isOpen);
+        holder.switchToggle.jumpDrawablesToCurrentState();
+        holder.switchToggle.setContentDescription(methodName.isEmpty() ? category : methodName);
         holder.switchToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
             item.put("open", isChecked);
             NavigationCaptureSource source = NavigationCaptureSource.forConfigurationRow(item);
@@ -176,8 +176,7 @@ public class SettingsAdapter extends RecyclerView.Adapter<SettingsAdapter.Settin
     public static class SettingsViewHolder extends RecyclerView.ViewHolder {
         ImageView icon, operate;
         TextView category, packageName, methodName, className;
-        @SuppressLint("UseSwitchCompatOrMaterialCode")
-        SwitchButton switchToggle;
+        SwitchCompat switchToggle;
 
         public SettingsViewHolder(@NonNull View itemView) {
             super(itemView);

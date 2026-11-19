@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="about_version_name">バージョン %1$s</string>
+    <string name="about_description">Xposed で Android の Intent と URI スキームを捕捉・インターセプト・再実行します。</string>
+    <string name="about_project_section">プロジェクト</string>
+    <string name="about_repository">GitHub リポジトリ</string>
+    <string name="about_releases">リリース</string>
+    <string name="about_demos">デモ動画</string>
+    <string name="about_feedback">問題を報告</string>
+    <string name="about_support_section">コミュニティとライセンス</string>
+    <string name="about_community">QQ コミュニティ</string>
+    <string name="about_copy_group">グループ番号をコピー</string>
+    <string name="about_join_group">QQ グループに参加</string>
+    <string name="about_license">オープンソースライセンス</string>
+    <string name="about_open_link_failed">リンクを開けませんでした</string>
+</resources>

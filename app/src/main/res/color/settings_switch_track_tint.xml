@@ -1,0 +1,6 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false" android:state_checked="true" android:color="@color/screen_accent" android:alpha="0.40" />
+    <item android:state_enabled="false" android:color="@color/settings_switch_track_off" android:alpha="0.40" />
+    <item android:state_checked="true" android:color="@color/screen_accent" />
+    <item android:color="@color/settings_switch_track_off" />
+</selector>

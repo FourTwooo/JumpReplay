@@ -1,123 +1,133 @@
 package com.fourtwo.hookintent.ui.me;
 
+import android.content.ActivityNotFoundException;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ProgressBar;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.DrawableRes;
+import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import androidx.core.view.ViewCompat;
 import androidx.fragment.app.Fragment;
-import androidx.lifecycle.ViewModelProvider;
 
+import com.fourtwo.hookintent.MainActivity;
+import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.databinding.FragmentMeBinding;
-import com.fourtwo.hookintent.utils.NetworkClient;
+import com.fourtwo.hookintent.databinding.RowAboutActionBinding;
+import com.fourtwo.hookintent.utils.AppDialogs;
 
-import io.noties.markwon.Markwon;
-import io.noties.markwon.ext.tables.TablePlugin;
-import io.noties.markwon.ext.tasklist.TaskListPlugin;
-import io.noties.markwon.html.HtmlPlugin;
-import io.noties.markwon.image.ImagesPlugin;
-import io.noties.markwon.image.network.OkHttpNetworkSchemeHandler;
-import io.noties.markwon.image.svg.SvgMediaDecoder;
-import okhttp3.OkHttpClient;
+import java.util.Scanner;
 
-public class MeFragment extends Fragment {
+public final class MeFragment extends Fragment {
+    private static final String QQ_JOIN_URL = "https://qm.qq.com/cgi-bin/qm/qr"
+            + "?k=6JWWosRVV0rtISqQKNVU5QY8KT0sBQP8&jump_from=webapi"
+            + "&authKey=kvD0trmJvJiWSeFVv1+WTUYBpalYGKh+dF3zgfpLDuByEmZF2wT8XXwC8QuT/tzQ";
 
-    private final String TAG = "MeFragment";
-    private FragmentMeBinding binding;
-    private MeViewModel meViewModel;
-    private Markwon markwon;
-
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        // 初始化 ViewModel
-        meViewModel = new ViewModelProvider(requireActivity()).get(MeViewModel.class);
-
-        // 初始化 OkHttpClient
-        OkHttpClient okHttpClient = new OkHttpClient.Builder()
-                .retryOnConnectionFailure(true) // 重试机制
-                .build();
-
-        // 配置 Markwon
-        markwon = Markwon.builder(requireContext())
-                .usePlugin(HtmlPlugin.create()) // 支持 HTML 内容
-                .usePlugin(TablePlugin.create(requireContext())) // 支持表格渲染
-                .usePlugin(TaskListPlugin.create(requireContext())) // 支持任务列表
-                .usePlugin(ImagesPlugin.create(plugin -> {
-                    // 添加 SVG 支持
-                    plugin.addMediaDecoder(SvgMediaDecoder.create());
-                    // 使用 OkHttp 处理网络图片
-                    plugin.addSchemeHandler(OkHttpNetworkSchemeHandler.create(okHttpClient));
-                }))
-                .build();
+    public MeFragment() {
+        super(R.layout.fragment_me);
     }
 
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater,
-                             ViewGroup container, Bundle savedInstanceState) {
-        binding = FragmentMeBinding.inflate(inflater, container, false);
-        View root = binding.getRoot();
-
-        final TextView textView = binding.textSlideshow;
-        final ProgressBar progressBar = binding.progressBar;
-        final TextView loadingText = binding.loadingText;
-
-        // 获取缓存的 Markdown 数据
-        String cachedData = meViewModel.getResponseData();
-
-        if (cachedData == null) {
-            Log.d(TAG, "请求 Github README.md");
-            progressBar.setVisibility(View.VISIBLE);
-            loadingText.setVisibility(View.VISIBLE);
-
-            // 请求 Markdown 文件
-            fetchMarkdownFile(Constants.GitHub_README_URL, textView);
+    @Override public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
+        FragmentMeBinding binding = FragmentMeBinding.bind(view);
+        String version = MainActivity.getAppVersionName(requireContext());
+        if (version.isEmpty()) {
+            binding.aboutVersion.setVisibility(View.GONE);
         } else {
-            Log.d(TAG, "使用缓存的 README.md");
-            markwon.setMarkdown(textView, cachedData); // 渲染 Markdown
+            binding.aboutVersion.setText(getString(R.string.about_version_name, version));
         }
 
-        return root;
+        String repository = getString(R.string.nav_header_subtitle);
+        addAction(binding.aboutProjectActions, R.id.about_repository, R.drawable.header_link_icon,
+                R.string.about_repository, 0, true, () -> openLink(repository));
+        addAction(binding.aboutProjectActions, R.id.about_releases, R.drawable.history,
+                R.string.about_releases, 0, true, () -> openLink(repository + "/releases"));
+        addAction(binding.aboutProjectActions, R.id.about_demos, R.drawable.action_play,
+                R.string.about_demos, 0, true,
+                () -> openLink(Uri.parse(repository).buildUpon().fragment("演示视频").build().toString()));
+        addAction(binding.aboutProjectActions, R.id.about_feedback, R.drawable.help,
+                R.string.about_feedback, 0, true, () -> openLink(Constants.GitHub_ISSUES_URL));
+
+        addAction(binding.aboutSupportActions, R.id.about_community, R.drawable.slideshow,
+                R.string.about_community, R.string.about_group_number, false, this::showCommunity);
+        addAction(binding.aboutSupportActions, R.id.about_license, R.drawable.header_link_icon,
+                R.string.about_license, R.string.about_license_value, true,
+                () -> openLink(repository + "/blob/master/LICENSE"));
+        addAction(binding.aboutSupportActions, R.id.about_agreement, R.drawable.help,
+                R.string.legal_notice_title, 0, false, this::showAgreement);
     }
 
-    private void fetchMarkdownFile(String url, TextView textView) {
-        final FragmentMeBinding expectedBinding = binding;
-        new NetworkClient().getReadMe(url, new NetworkClient.ReadMeCallback() {
-            @Override
-            public void onSuccess(String data) {
-                if (isAdded() && binding != null && binding == expectedBinding) {
-                    requireActivity().runOnUiThread(() -> {
-                        markwon.setMarkdown(textView, data); // 渲染 Markdown
-                        binding.progressBar.setVisibility(View.GONE);
-                        binding.loadingText.setVisibility(View.GONE);
-                    });
-                }
-                meViewModel.setResponseData(data); // 缓存数据到 ViewModel
-            }
-
-            @Override
-            public void onFailure(String errorMessage) {
-                if (isAdded() && binding != null && binding == expectedBinding) {
-                    requireActivity().runOnUiThread(() -> {
-                        textView.setTextColor(getResources().getColor(android.R.color.holo_red_dark, null));
-                        textView.setText(errorMessage);
-                        binding.progressBar.setVisibility(View.GONE);
-                        binding.loadingText.setVisibility(View.GONE);
-                    });
-                }
-            }
-        });
+    private void addAction(LinearLayout section, @IdRes int id, @DrawableRes int icon,
+            @StringRes int title, @StringRes int detail, boolean external, Runnable onClick) {
+        RowAboutActionBinding row = RowAboutActionBinding.inflate(LayoutInflater.from(section.getContext()),
+                section, false);
+        row.getRoot().setId(id);
+        row.icon.setImageResource(icon);
+        row.title.setText(title);
+        if (detail != 0) {
+            row.detail.setText(detail);
+            row.detail.setVisibility(View.VISIBLE);
+        }
+        row.indicator.setImageResource(external ? R.drawable.header_link_arrow : R.drawable.about_chevron);
+        ViewCompat.setScreenReaderFocusable(row.getRoot(), true);
+        row.getRoot().setOnClickListener(view -> onClick.run());
+        section.addView(row.getRoot());
     }
 
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        binding = null;
+    private void showCommunity() {
+        String number = getString(R.string.about_group_number);
+        AppDialogs.builder(requireContext()).setTitle(R.string.about_community)
+                .setMessage(number)
+                .setNeutralButton(R.string.about_copy_group, (dialog, which) -> copyGroupNumber(number))
+                .setPositiveButton(R.string.about_join_group, (dialog, which) -> openLink(QQ_JOIN_URL))
+                .show();
+    }
+
+    private void copyGroupNumber(String number) {
+        Context context = requireContext();
+        ClipboardManager clipboard = context.getSystemService(ClipboardManager.class);
+        if (clipboard == null) return;
+        clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.about_community), number));
+        Toast.makeText(context, R.string.detail_copied, Toast.LENGTH_SHORT).show();
+    }
+
+    private void showAgreement() {
+        String agreement;
+        try (Scanner input = new Scanner(getResources().openRawResource(R.raw.legal_notice), "UTF-8")) {
+            input.useDelimiter("\\A");
+            agreement = input.hasNext() ? input.next() : "";
+        }
+        Context context = AppDialogs.context(requireContext());
+        TextView text = new TextView(context);
+        text.setTextAppearance(R.style.TextAppearance_HookIntent_DialogBody);
+        text.setTextIsSelectable(true);
+        text.setText(agreement);
+        int padding = AppDialogs.dp(context, 20);
+        text.setPadding(padding, padding, padding, padding);
+        ScrollView scroll = new ScrollView(context);
+        scroll.addView(text);
+        AppDialogs.builder(requireContext()).setTitle(R.string.legal_notice_title).setView(scroll)
+                .setPositiveButton(R.string.ok, null).show();
+    }
+
+    private void openLink(String uri) {
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(uri)));
+        } catch (ActivityNotFoundException | SecurityException unavailable) {
+            Toast.makeText(requireContext(), R.string.about_open_link_failed, Toast.LENGTH_SHORT).show();
+        }
     }
 }

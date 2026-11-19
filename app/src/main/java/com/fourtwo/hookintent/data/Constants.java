@@ -47,7 +47,6 @@ public final class Constants {
     public static final String SQL_HASH = "_hash";
     public static final String SQL_DATA = "data";
 
-    public static final String GitHub_README_URL = "https://raw.githubusercontent.com/FourTwooo/JumpReplay/refs/heads/master/README.md";
     public static final String GitHub_VERSION_URL = "https://api.github.com/repos/FourTwooo/JumpReplay/tags";
     public static final String GitHub_RELEASES_URL = "https://api.github.com/repos/FourTwooo/JumpReplay/releases";
     public static final String GitHub_ISSUES_URL = "https://github.com/FourTwooo/JumpReplay/issues";

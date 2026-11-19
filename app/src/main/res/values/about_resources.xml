@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="about_version_name">版本 %1$s</string>
+    <string name="about_description">基于 Xposed 的 Android 跳转工具。\n捕获、拦截和重放 Intent 与 Scheme。</string>
+    <string name="about_project_section">项目</string>
+    <string name="about_repository">GitHub 项目主页</string>
+    <string name="about_releases">版本发布</string>
+    <string name="about_demos">演示视频</string>
+    <string name="about_feedback">问题反馈</string>
+    <string name="about_support_section">社区与许可</string>
+    <string name="about_community">QQ 交流群</string>
+    <string name="about_group_number" translatable="false">1021904342</string>
+    <string name="about_copy_group">复制群号</string>
+    <string name="about_join_group">加入 QQ 群</string>
+    <string name="about_license">开源许可</string>
+    <string name="about_license_value" translatable="false">GPL-3.0</string>
+    <string name="about_open_link_failed">无法打开链接</string>
+
+    <item name="about_repository" type="id" />
+    <item name="about_releases" type="id" />
+    <item name="about_demos" type="id" />
+    <item name="about_feedback" type="id" />
+    <item name="about_community" type="id" />
+    <item name="about_license" type="id" />
+    <item name="about_agreement" type="id" />
+
+    <style name="Widget.HookIntent.AboutCard" parent="Widget.MaterialComponents.CardView">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="cardBackgroundColor">@color/screen_surface</item>
+        <item name="cardCornerRadius">18dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/screen_border</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <style name="Widget.HookIntent.AboutSection" parent="TextAppearance.MaterialComponents.Body2">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">22dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:textColor">@color/screen_secondary</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:accessibilityHeading">true</item>
+    </style>
+</resources>

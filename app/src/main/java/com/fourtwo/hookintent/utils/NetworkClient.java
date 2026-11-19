@@ -40,11 +40,6 @@ public class NetworkClient {
         client.dispatcher().cancelAll();
     }
 
-    public interface ReadMeCallback {
-        void onSuccess(String data);
-        void onFailure(String errorMessage);
-    }
-
     public interface VersionCallback {
         void onVersionReceived(String version);
         void onFailure(String errorMessage);
@@ -78,32 +73,6 @@ public class NetworkClient {
                 .url(url)
                 .header("User-Agent", "JumpReplay")
                 .build();
-    }
-
-    public void getReadMe(String url, ReadMeCallback callback) {
-        Request request = buildJsonRequest(url);
-
-        client.newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(@NonNull Call call, @NonNull IOException e) {
-                mainHandler.post(() -> callback.onFailure("请求失败：" + e.getMessage()));
-            }
-
-            @Override
-            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
-                try (Response responseResource = response) {
-                if (response.isSuccessful() && response.body() != null) {
-                    String responseData = response.body().string();
-                    mainHandler.post(() -> callback.onSuccess(responseData));
-                } else {
-                    mainHandler.post(() -> callback.onFailure("请求失败，响应不成功"));
-                }
-
-                } catch (Exception error) {
-                    mainHandler.post(() -> callback.onFailure("请求处理失败：" + error.getMessage()));
-                }
-            }
-        });
     }
 
     public void getVersion(String url, VersionCallback callback) {
