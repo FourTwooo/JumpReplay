@@ -206,7 +206,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
     }
 
     private void captureNavigation(Activity activity, String destination,
-            NavigationCaptureSource source, Bundle arguments, Bundle descriptor) {
+            NavigationCaptureSource source, Bundle arguments, Bundle descriptor, Bundle diagnostics) {
         if (!shouldCaptureNavigation(source)) return;
         Bundle record = new Bundle();
         record.putString("category", source.category());
@@ -215,6 +215,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
         record.putString("from", activity.getClass().getName());
         record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
         if (descriptor == null) {
+            if (diagnostics != null) record.putBundle(Constants.NAVIGATION_REPLAY_DIAGNOSTICS, diagnostics);
             filterCustomize(record);
             return;
         }
@@ -230,6 +231,11 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 }
             } catch (Exception unavailable) {
                 XposedBridge.log("JumpReplay navigation descriptor: " + unavailable.getClass().getSimpleName());
+            }
+            if (!record.containsKey(Constants.NAVIGATION_REPLAY)) {
+                Bundle failure = new Bundle();
+                failure.putString("storage", "proof_unavailable");
+                record.putBundle(Constants.NAVIGATION_REPLAY_DIAGNOSTICS, failure);
             }
             filterCustomize(record);
         });

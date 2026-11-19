@@ -33,7 +33,7 @@ import de.robv.android.xposed.XposedBridge;
 public final class InAppNavigationCapture implements Application.ActivityLifecycleCallbacks {
     public interface Sink {
         void capture(Activity activity, String destination, NavigationCaptureSource source, Bundle arguments,
-                Bundle replayDescriptor);
+                Bundle replayDescriptor, Bundle replayDiagnostics);
     }
 
     private static final String NAV_CONTROLLER = "androidx.navigation.NavController";
@@ -235,7 +235,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 inspectManager(platform, frame);
                 states.keySet().retainAll(frame.seen.keySet());
                 initialized = capturing;
-                if (frame.complete) {
+                if (frame.incompleteReason == null) {
                     fragmentReplay.observe(activity, frame.visible);
                     transactionReplay.observe(activity, frame.visibleInstances);
                 } else {
@@ -243,14 +243,21 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 }
                 for (FragmentChange change : frame.changes) {
                     Bundle descriptor = null;
-                    if (frame.complete) {
+                    Bundle diagnostics = new Bundle();
+                    if (frame.incompleteReason != null) {
+                        diagnostics.putString("observation", frame.incompleteReason);
+                    } else {
                         descriptor = transactionReplay.capture(activity, change.fragment);
                         if (descriptor == null) {
+                            diagnostics.putString("transaction", transactionReplay.captureFailure(activity, change.fragment));
                             descriptor = fragmentReplay.capture(activity, change.destination, change.arguments);
+                            if (descriptor == null) {
+                                diagnostics.putString("host", fragmentReplay.captureFailure(activity, change.destination));
+                            }
                         }
                     }
                     emit(activity, change.destination, NavigationCaptureSource.FRAGMENT, change.arguments,
-                            descriptor);
+                            descriptor, descriptor == null ? diagnostics : null);
                 }
                 scheduleSample(frame.nextSample);
                 if (!capturing && !waitingForFragmentReplay(activity)) stop();
@@ -271,13 +278,15 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
             List<?> fragments = (List<?>) access.fragments.invoke(manager);
             if (fragments == null) return;
             if (depth == 8) {
-                if (!fragments.isEmpty()) frame.complete = false;
+                if (!fragments.isEmpty() && frame.incompleteReason == null) {
+                    frame.incompleteReason = "observation_depth_limit";
+                }
                 return;
             }
             for (Object fragment : fragments) {
                 if (fragment == null) continue;
                 if (frame.seen.size() >= MAX_FRAGMENTS) {
-                    frame.complete = false;
+                    if (frame.incompleteReason == null) frame.incompleteReason = "observation_count_limit";
                     return;
                 }
                 frame.seen.put(fragment, Boolean.TRUE);
@@ -372,7 +381,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         final List<FragmentChange> changes = new ArrayList<>();
         final long now;
         final boolean baseline;
-        boolean complete = true;
+        String incompleteReason;
         long nextSample = Long.MAX_VALUE;
 
         Frame(long now, boolean baseline) {
@@ -516,7 +525,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 String destinationLabel = route;
                 jetpackReplay.observe(controller, destination, value,
                         descriptor -> emit(activity, destinationLabel, NavigationCaptureSource.NAV_CONTROLLER,
-                                args, descriptor));
+                                args, descriptor, null));
             } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
                 report(error);
             }
@@ -564,9 +573,11 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 if (++visited > 64 || result.size() == 24) break;
                 if (key == null || key.length() > 128) continue;
                 Object value = source.get(key);
-                if ((value instanceof String && ((String) value).length() <= 512)
+                if (value == null || (value instanceof String && ((String) value).length() <= 512)
                         || value instanceof Integer || value instanceof Long || value instanceof Boolean
-                        || value instanceof Float || value instanceof Double) {
+                        || value instanceof Short || value instanceof Byte
+                        || (value instanceof Float && Float.isFinite((Float) value))
+                        || (value instanceof Double && Double.isFinite((Double) value))) {
                     result.put(key, value);
                 }
             }
@@ -577,14 +588,14 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     }
 
     private void emit(Activity activity, String destination, NavigationCaptureSource source,
-            Map<String, Object> args, Bundle replayDescriptor) {
+            Map<String, Object> args, Bundle replayDescriptor, Bundle replayDiagnostics) {
         if (!enabled.test(source)) return;
         Bundle bundle = new Bundle();
         for (Map.Entry<String, Object> entry : args.entrySet()) {
             bundle.putSerializable(entry.getKey(), (java.io.Serializable) entry.getValue());
         }
         try {
-            sink.capture(activity, destination, source, bundle, replayDescriptor);
+            sink.capture(activity, destination, source, bundle, replayDescriptor, replayDiagnostics);
         } catch (RuntimeException | LinkageError error) {
             report(error);
         }

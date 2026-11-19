@@ -30,6 +30,7 @@ public final class Constants {
     public static final String NAVIGATION_CATEGORY = "Navigation";
     public static final String NAVIGATION_ARGUMENTS = "navigation_arguments";
     public static final String NAVIGATION_REPLAY = "navigation_replay";
+    public static final String NAVIGATION_REPLAY_DIAGNOSTICS = "navigation_replay_diagnostics";
 
     public static final String INTERNAL_HOOKS_CONFIG = "internalHooksConfig";
     public static final String EXTERNAL_HOOKS_CONFIG = "externalHooksConfig";

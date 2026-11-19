@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -30,7 +31,7 @@ import java.util.function.Supplier;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 
-/** Reconstructs a directly observed, single-operation FragmentManager transaction. */
+/** Reconstructs a directly observed FragmentManager transaction and its destination. */
 final class FragmentTransactionReplay {
     private static final String MECHANISM = "mechanism";
     private static final String TRANSACTION = "fragment_transaction";
@@ -42,6 +43,16 @@ final class FragmentTransactionReplay {
     private static final String[] ANIMATIONS = {"enter", "exit", "popEnter", "popExit"};
     private static final int ADD = 1;
     private static final int REPLACE = 2;
+    private static final int REMOVE = 3;
+    private static final int HIDE = 4;
+    private static final int SHOW = 5;
+    private static final int ATTACH = 7;
+    private static final int SET_PRIMARY = 8;
+    private static final int MAX_OPERATIONS = 16;
+    private static final String OPERATIONS = "operations";
+    private static final String PRIMARY_SOURCE = "primary_source";
+    private static final String EXISTING_DESTINATION = "transaction_existing_destination";
+    private static final String INSPECTION_FAILED = "transaction_inspection_failed";
     private static final int MAX_DEPTH = 8;
     private static final int MAX_ARGUMENTS = 64;
     private static final int MAX_FIELD = 8192;
@@ -55,9 +66,13 @@ final class FragmentTransactionReplay {
     private final Consumer<Activity> resample;
     private final Map<Class<?>, Api> installed = new HashMap<>();
     private final Set<ClassLoader> scanned = new HashSet<>();
+    private final Set<Class<?>> hooked = new HashSet<>();
     private final Map<Object, Recorded> records = new WeakHashMap<>();
     private final Runnable poll = this::tick;
     private Request request;
+    private WeakReference<Activity> lastActivity = new WeakReference<>(null);
+    private WeakReference<Object> lastFragment = new WeakReference<>(null);
+    private String lastFailure;
 
     FragmentTransactionReplay(Handler main, Predicate<Activity> capturing,
             Supplier<? extends Collection<Activity>> resumed, Consumer<Activity> resample) {
@@ -84,89 +99,205 @@ final class FragmentTransactionReplay {
                                 || resumed.get().stream().noneMatch(capturing)) return;
                         try {
                             param.setObjectExtra(TRANSACTION, snapshot(api, param.thisObject, commit));
-                        } catch (ReflectiveOperationException | JSONException | RuntimeException | LinkageError ignored) {
-                            // Visibility capture remains available for transactions we cannot reconstruct.
+                        } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+                            // The original operations themselves could not be read.
                         }
                     }
 
                     @Override protected void afterHookedMethod(MethodHookParam param) {
                         Recording recording = (Recording) param.getObjectExtra(TRANSACTION);
-                        if (recording == null || param.hasThrowable()) return;
-                        Recorded prior = records.get(recording.fragment);
-                        records.put(recording.fragment,
-                                new Recorded(api, recording.activity, prior == null ? recording.descriptor : null));
+                        if (recording == null) return;
+                        recordCompletion(api, recording, param.hasThrowable());
                     }
                 });
             }
+            hooked.add(api.record);
         } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
             // The target may omit this Fragment library or ship a different internal layout.
         }
     }
 
-    private Recording snapshot(Api api, Object transaction, String commit)
-            throws ReflectiveOperationException, JSONException {
-        Object manager = api.recordManager.get(transaction);
+    private void recordCompletion(Api api, Recording recording, boolean failed) {
+        for (Object fragment : recording.observedDestinations) {
+            Recorded prior = records.get(fragment);
+            boolean duplicate = prior != null && SystemClock.uptimeMillis() - prior.start <= CAPTURE_MS;
+            String cause = recording.failure;
+            if (failed) cause = "transaction_commit_failed";
+            else if (duplicate) cause = "transaction_duplicate";
+            else if (cause == null && fragment != recording.fragment) cause = EXISTING_DESTINATION;
+            records.put(fragment, new Recorded(api, recording.activity,
+                    cause == null ? recording.descriptor : null, cause));
+        }
+    }
+
+    private Recording snapshot(Api api, Object transaction, String commit) throws ReflectiveOperationException {
         List<?> ops = (List<?>) api.operations.get(transaction);
-        if (manager == null || ops == null || ops.size() != 1 || api.hasCustomState(transaction)) return null;
-        Object op = ops.get(0);
-        int command = api.command.getInt(op);
-        if (command != ADD && command != REPLACE) return null;
-        Object fragment = api.destination.get(op);
-        if (!api.fragment.isInstance(fragment) || Boolean.TRUE.equals(api.isAdded.invoke(fragment))) return null;
+        if (ops == null || ops.isEmpty()) return null;
+        Recording recording = new Recording();
+        Object destinationOp = null;
+        int creations = 0;
+        for (Object op : ops) {
+            int command = api.command.getInt(op);
+            Object fragment = api.destination.get(op);
+            if (!api.fragment.isInstance(fragment)) continue;
+            if (command == ADD || command == REPLACE) {
+                creations++;
+                destinationOp = op;
+            }
+            if (command == ADD || command == REPLACE || command == SHOW || command == ATTACH) {
+                recording.observedDestinations.add(fragment);
+            }
+        }
+        if (recording.observedDestinations.isEmpty()) return null;
+        if (creations == 0) return recording.failed(EXISTING_DESTINATION);
+        if (creations != 1) return recording.failed("transaction_multiple_destinations");
+        if (ops.size() > MAX_OPERATIONS) return recording.failed("transaction_unsupported_operation");
+        try {
+            describe(api, transaction, commit, ops, destinationOp, recording);
+            return recording;
+        } catch (ReflectiveOperationException | JSONException | RuntimeException | LinkageError error) {
+            return recording.failed(INSPECTION_FAILED);
+        }
+    }
+
+    private void describe(Api api, Object transaction, String commit, List<?> ops, Object destinationOp,
+            Recording recording) throws ReflectiveOperationException, JSONException {
+        Object manager = api.recordManager.get(transaction);
+        if (manager == null) {
+            recording.failed("transaction_source_unresolved");
+            return;
+        }
+        if (api.hasCustomState(transaction)) {
+            recording.failed("transaction_custom_state");
+            return;
+        }
+        Object fragment = api.destination.get(destinationOp);
+        if (Boolean.TRUE.equals(api.isAdded.invoke(fragment))) {
+            recording.failed(EXISTING_DESTINATION);
+            return;
+        }
         int container = api.container.getInt(fragment);
-        if (container <= 0) return null;
+        if (container <= 0) {
+            recording.failed("transaction_container_unavailable");
+            return;
+        }
 
         ArrayList<String> parents = new ArrayList<>();
         Object root = manager;
-        Object parent = api.parent.get(root);
-        while (parent != null) {
-            if (parents.size() == MAX_DEPTH || !isAttached(api.view.invoke(parent))) return null;
+        for (Object parent = api.parent.get(root); parent != null; parent = api.parent.get(root)) {
+            if (parents.size() == MAX_DEPTH || !isAttached(api.view.invoke(parent))) {
+                recording.failed("transaction_source_unresolved");
+                return;
+            }
             parents.add(api.identity(parent));
             root = api.fragmentManager.invoke(parent);
-            if (root == null) return null;
-            parent = api.parent.get(root);
-        }
-        Collections.reverse(parents);
-        Activity owner = null;
-        for (Activity activity : new ArrayList<>(resumed.get())) {
-            if (api.rootFor(activity) == root && active(activity) && capturing.test(activity)) {
-                if (owner != null) return null;
-                owner = activity;
+            if (root == null) {
+                recording.failed("transaction_source_unresolved");
+                return;
             }
         }
-        if (owner == null || !isAttached(api.containerView(owner, manager, container))) return null;
-        JSONArray path = new JSONArray(parents);
+        Collections.reverse(parents);
+        for (Activity activity : resumed.get()) {
+            if (api.rootFor(activity) != root || !active(activity) || !capturing.test(activity)) continue;
+            if (recording.activity != null) {
+                recording.failed("transaction_source_unresolved");
+                return;
+            }
+            recording.activity = activity;
+        }
+        Activity owner = recording.activity;
+        if (owner == null) {
+            recording.failed("transaction_source_unresolved");
+            return;
+        }
+        if (!isAttached(api.containerView(owner, manager, container))) {
+            recording.failed("transaction_container_unavailable");
+            return;
+        }
+        String path = new JSONArray(parents).toString();
         String source = api.slot(manager, container);
-        if (!field(source) || !field(path.toString())) return null;
+        if (!field(source) || !field(path)) {
+            recording.failed("transaction_source_unresolved");
+            return;
+        }
 
         Bundle original = (Bundle) api.getArguments.invoke(fragment);
         Bundle arguments = original == null ? new Bundle() : new Bundle(original);
-        Bundle types = schema(arguments);
-        if (types == null) return null;
+        Bundle types = new Bundle();
+        String reason = describeArgumentTypes(arguments, types);
+        if (reason != null) {
+            recording.failed(reason);
+            return;
+        }
 
         Bundle descriptor = new Bundle();
+        JSONArray operations = new JSONArray();
+        boolean destinationAdded = false;
+        for (Object op : ops) {
+            int command = api.command.getInt(op);
+            Object target = api.destination.get(op);
+            if (op == destinationOp) {
+                destinationAdded = true;
+                operations.put(describeOperation(api, op, command, null, false));
+                continue;
+            }
+            if (command == SET_PRIMARY && api.setPrimary != null && api.primary != null) {
+                Object currentPrimary = api.primary.invoke(manager);
+                descriptor.putString(PRIMARY_SOURCE, currentPrimary == null ? "" : api.identity(currentPrimary));
+                if (target == null || (target == fragment && destinationAdded)) {
+                    operations.put(describeOperation(api, op, command, target == null ? "" : null, false));
+                    continue;
+                }
+            } else if (command != HIDE && command != REMOVE && command != SHOW) {
+                recording.failed("transaction_unsupported_operation");
+                return;
+            }
+            if (!api.fragment.isInstance(target) || target == fragment) {
+                recording.failed("transaction_unsupported_operation");
+                return;
+            }
+            String identity = api.identity(target);
+            boolean hidden = Boolean.TRUE.equals(api.hidden.invoke(target));
+            if (api.existingFragment(manager, identity, hidden) != target) {
+                recording.failed("transaction_source_unresolved");
+                return;
+            }
+            operations.put(describeOperation(api, op, command, identity, hidden));
+        }
+        String operationList = operations.toString();
+        if (!field(operationList)) {
+            recording.failed("transaction_unsupported_operation");
+            return;
+        }
+
         descriptor.putString(MECHANISM, TRANSACTION);
         descriptor.putString("family", api.family);
         descriptor.putString("host", owner.getClass().getName());
         descriptor.putString("destination", fragment.getClass().getName());
-        descriptor.putString("parents", path.toString());
+        descriptor.putString("parents", path);
         descriptor.putString("source", source);
         descriptor.putString("method", commit);
         descriptor.putInt("container", container);
         descriptor.putString("tag", (String) api.tag.invoke(fragment));
-        descriptor.putInt("operation", command);
+        descriptor.putInt("operation", api.command.getInt(destinationOp));
+        descriptor.putString(OPERATIONS, operationList);
         descriptor.putBoolean("back_stack", api.addToBackStack.getBoolean(transaction));
         descriptor.putString("back_stack_name", (String) api.name.get(transaction));
         descriptor.putInt("transition", api.transition.getInt(transaction));
         descriptor.putInt("style", api.transitionStyle == null ? 0 : api.transitionStyle.getInt(transaction));
         descriptor.putBoolean("reorder", api.reordering != null && api.reordering.getBoolean(transaction));
         descriptor.putBoolean("null_args", original == null);
-        for (int i = 0; i < ANIMATIONS.length; i++) {
-            descriptor.putInt(ANIMATIONS[i], api.animation[i].getInt(op));
-        }
         descriptor.putBundle(ARGUMENTS, arguments);
         descriptor.putBundle(ARGUMENT_TYPES, types);
-        return new Recording(owner, fragment, descriptor);
+        recording.fragment = fragment;
+        recording.descriptor = descriptor;
+    }
+
+    private static JSONArray describeOperation(Api api, Object op, int command, String identity, boolean hidden)
+            throws IllegalAccessException {
+        JSONArray fields = new JSONArray().put(command).put(identity).put(hidden);
+        for (Field animation : api.animation) fields.put(animation.getInt(op));
+        return fields;
     }
 
     void forget(Activity activity) {
@@ -174,16 +305,38 @@ final class FragmentTransactionReplay {
     }
 
     Bundle capture(Activity activity, Object fragment) {
+        lastActivity = new WeakReference<>(activity);
+        lastFragment = new WeakReference<>(fragment);
         Recorded record = records.remove(fragment);
-        if (record == null || record.activity.get() != activity || record.descriptor == null
-                || SystemClock.uptimeMillis() - record.start > CAPTURE_MS) return null;
-        try {
-            Bundle actual = (Bundle) record.api.getArguments.invoke(fragment);
-            // The collector's display snapshot deliberately omits some supported primitive values.
-            return contains(actual, record.descriptor.getBundle(ARGUMENTS)) ? record.descriptor : null;
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+        if (record == null) {
+            boolean available = installed.values().stream()
+                    .anyMatch(api -> api.fragment.isInstance(fragment) && hooked.contains(api.record));
+            lastFailure = available ? "transaction_not_seen" : "transaction_hook_unavailable";
             return null;
         }
+        Activity recordedOwner = record.activity.get();
+        if ((recordedOwner != null || record.descriptor != null) && recordedOwner != activity) {
+            lastFailure = "transaction_source_unresolved";
+            return null;
+        }
+        if (SystemClock.uptimeMillis() - record.start > CAPTURE_MS) {
+            lastFailure = "transaction_expired";
+            return null;
+        }
+        lastFailure = record.failure;
+        if (lastFailure != null) return null;
+        try {
+            Bundle actual = (Bundle) record.api.getArguments.invoke(fragment);
+            if (contains(actual, record.descriptor.getBundle(ARGUMENTS))) return record.descriptor;
+            lastFailure = "transaction_arguments_changed";
+        } catch (ReflectiveOperationException | RuntimeException | LinkageError ignored) {
+            lastFailure = INSPECTION_FAILED;
+        }
+        return null;
+    }
+
+    String captureFailure(Activity activity, Object fragment) {
+        return lastActivity.get() == activity && lastFragment.get() == fragment ? lastFailure : null;
     }
 
     static boolean handles(Bundle descriptor) {
@@ -246,6 +399,7 @@ final class FragmentTransactionReplay {
         Activity target = null;
         Api api = null;
         Object manager = null;
+        List<Object> targets = null;
         for (Activity activity : new ArrayList<>(resumed.get())) {
             if (!waitingFor(activity) || !active(activity)) continue;
             install(activity.getClass().getClassLoader());
@@ -255,10 +409,13 @@ final class FragmentTransactionReplay {
                 if (found == null || Boolean.TRUE.equals(candidate.stateSaved.invoke(found))
                         || !isAttached(candidate.containerView(activity, found, pending.container))
                         || !pending.source.equals(candidate.slot(found, pending.container))) continue;
+                List<Object> foundTargets = candidate.replayTargets(found, pending.plan, pending.primarySource);
+                if (foundTargets == null) continue;
                 if (target != null) throw new IllegalStateException("有多个匹配的 Fragment 宿主");
                 target = activity;
                 api = candidate;
                 manager = found;
+                targets = foundTargets;
             }
         }
         if (target == null) return;
@@ -267,13 +424,36 @@ final class FragmentTransactionReplay {
         if (!pending.descriptor.getBoolean("null_args")) api.setArguments.invoke(destination, pending.arguments);
         Object transaction = api.begin.invoke(manager);
         Bundle descriptor = pending.descriptor;
-        api.animations.invoke(transaction, descriptor.getInt("enter"), descriptor.getInt("exit"),
-                descriptor.getInt("popEnter"), descriptor.getInt("popExit"));
         api.setTransition.invoke(transaction, descriptor.getInt("transition"));
         if (api.setTransitionStyle != null) api.setTransitionStyle.invoke(transaction, descriptor.getInt("style"));
         if (api.setReordering != null) api.setReordering.invoke(transaction, descriptor.getBoolean("reorder"));
-        Method operation = pending.operation == ADD ? api.add : api.replace;
-        operation.invoke(transaction, pending.container, destination, descriptor.getString("tag"));
+        for (int i = 0; i < pending.plan.size(); i++) {
+            Operation op = pending.plan.get(i);
+            Object fragment = op.target == null ? destination : targets.get(i);
+            int[] animations = op.animations;
+            api.animations.invoke(transaction, animations[0], animations[1], animations[2], animations[3]);
+            switch (op.command) {
+                case ADD:
+                case REPLACE:
+                    Method create = op.command == ADD ? api.add : api.replace;
+                    create.invoke(transaction, pending.container, fragment, descriptor.getString("tag"));
+                    break;
+                case REMOVE:
+                    api.remove.invoke(transaction, fragment);
+                    break;
+                case HIDE:
+                    api.hide.invoke(transaction, fragment);
+                    break;
+                case SHOW:
+                    api.show.invoke(transaction, fragment);
+                    break;
+                case SET_PRIMARY:
+                    api.setPrimary.invoke(transaction, fragment);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unknown Fragment operation");
+            }
+        }
         if (descriptor.getBoolean("back_stack")) {
             api.addBackStack.invoke(transaction, descriptor.getString("back_stack_name"));
         }
@@ -315,22 +495,24 @@ final class FragmentTransactionReplay {
         return true;
     }
 
-    private static Bundle schema(Bundle arguments) {
-        if (arguments.size() > MAX_ARGUMENTS) return null;
-        Bundle result = new Bundle();
+    private static String describeArgumentTypes(Bundle arguments, Bundle types) {
+        if (arguments.size() > MAX_ARGUMENTS) return "transaction_argument_limit";
         for (String key : arguments.keySet()) {
-            if (!field(key) || key.length() > 256) return null;
+            if (key == null || key.isEmpty()) return "transaction_unsupported_arguments";
+            if (key.length() > 256) return "transaction_argument_limit";
             Object value = arguments.get(key);
-            if (value == null) result.putString(key, "null");
-            else if (value instanceof Boolean || value instanceof Integer || value instanceof Long
+            if (value == null) types.putString(key, "null");
+            else if (value instanceof String) {
+                if (((String) value).length() > MAX_FIELD) return "transaction_argument_limit";
+                types.putString(key, "String");
+            } else if (value instanceof Boolean || value instanceof Integer || value instanceof Long
                     || value instanceof Byte || value instanceof Short
-                    || (value instanceof String && ((String) value).length() <= MAX_FIELD)
                     || (value instanceof Float && Float.isFinite((Float) value))
                     || (value instanceof Double && Double.isFinite((Double) value))) {
-                result.putString(key, value.getClass().getSimpleName());
-            } else return null;
+                types.putString(key, value.getClass().getSimpleName());
+            } else return "transaction_unsupported_arguments";
         }
-        return result;
+        return null;
     }
 
     private static Bundle typed(Bundle edited, Bundle schema) {
@@ -359,7 +541,9 @@ final class FragmentTransactionReplay {
                 }
             } else throw new IllegalArgumentException("Invalid edited argument type");
         }
-        if (schema(arguments) == null) throw new IllegalArgumentException("Invalid edited argument values");
+        if (describeArgumentTypes(arguments, new Bundle()) != null) {
+            throw new IllegalArgumentException("Invalid edited argument values");
+        }
         return arguments;
     }
 
@@ -387,8 +571,8 @@ final class FragmentTransactionReplay {
         return method;
     }
 
-    private static Method optional(Class<?> type, String name, Class<?> parameter) {
-        try { return type.getMethod(name, parameter); }
+    private static Method optional(Class<?> type, String name, Class<?>... parameters) {
+        try { return type.getMethod(name, parameters); }
         catch (NoSuchMethodException ignored) { return null; }
     }
 
@@ -412,8 +596,14 @@ final class FragmentTransactionReplay {
         final Method tag;
         final Method view;
         final Method isAdded;
+        final Method hidden;
         final Method add;
         final Method replace;
+        final Method remove;
+        final Method hide;
+        final Method show;
+        final Method primary;
+        final Method setPrimary;
         final Method animations;
         final Method setTransition;
         final Method setTransitionStyle;
@@ -479,10 +669,16 @@ final class FragmentTransactionReplay {
             id = fragment.getMethod("getId");
             tag = fragment.getMethod("getTag");
             isAdded = fragment.getMethod("isAdded");
+            hidden = fragment.getMethod("isHidden");
             getArguments = fragment.getMethod("getArguments");
             setArguments = fragment.getMethod("setArguments", Bundle.class);
             add = transaction.getMethod("add", int.class, fragment, String.class);
             replace = transaction.getMethod("replace", int.class, fragment, String.class);
+            remove = transaction.getMethod("remove", fragment);
+            hide = transaction.getMethod("hide", fragment);
+            show = transaction.getMethod("show", fragment);
+            primary = optional(manager, "getPrimaryNavigationFragment");
+            setPrimary = optional(transaction, "setPrimaryNavigationFragment", fragment);
             animations = transaction.getMethod("setCustomAnimations", int.class, int.class, int.class, int.class);
             setTransition = transaction.getMethod("setTransition", int.class);
             setTransitionStyle = optional(transaction, "setTransitionStyle", int.class);
@@ -507,6 +703,36 @@ final class FragmentTransactionReplay {
         String identity(Object candidate) throws ReflectiveOperationException {
             return new JSONArray().put(candidate.getClass().getName()).put(id.invoke(candidate))
                     .put(tag.invoke(candidate)).toString();
+        }
+
+        Object existingFragment(Object manager, String label, boolean wasHidden) throws ReflectiveOperationException {
+            Object matched = null;
+            for (Object fragment : (List<?>) fragments.invoke(manager)) {
+                if (fragment == null || !label.equals(identity(fragment))) continue;
+                if (matched != null) return null;
+                matched = fragment;
+            }
+            return matched != null && Boolean.TRUE.equals(isAdded.invoke(matched))
+                    && Boolean.TRUE.equals(hidden.invoke(matched)) == wasHidden ? matched : null;
+        }
+
+        List<Object> replayTargets(Object manager, List<Operation> plan, String primarySource)
+                throws ReflectiveOperationException {
+            if (primarySource != null) {
+                if (primary == null || setPrimary == null) return null;
+                Object current = primary.invoke(manager);
+                if (!primarySource.equals(current == null ? "" : identity(current))) return null;
+            }
+            List<Object> targets = new ArrayList<>(plan.size());
+            for (Operation op : plan) {
+                Object target = null;
+                if (op.target != null && !op.target.isEmpty()) {
+                    target = existingFragment(manager, op.target, op.hidden);
+                    if (target == null) return null;
+                }
+                targets.add(target);
+            }
+            return targets;
         }
 
         String slot(Object manager, int targetContainer) throws ReflectiveOperationException {
@@ -550,14 +776,15 @@ final class FragmentTransactionReplay {
     }
 
     private static final class Recording {
-        final Activity activity;
-        final Object fragment;
-        final Bundle descriptor;
+        final Set<Object> observedDestinations = Collections.newSetFromMap(new IdentityHashMap<>());
+        Activity activity;
+        Object fragment;
+        Bundle descriptor;
+        String failure;
 
-        Recording(Activity activity, Object fragment, Bundle descriptor) {
-            this.activity = activity;
-            this.fragment = fragment;
-            this.descriptor = descriptor;
+        Recording failed(String reason) {
+            failure = reason;
+            return this;
         }
     }
 
@@ -566,11 +793,65 @@ final class FragmentTransactionReplay {
         final Api api;
         final WeakReference<Activity> activity;
         final Bundle descriptor;
+        final String failure;
 
-        Recorded(Api api, Activity activity, Bundle descriptor) {
+        Recorded(Api api, Activity activity, Bundle descriptor, String failure) {
             this.api = api;
             this.activity = new WeakReference<>(activity);
             this.descriptor = descriptor;
+            this.failure = failure;
+        }
+    }
+
+    private static final class Operation {
+        final int command;
+        // null means the newly instantiated destination, and an empty value clears primary navigation.
+        final String target;
+        final boolean hidden;
+        final int[] animations;
+
+        Operation(int command, String target, boolean hidden, int[] animations) {
+            this.command = command;
+            this.target = target;
+            this.hidden = hidden;
+            this.animations = animations;
+        }
+
+        static List<Operation> plan(Bundle descriptor) throws JSONException {
+            int creation = descriptor.getInt("operation");
+            String encoded = descriptor.getString(OPERATIONS);
+            if (encoded == null) {
+                int[] animations = new int[ANIMATIONS.length];
+                for (int i = 0; i < ANIMATIONS.length; i++) animations[i] = descriptor.getInt(ANIMATIONS[i]);
+                return Collections.singletonList(new Operation(creation, null, false, animations));
+            }
+            if (!field(encoded)) throw new IllegalArgumentException("Invalid Fragment operation list");
+            JSONArray operations = new JSONArray(encoded);
+            if (operations.length() < 1 || operations.length() > MAX_OPERATIONS) {
+                throw new IllegalArgumentException("Invalid Fragment operation count");
+            }
+            List<Operation> plan = new ArrayList<>(operations.length());
+            boolean created = false;
+            for (int i = 0; i < operations.length(); i++) {
+                JSONArray fields = operations.getJSONArray(i);
+                int command = fields.getInt(0);
+                String target = fields.isNull(1) ? null : fields.getString(1);
+                if ((command == ADD || command == REPLACE) && command == creation && !created && target == null) {
+                    created = true;
+                } else if (command == SET_PRIMARY && descriptor.containsKey(PRIMARY_SOURCE)
+                        && (target != null || created)) {
+                    if (target != null && target.length() > MAX_FIELD) {
+                        throw new IllegalArgumentException("Invalid Fragment operation target");
+                    }
+                } else if ((command != REMOVE && command != HIDE && command != SHOW) || !field(target)) {
+                    throw new IllegalArgumentException("Invalid auxiliary Fragment operation");
+                }
+                int[] animations = new int[ANIMATIONS.length];
+                for (int j = 0; j < ANIMATIONS.length; j++) animations[j] = fields.getInt(j + 3);
+                plan.add(new Operation(command, target, fields.getBoolean(2), animations));
+            }
+            if (!created) throw new IllegalArgumentException("Missing Fragment destination");
+            return plan;
         }
     }
 
@@ -582,7 +863,8 @@ final class FragmentTransactionReplay {
         final JSONArray parents;
         final String source;
         final String commit;
-        final int operation;
+        final List<Operation> plan;
+        final String primarySource;
         final int container;
         final Consumer<Exception> complete;
 
@@ -598,7 +880,7 @@ final class FragmentTransactionReplay {
             family = descriptor.getString("family");
             source = descriptor.getString("source");
             commit = descriptor.getString("method");
-            operation = descriptor.getInt("operation");
+            int operation = descriptor.getInt("operation");
             container = descriptor.getInt("container");
             String path = descriptor.getString("parents");
             if (!field(host) || !field(source) || !field(path) || !field(descriptor.getString("destination"))
@@ -609,6 +891,8 @@ final class FragmentTransactionReplay {
             }
             parents = new JSONArray(path);
             if (parents.length() > MAX_DEPTH) throw new IllegalArgumentException("Fragment parent path too deep");
+            plan = Operation.plan(descriptor);
+            primarySource = descriptor.getString(PRIMARY_SOURCE);
             arguments = typed(edited, descriptor.getBundle(ARGUMENT_TYPES));
         }
     }

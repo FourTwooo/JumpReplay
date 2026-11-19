@@ -172,13 +172,12 @@ public class DetailFragment extends Fragment {
 
             dataList.add(new Pair<>("separator", ""));
             if (source != null && !bundle.containsKey(Constants.NAVIGATION_REPLAY)) {
-                dataList.add(new Pair<>(getString(R.string.navigation_replay_options),
-                        getString(R.string.navigation_replay_unavailable)));
+                NavigationReplayDiagnostics.append(requireContext(), dataList, source, bundle);
             }
 
             List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data",
                     "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS,
-                    Constants.NAVIGATION_REPLAY);
+                    Constants.NAVIGATION_REPLAY, Constants.NAVIGATION_REPLAY_DIAGNOSTICS);
             if (source != null) {
                 Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
                 if (arguments != null) {

@@ -14,11 +14,9 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Duration;
-import java.util.ArrayDeque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,18 +31,24 @@ import static org.junit.Assert.assertTrue;
 @RunWith(RobolectricTestRunner.class)
 @Config(application = Application.class, sdk = 33)
 public class FragmentHostReplayTest {
-    @Test public void replaysOriginalHostMethodWithEditedValueAndPreservedExtras() throws Exception {
+    @Test public void replaysInheritedNonVoidMethodWithMultipleTypedEdits() throws Exception {
         Fixture fixture = new Fixture();
-        Bundle recorded = fixture.record("openProduct", true, false, 6000);
+        Bundle recorded = fixture.record(false, false, 6000);
         assertTrue(FragmentHostReplay.handles(recorded));
         assertEquals("openProduct", recorded.getString("method"));
-        assertEquals(Set.of("sku"), recorded.getBundle("arguments").keySet());
+        Bundle edited = new Bundle(recorded.getBundle("arguments"));
+        assertEquals(Set.of("sku", "quantity", "motion", "region", "aisle"), edited.keySet());
 
         fixture.returnToCatalog();
         fixture.host.renderDelayMillis = 6000;
+        edited.putString("sku", "new-sku");
+        edited.putInt("quantity", 37); // The persisted JSON may decode a small Long as an Integer.
+        edited.putBoolean("motion", false);
+        edited.putString("region", "west");
+        edited.putInt("aisle", 29);
         AtomicReference<Exception> error = new AtomicReference<>();
         AtomicBoolean done = new AtomicBoolean();
-        fixture.engine.replay(recorded, arguments("new-sku"), failure -> {
+        fixture.engine.replay(recorded, edited, failure -> {
             error.set(failure);
             done.set(true);
         });
@@ -54,27 +58,77 @@ public class FragmentHostReplayTest {
 
         assertTrue(done.get());
         assertNull(error.get());
-        assertTrue(fixture.host.animate);
-        assertEquals(2, fixture.host.calls);
-        assertEquals("new-sku", fixture.host.getFragmentManager().findFragmentByTag("current")
-                .getArguments().getString("sku"));
-        assertEquals((short) 13, fixture.host.received.get("aisle"));
-        assertEquals(5L, fixture.host.received.get("revision"));
+        Bundle rendered = fixture.host.getFragmentManager().findFragmentByTag("current").getArguments();
+        assertEquals("new-sku", rendered.getString("sku"));
+        assertEquals(37L, rendered.get("quantity"));
+        assertEquals(false, rendered.getBoolean("motion"));
+        assertEquals("west", rendered.getString("region"));
+        assertEquals((short)29, fixture.host.received.get("aisle"));
+        assertTrue(fixture.host.received.containsKey("unused"));
+        assertNull(fixture.host.received.get("unused"));
     }
 
-    @Test public void rejectsAnArgumentMatchThatAlsoBelongsToAnotherObservedCall() throws Exception {
+    @Test public void recordsSpecificReasonForUnrelatedMatchingCalls() throws Exception {
         Fixture fixture = new Fixture();
-        assertNull(fixture.record("openVariant", false, true, 0));
-        assertEquals(1, fixture.host.calls);
+        assertNull(fixture.record(true, false, 0));
+        assertEquals("host_call_ambiguous",
+                fixture.engine.captureFailure(fixture.host, ProductFragment.class.getName()));
+    }
+
+    @Test public void evictedNamedAndPositionalNumbersDoNotHideStrongerTextEvidence() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.stageCounter(11L);
+        fixture.stageNamedCounter(11L);
+        for (int index = 0; index < 150; index++) {
+            fixture.stageCounter(1000L + index);
+            fixture.stageNamedCounter(1000L + index);
+        }
+        Bundle recorded = fixture.record(false, false, 0);
+        assertNotNull(recorded);
+        assertEquals("openProduct", recorded.getString("method"));
+        assertNull(fixture.engine.captureFailure(fixture.host, ProductFragment.class.getName()));
+    }
+
+    @Test public void aNoisyStringMethodDoesNotEvictAnotherMethodsObservedCall() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.trailingStringCalls = 150;
+        Bundle recorded = fixture.record(false, false, 0);
+        assertNotNull(recorded);
+        assertEquals("openProduct", recorded.getString("method"));
+    }
+
+    @Test public void repeatedIdenticalInvocationsProduceOneReplayRecipe() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.repeatedProductCalls = 150;
+        Bundle recorded = fixture.record(false, false, 0);
+        assertNotNull(recorded);
+        assertEquals("openProduct", recorded.getString("method"));
+    }
+
+    @Test public void rejectsReplayIfACompetingStringWitnessWasDiscarded() throws Exception {
+        Fixture fixture = new Fixture();
+        fixture.stageOtherProduct("original-sku");
+        for (int index = 0; index < 150; index++) fixture.stageOtherProduct("unrelated-" + index);
+        assertNull(fixture.record(false, false, 0));
+        assertEquals("host_candidate_overflow",
+                fixture.engine.captureFailure(fixture.host, ProductFragment.class.getName()));
+    }
+
+    @Test public void recordsSpecificReasonWhenOneInputCannotBePreserved() throws Exception {
+        Fixture fixture = new Fixture();
+        assertNull(fixture.record(false, true, 0));
+        assertEquals("host_arguments_unsupported",
+                fixture.engine.captureFailure(fixture.host, ProductFragment.class.getName()));
     }
 
     @Test public void rejectsWrongSourceAndUnconfirmedEditedValue() throws Exception {
         Fixture fixture = new Fixture();
-        Bundle recorded = fixture.record("openVariant", false, false, 0);
+        Bundle recorded = fixture.record(false, false, 0);
         assertNotNull(recorded);
-        fixture.publish();
+        Bundle edited = new Bundle(recorded.getBundle("arguments"));
+        edited.putString("sku", "new-sku");
         AtomicReference<Exception> failure = new AtomicReference<>();
-        fixture.engine.replay(recorded, arguments("new-sku"), failure::set);
+        fixture.engine.replay(recorded, edited, failure::set);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(7));
         assertNotNull(failure.get());
         assertEquals(1, fixture.host.calls);
@@ -82,49 +136,73 @@ public class FragmentHostReplayTest {
         fixture.returnToCatalog();
         fixture.host.ignoreEditedValue = true;
         failure.set(null);
-        fixture.engine.replay(recorded, arguments("new-sku"), failure::set);
+        fixture.engine.replay(recorded, edited, failure::set);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(9));
         assertNotNull(failure.get());
         assertEquals(2, fixture.host.calls);
     }
 
-    private static Bundle arguments(String value) {
-        Bundle result = new Bundle();
-        result.putString("sku", value);
-        return result;
+    @Test public void stillReplaysAnExistingSingleArgumentRecord() {
+        Fixture fixture = new Fixture();
+        String catalog = CatalogFragment.class.getName();
+        Bundle original = new Bundle();
+        original.putString("sku", "original-sku");
+        Bundle descriptor = new Bundle();
+        descriptor.putString("mechanism", "fragment_host");
+        descriptor.putString("host", ShopActivity.class.getName());
+        descriptor.putString("source", catalog.length() + ":" + catalog + ":1\n");
+        descriptor.putString("method", "openLegacy");
+        descriptor.putString("destination", ProductFragment.class.getName());
+        descriptor.putBundle("arguments", original);
+        descriptor.putString("fixed_bundle", "{\"aisle\":[\"Short\",\"13\"],\"region\":[\"String\",\"east\"]}");
+        Bundle edited = new Bundle();
+        edited.putString("sku", "new-sku");
+        AtomicBoolean done = new AtomicBoolean();
+        fixture.engine.replay(descriptor, edited, failure -> done.set(failure == null));
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(done.get());
+        assertEquals("new-sku", fixture.host.getFragmentManager().findFragmentByTag("current")
+                .getArguments().getString("sku"));
+        assertEquals((short)13, fixture.host.received.get("aisle"));
     }
 
     public static class CatalogFragment extends Fragment {}
     public static class ProductFragment extends Fragment {}
 
-    public static class ShopActivity extends Activity {
+    public static class ShopActivity extends ShopBaseActivity {
+        public void openLegacy(String sku, Bundle options) {
+            openProduct(11L, options, true, sku);
+        }
+    }
+
+    public static class ShopBaseActivity extends Activity {
         int calls;
-        boolean animate;
         boolean ignoreEditedValue;
         long renderDelayMillis;
         Bundle received;
 
         @Override public boolean hasWindowFocus() { return true; }
 
-        public void openProduct(String sku, Bundle options, boolean transitions) {
-            animate = transitions;
-            showProduct(sku, options);
-        }
-
-        public void openVariant(String sku, Bundle options) {
-            showProduct(sku, options);
-        }
-
-        private void showProduct(String sku, Bundle options) {
+        protected int openProduct(long quantity, Bundle options, boolean transitions, String sku) {
             calls++;
             received = options;
             ProductFragment product = new ProductFragment();
-            product.setArguments(arguments(ignoreEditedValue ? "original-sku" : sku));
+            Bundle arguments = new Bundle();
+            arguments.putLong("quantity", quantity);
+            arguments.putBoolean("motion", transitions);
+            arguments.putString("sku", ignoreEditedValue ? "original-sku" : sku);
+            arguments.putString("region", options.getString("region"));
+            product.setArguments(arguments);
             if (renderDelayMillis == 0) show(product);
             else new Handler(Looper.getMainLooper()).postDelayed(() -> show(product), renderDelayMillis);
+            return calls;
         }
 
-        private void show(Fragment fragment) {
+        protected void otherProduct(String sku) {}
+        protected void updateCounter(long value) {}
+        protected void updateNamedCounter(Bundle options) {}
+
+        void show(Fragment fragment) {
             getFragmentManager().beginTransaction().replace(android.R.id.content, fragment, "current").commitNow();
         }
     }
@@ -134,6 +212,9 @@ public class FragmentHostReplayTest {
         final FragmentHostReplay engine = new FragmentHostReplay(new Handler(Looper.getMainLooper()),
                 ignored -> true, () -> List.of(host), ignored -> publish());
 
+        int trailingStringCalls;
+        int repeatedProductCalls;
+
         Fixture() { returnToCatalog(); }
 
         void returnToCatalog() {
@@ -141,49 +222,67 @@ public class FragmentHostReplayTest {
             publish();
         }
 
-        void publish() {
+        Map<String, Object> publish() {
             Fragment visible = host.getFragmentManager().findFragmentByTag("current");
             Bundle arguments = visible.getArguments();
-            Map<String, Object> values = arguments == null ? Map.of() : Map.of("sku", arguments.getString("sku"));
+            Map<String, Object> values = new LinkedHashMap<>();
+            if (arguments != null) for (String key : arguments.keySet()) values.put(key, arguments.get(key));
             engine.observe(host, Map.of(visible.getClass().getName(), List.of(values)));
+            return values;
         }
 
-        Bundle record(String method, boolean transitions, boolean ambiguous, long renderDelay) throws Exception {
+        Bundle record(boolean ambiguous, boolean unsupported, long renderDelay) throws Exception {
             String sku = "original-sku";
             Bundle extras = new Bundle();
-            extras.putShort("aisle", (short) 13);
-            extras.putLong("revision", 5L);
+            extras.putShort("aisle", (short)13);
+            extras.putString("region", "east");
+            extras.putString("unused", null);
+            if (unsupported) extras.putIntArray("opaque", new int[] { 1, 2 });
 
-            // Feed the Xposed boundary while exercising actual Fragment commits and host method replay.
-            stage(method, sku, extras, transitions ? Boolean.TRUE : null);
-            if (ambiguous) stage("openProduct", sku, extras, true);
+            // Robolectric exercises real Android Fragment commits but mocks the LSPosed boundary.
+            if (ambiguous) stageOtherProduct(sku);
+            Method method = ShopBaseActivity.class.getDeclaredMethod("openProduct",
+                    long.class, Bundle.class, boolean.class, String.class);
+            for (int index = 0; index < repeatedProductCalls; index++) {
+                end(begin(method, 11L, extras, true, sku));
+            }
+            Object original = begin(method, 11L, extras, true, sku);
             host.renderDelayMillis = renderDelay;
-            if (transitions) host.openProduct(sku, extras, true);
-            else host.openVariant(sku, extras);
+            host.openProduct(11L, extras, true, sku);
+            end(original);
+            for (int index = 0; index < trailingStringCalls; index++) stageOtherProduct("unrelated-" + index);
             Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(renderDelay));
-            publish();
-            return engine.capture(host, ProductFragment.class.getName(), Map.of("sku", sku));
+            return engine.capture(host, ProductFragment.class.getName(), publish());
         }
 
-        @SuppressWarnings("unchecked")
-        private void stage(String methodName, String value, Bundle extras, Boolean option) throws Exception {
-            Field states = FragmentHostReplay.class.getDeclaredField("states");
-            states.setAccessible(true);
-            Object state = ((Map<?, ?>) states.get(engine)).get(host);
-            Field calls = state.getClass().getDeclaredField("calls");
-            calls.setAccessible(true);
-            Field source = state.getClass().getDeclaredField("source");
-            source.setAccessible(true);
-            Method encode = FragmentHostReplay.class.getDeclaredMethod("encode", Bundle.class);
-            encode.setAccessible(true);
-            Method target = option == null ? ShopActivity.class.getDeclaredMethod(methodName, String.class, Bundle.class)
-                    : ShopActivity.class.getDeclaredMethod(methodName, String.class, Bundle.class, boolean.class);
-            Class<?> call = Class.forName(FragmentHostReplay.class.getName() + "$Call");
-            Constructor<?> make = call.getDeclaredConstructor(Method.class, String.class, Set.class,
-                    String.class, Boolean.class, String.class, boolean.class);
-            make.setAccessible(true);
-            ((ArrayDeque<Object>) calls.get(state)).add(make.newInstance(target, source.get(state),
-                    Set.of(CatalogFragment.class.getName()), value, option, encode.invoke(null, extras), true));
+        void stageOtherProduct(String value) throws Exception {
+            end(begin(ShopBaseActivity.class.getDeclaredMethod("otherProduct", String.class), value));
+        }
+
+        void stageCounter(long value) throws Exception {
+            end(begin(ShopBaseActivity.class.getDeclaredMethod("updateCounter", long.class), value));
+        }
+
+        void stageNamedCounter(long value) throws Exception {
+            Bundle options = new Bundle();
+            options.putLong("quantity", value);
+            end(begin(ShopBaseActivity.class.getDeclaredMethod("updateNamedCounter", Bundle.class), options));
+        }
+
+        private Object begin(Method method, Object... arguments) throws Exception {
+            Method begin = FragmentHostReplay.class.getDeclaredMethod("begin", Activity.class,
+                    Method.class, Object[].class);
+            begin.setAccessible(true);
+            Object result = begin.invoke(engine, host, method, arguments);
+            assertNotNull(result);
+            return result;
+        }
+
+        private void end(Object call) throws Exception {
+            Method end = FragmentHostReplay.class.getDeclaredMethod("end", Activity.class,
+                    call.getClass(), boolean.class);
+            end.setAccessible(true);
+            end.invoke(engine, host, call, true);
         }
     }
 }

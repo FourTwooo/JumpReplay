@@ -1,6 +1,7 @@
 package com.fourtwo.hookintent.xposed;
 
 import android.app.Application;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -35,14 +36,16 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(application = Application.class, sdk = 33)
 public class FragmentTransactionReplayTest {
-    @Test public void replaysActualAndroidXReplaceWithEditedArgumentsAndBackStack() throws Exception {
+    @Test public void replaysLegacySingleReplaceWithoutAnOperationList() throws Exception {
         FixtureActivity host = Robolectric.buildActivity(FixtureActivity.class).setup().get();
         FragmentManager manager = host.getSupportFragmentManager();
         FragmentTransactionReplay engine = new FragmentTransactionReplay(new Handler(Looper.getMainLooper()),
@@ -75,6 +78,7 @@ public class FragmentTransactionReplayTest {
         assertTrue(FragmentTransactionReplay.handles(descriptor));
         assertTrue(descriptor.getBoolean("reorder"));
         assertEquals("from_catalog", descriptor.getString("back_stack_name"));
+        descriptor.remove("operations"); // A descriptor saved by an earlier build stores one ADD/REPLACE.
         transaction.commit();
         manager.executePendingTransactions();
         assertTrue(manager.popBackStackImmediate());
@@ -100,6 +104,106 @@ public class FragmentTransactionReplayTest {
         assertEquals("from_catalog", manager.getBackStackEntryAt(0).getName());
         assertTrue(manager.popBackStackImmediate());
         assertTrue(manager.findFragmentById(FixtureActivity.CONTAINER) instanceof Catalog);
+    }
+
+    @Test public void replaysMultiOperationTransactionAndRestoresOriginalNavigation() throws Exception {
+        FixtureActivity host = Robolectric.buildActivity(FixtureActivity.class).setup().get();
+        FragmentManager manager = host.getSupportFragmentManager();
+        Catalog catalog = (Catalog) manager.findFragmentById(FixtureActivity.CONTAINER);
+        FragmentTransactionReplay replay = new FragmentTransactionReplay(new Handler(Looper.getMainLooper()),
+                activity -> activity == host, () -> List.of(host), ignored -> {
+                    Set<Object> visible = Collections.newSetFromMap(new IdentityHashMap<>());
+                    for (Fragment fragment : manager.getFragments()) {
+                        if (!fragment.isHidden() && fragment.getView() != null
+                                && fragment.getView().isAttachedToWindow()) visible.add(fragment);
+                    }
+                    host.engine.observe(host, visible);
+                });
+        host.engine = replay;
+        Object api = installWithoutXposed(replay, host.getClassLoader());
+        Detail detail = new Detail();
+        Bundle original = new Bundle();
+        original.putString("title", "initial");
+        original.putLong("quantity", 3L);
+        detail.setArguments(original);
+
+        FragmentTransaction originalCall = manager.beginTransaction().hide(catalog)
+                .add(FixtureActivity.CONTAINER, detail, "detail")
+                .setPrimaryNavigationFragment(detail)
+                .addToBackStack("show_detail");
+        Object record = snapshot(replay, api, originalCall, "commit");
+        assertNull(get(record, "failure"));
+        originalCall.commit();
+        manager.executePendingTransactions();
+        recordCompletion(replay, api, record);
+        Bundle descriptor = replay.capture(host, detail);
+        assertNotNull(descriptor);
+        assertNull(replay.captureFailure(host, detail));
+        assertTrue(manager.popBackStackImmediate());
+
+        Bundle edited = new Bundle();
+        edited.putString("title", "changed");
+        edited.putLong("quantity", 7L);
+        AtomicBoolean completed = new AtomicBoolean();
+        AtomicReference<Exception> failure = new AtomicReference<>();
+        replay.replay(descriptor, edited, error -> {
+            failure.set(error);
+            completed.set(true);
+        });
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(500));
+
+        assertTrue(completed.get());
+        assertNull(failure.get());
+        Fragment target = manager.findFragmentByTag("detail");
+        assertSame(target, manager.getPrimaryNavigationFragment());
+        assertTrue(catalog.isHidden());
+        assertEquals("changed:7", ((TextView) target.requireView()).getText().toString());
+        assertTrue(manager.popBackStackImmediate());
+        assertFalse(catalog.isHidden());
+        assertNull(manager.getPrimaryNavigationFragment());
+    }
+
+    @Test public void storesSpecificReasonsForOpaqueArgumentsAndShowingExistingFragment() throws Exception {
+        FixtureActivity host = Robolectric.buildActivity(FixtureActivity.class).setup().get();
+        FragmentManager manager = host.getSupportFragmentManager();
+        FragmentTransactionReplay replay = new FragmentTransactionReplay(new Handler(Looper.getMainLooper()),
+                activity -> activity == host, () -> List.of(host), ignored -> {});
+        Object api = installWithoutXposed(replay, host.getClassLoader());
+        Fragment catalog = manager.findFragmentById(FixtureActivity.CONTAINER);
+        manager.beginTransaction().hide(catalog).commitNow();
+
+        FragmentTransaction show = manager.beginTransaction().show(catalog);
+        Object existing = snapshot(replay, api, show, "commitNow");
+        show.commitNow();
+        recordCompletion(replay, api, existing);
+        assertNull(replay.capture(host, catalog));
+        assertEquals("transaction_existing_destination", replay.captureFailure(host, catalog));
+
+        Detail opaque = new Detail();
+        Bundle unsupported = new Bundle();
+        unsupported.putParcelable("custom_state", new Intent());
+        opaque.setArguments(unsupported);
+        FragmentTransaction add = manager.beginTransaction().add(FixtureActivity.CONTAINER, opaque);
+        Object unsupportedRecord = snapshot(replay, api, add, "commitNow");
+        add.commitNow();
+        recordCompletion(replay, api, unsupportedRecord);
+        assertNull(replay.capture(host, opaque));
+        assertEquals("transaction_unsupported_arguments", replay.captureFailure(host, opaque));
+    }
+
+    private static Object snapshot(FragmentTransactionReplay engine, Object api, FragmentTransaction transaction,
+            String commit) throws Exception {
+        Method method = FragmentTransactionReplay.class.getDeclaredMethod("snapshot",
+                api.getClass(), Object.class, String.class);
+        method.setAccessible(true);
+        return method.invoke(engine, api, transaction, commit);
+    }
+
+    private static void recordCompletion(FragmentTransactionReplay engine, Object api, Object record) throws Exception {
+        Method method = FragmentTransactionReplay.class.getDeclaredMethod("recordCompletion",
+                api.getClass(), record.getClass(), boolean.class);
+        method.setAccessible(true);
+        method.invoke(engine, api, record, false);
     }
 
     @SuppressWarnings("unchecked")
