@@ -8,7 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.fourtwo.hookintent.R;
 
-/** Entry for a local, preconfigured replay. The incoming Intent only supplies its capability URI. */
+/** Entry for a generated replay, scoped to its saved destination and editable argument types. */
 public final class FragmentReplayActivity extends AppCompatActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);

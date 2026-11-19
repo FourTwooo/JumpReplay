@@ -8,8 +8,11 @@ import android.content.pm.PackageInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.AtomicFile;
 
+import com.fourtwo.hookintent.base.IntentPayloadCodec;
 import com.fourtwo.hookintent.data.Constants;
+import com.fourtwo.hookintent.xposed.CaptureFiles;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -17,11 +20,14 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 
 @RunWith(RobolectricTestRunner.class)
@@ -29,7 +35,7 @@ import static org.robolectric.Shadows.shadowOf;
 public class FragmentReplayStoreTest {
     private static final String TARGET = "example.test";
 
-    @Test public void uriRoundTripLoadsTheSavedEditsAndIgnoresIncomingExtras() throws Exception {
+    @Test public void sameReplayIntentAcceptsDifferentTypedEditsAndKeepsItsOriginalRoute() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         Bundle capture = capturedCall(context);
         Bundle descriptor = capture.getBundle(Constants.NAVIGATION_REPLAY);
@@ -39,19 +45,64 @@ public class FragmentReplayStoreTest {
 
         Intent generated = FragmentReplayStore.createIntent(context, capture, descriptor, edits);
         String uri = generated.toUri(Intent.URI_INTENT_SCHEME);
-        assertFalse(uri.contains("edited value"));
+        assertTrue(uri.contains("S.item="));
+        assertTrue(uri.contains("l.selectedIndex=3"));
         assertFalse(uri.contains(TARGET));
 
         Intent incoming = Intent.parseUri(uri, Intent.URI_INTENT_SCHEME);
+        assertEquals("edited value", incoming.getStringExtra("item"));
         incoming.putExtra("packageName", "another.app");
-        incoming.putExtra("item", "injected value");
+        incoming.putExtra("descriptor", "another route");
+        incoming.putExtra("item", "first runtime value");
         edits.putString("item", "modified after saving");
         FragmentReplayStore.Prepared loaded = FragmentReplayStore.load(context, incoming);
 
         assertEquals(TARGET, loaded.source.getString("packageName"));
-        assertEquals("edited value", loaded.arguments.getString("item"));
+        assertEquals("first runtime value", loaded.arguments.getString("item"));
         assertEquals(3L, loaded.arguments.get("selectedIndex"));
+        assertFalse(loaded.arguments.containsKey("packageName"));
+        assertFalse(loaded.arguments.containsKey("descriptor"));
         assertEquals(descriptor.getString("capture_proof"), loaded.descriptor.getString("capture_proof"));
+
+        Intent second = new Intent(incoming).replaceExtras((Bundle) null).putExtra("item", "第二个值");
+        FragmentReplayStore.Prepared loadedAgain = FragmentReplayStore.load(context, second);
+        assertEquals(incoming.getData(), second.getData());
+        assertEquals("第二个值", loadedAgain.arguments.getString("item"));
+        assertEquals(3L, loadedAgain.arguments.get("selectedIndex"));
+        assertEquals("first runtime value", loaded.arguments.getString("item"));
+        assertEquals("edited value", FragmentReplayStore.load(context,
+                new Intent(incoming).replaceExtras((Bundle) null)).arguments.getString("item"));
+    }
+
+    @Test public void rejectsOverridesWithTheWrongTypeOrSize() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Bundle capture = capturedCall(context);
+        Bundle descriptor = capture.getBundle(Constants.NAVIGATION_REPLAY);
+        Intent generated = FragmentReplayStore.createIntent(context, capture, descriptor,
+                descriptor.getBundle("arguments"));
+
+        assertThrows(IllegalArgumentException.class, () -> FragmentReplayStore.load(context,
+                new Intent(generated).putExtra("selectedIndex", 3)));
+        assertThrows(IllegalArgumentException.class, () -> FragmentReplayStore.load(context,
+                new Intent(generated).putExtra("item", new String(new char[8193]))));
+    }
+
+    @Test public void olderFixedArgumentIntentStillIgnoresOverrides() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Bundle capture = capturedCall(context);
+        Bundle descriptor = capture.getBundle(Constants.NAVIGATION_REPLAY);
+        Intent generated = FragmentReplayStore.createIntent(context, capture, descriptor,
+                descriptor.getBundle("arguments"));
+        File directory = new File(context.getNoBackupFilesDir(), "fragment_replays");
+        File saved = new File(directory, generated.getData().getLastPathSegment());
+        Bundle encoded = new Bundle();
+        encoded.putString(IntentPayloadCodec.KEY,
+                new String(new AtomicFile(saved).readFully(), StandardCharsets.US_ASCII));
+        Intent savedReplay = IntentPayloadCodec.decode(encoded).putExtra("version", 1);
+        CaptureFiles.write(saved, IntentPayloadCodec.encode(savedReplay).getBytes(StandardCharsets.US_ASCII));
+
+        Intent legacy = new Intent(generated).replaceExtras((Bundle) null).putExtra("item", "ignored value");
+        assertEquals("old captured value", FragmentReplayStore.load(context, legacy).arguments.getString("item"));
     }
 
     @Test public void rejectsUnknownCapabilitiesAndUnexpectedEntryShape() throws Exception {

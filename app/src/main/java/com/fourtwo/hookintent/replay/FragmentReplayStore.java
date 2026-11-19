@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.UUID;
@@ -28,11 +29,13 @@ import java.util.concurrent.Executors;
 import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 
-/** Generated intents reference sealed, typed replay data kept in the app's private storage. */
+/** Generated intents reference a sealed replay and can carry edits to its saved arguments. */
 public final class FragmentReplayStore {
     static final String ACTION = "com.fourtwo.hookintent.action.REPLAY_FRAGMENT";
     private static final String URI_PREFIX = "jumpreplay-fragment://replay/";
     private static final Pattern TOKEN = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
+    private static final int VERSION_FIXED_ARGUMENTS = 1;
+    private static final int VERSION_EDITABLE_ARGUMENTS = 2;
     private static final int MAX_BYTES = 512 * 1024;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final Executor IO = Executors.newSingleThreadExecutor();
@@ -60,7 +63,7 @@ public final class FragmentReplayStore {
         Bundle capturedCall = NavigationCaptureProof.copy(archived, true);
         Bundle arguments = checkedEdits(capturedCall, editedArguments);
         Bundle payload = new Bundle();
-        payload.putInt("version", 1);
+        payload.putInt("version", VERSION_EDITABLE_ARGUMENTS);
         payload.putBundle("source", sourceOf(captureRecord));
         payload.putBundle("descriptor", capturedCall);
         payload.putBundle("arguments", arguments);
@@ -73,7 +76,8 @@ public final class FragmentReplayStore {
         }
         String token = UUID.randomUUID().toString();
         CaptureFiles.write(new File(directory, token), bytes);
-        return new Intent(ACTION, Uri.parse(URI_PREFIX + token)).setComponent(component(context));
+        return new Intent(ACTION, Uri.parse(URI_PREFIX + token)).setComponent(component(context))
+                .putExtras(arguments);
     }
 
     static void openAsync(Context context, Intent incoming, BiConsumer<Prepared, Exception> callback) {
@@ -110,7 +114,8 @@ public final class FragmentReplayStore {
         Bundle encoded = new Bundle();
         encoded.putString(IntentPayloadCodec.KEY, new String(bytes, StandardCharsets.US_ASCII));
         Bundle payload = IntentPayloadCodec.decode(encoded).getExtras();
-        if (payload == null || payload.getInt("version") != 1) {
+        int version = payload == null ? 0 : payload.getInt("version");
+        if (version != VERSION_FIXED_ARGUMENTS && version != VERSION_EDITABLE_ARGUMENTS) {
             throw new IOException("重放记录版本无效");
         }
         Bundle source = payload.getBundle("source");
@@ -119,7 +124,24 @@ public final class FragmentReplayStore {
         if (!NavigationCaptureProof.hasProof(descriptor)) {
             throw new IllegalArgumentException("这条记录没有可验证的原导航调用");
         }
-        return new Prepared(source, descriptor, checkedEdits(descriptor, payload.getBundle("arguments")));
+        Bundle arguments = checkedEdits(descriptor, payload.getBundle("arguments"));
+        if (version == VERSION_EDITABLE_ARGUMENTS) arguments = applyOverrides(arguments, incoming.getExtras());
+        return new Prepared(source, descriptor, arguments);
+    }
+
+    private static Bundle applyOverrides(Bundle arguments, Bundle overrides) {
+        if (overrides == null) return arguments;
+        overrides.setClassLoader(ClassLoader.getSystemClassLoader());
+        for (String key : arguments.keySet()) {
+            if (!overrides.containsKey(key)) continue;
+            Object original = arguments.get(key);
+            Object supplied = overrides.get(key);
+            if (original == null ? supplied != null : supplied == null || original.getClass() != supplied.getClass()) {
+                throw new IllegalArgumentException("重放参数 " + key + " 的类型不符");
+            }
+            arguments.putSerializable(key, (Serializable) supplied);
+        }
+        return NavigationCaptureProof.copy(arguments, false);
     }
 
     private static Bundle checkedEdits(Bundle descriptor, Bundle edited) {
