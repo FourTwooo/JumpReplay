@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="intent_library_title">应用活动</string>
+    <string name="library_app_type">应用类型</string>
+    <string name="library_apps_all">所有应用</string>
+    <string name="library_apps_system">系统应用</string>
+    <string name="library_apps_user">用户应用</string>
     <string name="library_cache_enabled">自动记录新捕获的 Intent</string>
     <string name="library_observed_tab">捕获记录</string>
     <string name="library_declared_tab">应用活动</string>

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="intent_library_title">アプリの Activity</string>
+    <string name="library_app_type">アプリの種類</string>
+    <string name="library_apps_all">すべてのアプリ</string>
+    <string name="library_apps_system">システムアプリ</string>
+    <string name="library_apps_user">ユーザーアプリ</string>
     <string name="library_cache_enabled">新しい Intent の捕捉を保存</string>
     <string name="library_observed_tab">観測結果</string>
     <string name="library_declared_tab">アプリの Activity</string>

@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="intent_library_title">App activities</string>
+    <string name="library_app_type">App type</string>
+    <string name="library_apps_all">All apps</string>
+    <string name="library_apps_system">System apps</string>
+    <string name="library_apps_user">User apps</string>
     <string name="library_cache_enabled">Save new Intent captures to the library</string>
     <string name="library_observed_tab">Observed</string>
     <string name="library_declared_tab">App activities</string>

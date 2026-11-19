@@ -10,6 +10,19 @@
         app:showAsAction="ifRoom|collapseActionView" />
 
     <item
+        android:id="@+id/library_app_type"
+        android:title="@string/library_app_type"
+        app:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/library_apps_all" android:title="@string/library_apps_all" />
+                <item android:id="@+id/library_apps_system" android:title="@string/library_apps_system" />
+                <item android:id="@+id/library_apps_user" android:title="@string/library_apps_user" />
+            </group>
+        </menu>
+    </item>
+
+    <item
         android:id="@+id/library_enabled"
         android:checkable="true"
         android:title="@string/library_cache_enabled"

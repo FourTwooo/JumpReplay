@@ -3,6 +3,7 @@ package com.fourtwo.hookintent.library;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -55,6 +56,7 @@ public final class IntentLibraryFragment extends Fragment {
     private static final String ARG_LABEL = "libraryAppLabel";
     private static final String STATE_QUERY = "library_query";
     private static final String STATE_SEARCH = "library_search_open";
+    private static final String STATE_APP_TYPE = "library_app_type";
     private static final AccessibilityDelegateCompat ROW_SELECTION_ACCESSIBILITY = new AccessibilityDelegateCompat() {
         @Override public void onInitializeAccessibilityNodeInfo(@NonNull View host,
                 @NonNull AccessibilityNodeInfoCompat info) {
@@ -76,6 +78,7 @@ public final class IntentLibraryFragment extends Fragment {
     private SearchView search;
     private String packageName;
     private String query = "";
+    private int appType = R.id.library_apps_all;
     private boolean searchOpen;
     private boolean loaded;
     private boolean loadFailed;
@@ -102,6 +105,8 @@ public final class IntentLibraryFragment extends Fragment {
         if (state != null) {
             query = state.getString(STATE_QUERY, "");
             searchOpen = state.getBoolean(STATE_SEARCH);
+            int savedType = state.getInt(STATE_APP_TYPE);
+            if (savedType == R.id.library_apps_system || savedType == R.id.library_apps_user) appType = savedType;
         }
     }
 
@@ -134,6 +139,7 @@ public final class IntentLibraryFragment extends Fragment {
         super.onSaveInstanceState(outState);
         outState.putString(STATE_QUERY, query);
         outState.putBoolean(STATE_SEARCH, searchOpen);
+        outState.putInt(STATE_APP_TYPE, appType);
     }
 
     @Override public void onPause() {
@@ -160,6 +166,8 @@ public final class IntentLibraryFragment extends Fragment {
         requireActivity().addMenuProvider(new MenuProvider() {
             @Override public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater inflater) {
                 inflater.inflate(R.menu.intent_library, menu);
+                if (packageName == null) menu.findItem(appType).setChecked(true);
+                else menu.removeItem(R.id.library_app_type);
                 menu.findItem(R.id.library_enabled).setChecked(library.enabled());
                 searchItem = menu.findItem(R.id.library_search);
                 search = (SearchView) searchItem.getActionView();
@@ -167,6 +175,17 @@ public final class IntentLibraryFragment extends Fragment {
             }
 
             @Override public boolean onMenuItemSelected(@NonNull MenuItem item) {
+                int id = item.getItemId();
+                if (packageName == null && (id == R.id.library_apps_all
+                        || id == R.id.library_apps_system || id == R.id.library_apps_user)) {
+                    item.setChecked(true);
+                    if (appType != id) {
+                        appType = id;
+                        renderRows();
+                        recycler.scrollToPosition(0);
+                    }
+                    return true;
+                }
                 if (item.getItemId() == R.id.library_enabled) {
                     boolean enabled = !library.enabled();
                     library.setEnabled(enabled);
@@ -395,8 +414,8 @@ public final class IntentLibraryFragment extends Fragment {
         if (packageName == null) {
             List<PackageActivityCatalog.App> matches = new ArrayList<>();
             for (PackageActivityCatalog.App app : apps) {
-                if (matches(filter, app.label) || matches(filter, app.packageName)
-                        || matches(filter, app.versionName) || matches(filter, Long.toString(app.versionCode))) {
+                if (matchesAppType(app) && (matches(filter, app.label) || matches(filter, app.packageName)
+                        || matches(filter, app.versionName) || matches(filter, Long.toString(app.versionCode)))) {
                     matches.add(app);
                 }
             }
@@ -410,11 +429,20 @@ public final class IntentLibraryFragment extends Fragment {
             activityRows.submit(matches);
             hasRows = !matches.isEmpty();
         }
+        boolean filtering = !filter.isEmpty() || (packageName == null && appType != R.id.library_apps_all);
         int message = loadFailed ? R.string.library_read_error
-                : !filter.isEmpty() ? R.string.library_no_match
+                : filtering ? R.string.library_no_match
                 : packageName == null ? R.string.library_no_apps : R.string.library_no_activities;
         empty.setText(message);
         empty.setVisibility(loaded && !hasRows ? View.VISIBLE : View.GONE);
+    }
+
+    private boolean matchesAppType(PackageActivityCatalog.App app) {
+        if (appType == R.id.library_apps_all) return true;
+        if (app.applicationInfo == null) return false;
+        int systemFlags = ApplicationInfo.FLAG_SYSTEM | ApplicationInfo.FLAG_UPDATED_SYSTEM_APP;
+        boolean system = (app.applicationInfo.flags & systemFlags) != 0;
+        return system == (appType == R.id.library_apps_system);
     }
 
     private void openApp(PackageActivityCatalog.App app) {
