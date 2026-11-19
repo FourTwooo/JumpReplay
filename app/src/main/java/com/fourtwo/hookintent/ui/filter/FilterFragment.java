@@ -244,10 +244,11 @@ public class FilterFragment extends Fragment {
     }
 
     private boolean isBuiltInGroup(String groupKey) {
-        return LEGACY_INTENT_KEY.equalsIgnoreCase(groupKey)
-                || LEGACY_SCHEME_KEY.equalsIgnoreCase(groupKey)
-                || Constants.FRAGMENT_CATEGORY.equals(groupKey)
-                || Constants.NAV_CONTROLLER_CATEGORY.equals(groupKey);
+        if (LEGACY_INTENT_KEY.equalsIgnoreCase(groupKey) || LEGACY_SCHEME_KEY.equalsIgnoreCase(groupKey)) {
+            return true;
+        }
+        NavigationCaptureSource source = NavigationCaptureSource.forCategory(groupKey);
+        return source != null && source.category().equals(groupKey);
     }
 
     private List<String> buildProtocolKeys() {

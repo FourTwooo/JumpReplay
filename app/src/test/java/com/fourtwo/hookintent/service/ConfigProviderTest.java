@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.ContentValues;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Bundle;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
@@ -36,11 +37,13 @@ public class ConfigProviderTest {
         ConfigProvider provider = Robolectric.buildContentProvider(ConfigProvider.class).create().get();
         assertEquals("false", navigationFlag(provider, Constants.FRAGMENT_CAPTURE_ENABLED));
         assertEquals("false", navigationFlag(provider, Constants.NAV_CONTROLLER_CAPTURE_ENABLED));
+        assertEquals("false", navigationFlag(provider, Constants.VIEW_PAGER_CAPTURE_ENABLED));
         assertNull(SharedPreferencesUtils.getStr(provider.getContext(), Constants.INTERNAL_HOOKS_CONFIG));
 
         SharedPreferencesUtils.putBoolean(provider.getContext(), Constants.IN_APP_NAVIGATION_CAPTURE, true);
         assertEquals("true", navigationFlag(provider, Constants.FRAGMENT_CAPTURE_ENABLED));
         assertEquals("true", navigationFlag(provider, Constants.NAV_CONTROLLER_CAPTURE_ENABLED));
+        assertEquals("false", navigationFlag(provider, Constants.VIEW_PAGER_CAPTURE_ENABLED));
 
         NavigationCaptureSource.FRAGMENT.setEnabled(provider.getContext(), false);
         ContentValues values = new ContentValues();
@@ -53,6 +56,18 @@ public class ConfigProviderTest {
 
         NavigationCaptureSource.NAV_CONTROLLER.setEnabled(provider.getContext(), false);
         assertEquals("false", navigationFlag(provider, Constants.IN_APP_NAVIGATION_CAPTURE));
+
+        NavigationCaptureSource pager = NavigationCaptureSource.VIEW_PAGER;
+        pager.setEnabled(provider.getContext(), true);
+        assertSame(pager, NavigationCaptureSource.forConfigurationRow(pager.configurationRow(provider.getContext())));
+        assertEquals("true", navigationFlag(provider, Constants.VIEW_PAGER_CAPTURE_ENABLED));
+        assertEquals("false", navigationFlag(provider, Constants.FRAGMENT_CAPTURE_ENABLED));
+        assertEquals("false", navigationFlag(provider, Constants.NAV_CONTROLLER_CAPTURE_ENABLED));
+        assertEquals("true", navigationFlag(provider, Constants.IN_APP_NAVIGATION_CAPTURE));
+
+        Bundle record = new Bundle();
+        record.putBundle(Constants.NAVIGATION_ARGUMENTS, Bundle.EMPTY);
+        assertSame(pager, NavigationCaptureSource.fromRecord(pager.category(), record));
     }
 
     private String navigationFlag(ConfigProvider provider, String name) {

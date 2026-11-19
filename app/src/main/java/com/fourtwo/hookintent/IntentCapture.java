@@ -181,11 +181,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
         EnumSet<NavigationCaptureSource> sources = EnumSet.noneOf(NavigationCaptureSource.class);
         try {
             Map<String, String> config = getConfig(Constants.IN_APP_NAVIGATION_URI);
-            if (Boolean.parseBoolean(config.get(Constants.FRAGMENT_CAPTURE_ENABLED))) {
-                sources.add(NavigationCaptureSource.FRAGMENT);
-            }
-            if (Boolean.parseBoolean(config.get(Constants.NAV_CONTROLLER_CAPTURE_ENABLED))) {
-                sources.add(NavigationCaptureSource.NAV_CONTROLLER);
+            for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
+                if (Boolean.parseBoolean(config.get(source.preference()))) sources.add(source);
             }
         } catch (RuntimeException error) {
             sources.clear();
@@ -225,8 +222,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 Bundle sealed = NavigationReplayTransport.seal(applicationContext, descriptor);
                 if (sealed != null) {
                     record.putBundle(Constants.NAVIGATION_REPLAY, sealed);
-                    String method = source == NavigationCaptureSource.FRAGMENT
-                            ? descriptor.getString("method", source.method()) : "navigate";
+                    String method = source == NavigationCaptureSource.NAV_CONTROLLER
+                            ? "navigate" : descriptor.getString("method", source.method());
                     record.putString("FunctionCall", method);
                 }
             } catch (Exception unavailable) {

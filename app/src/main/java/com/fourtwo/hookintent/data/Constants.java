@@ -25,8 +25,10 @@ public final class Constants {
     public static final String IN_APP_NAVIGATION_CAPTURE = "inAppNavigationCapture";
     public static final String FRAGMENT_CAPTURE_ENABLED = "fragmentCapture";
     public static final String NAV_CONTROLLER_CAPTURE_ENABLED = "navigationControllerCapture";
+    public static final String VIEW_PAGER_CAPTURE_ENABLED = "viewPagerCapture";
     public static final String FRAGMENT_CATEGORY = "Fragment";
     public static final String NAV_CONTROLLER_CATEGORY = "NavController";
+    public static final String VIEW_PAGER_CATEGORY = "ViewPager";
     public static final String NAVIGATION_CATEGORY = "Navigation";
     public static final String NAVIGATION_ARGUMENTS = "navigation_arguments";
     public static final String NAVIGATION_REPLAY = "navigation_replay";

@@ -48,6 +48,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     private final JetpackNavigationReplay jetpackReplay;
     private final FragmentHostReplay fragmentReplay;
     private final FragmentTransactionReplay transactionReplay;
+    private final ViewPagerReplay pagerReplay;
     private final Map<ClassLoader, FragmentAccess> supportByLoader = new WeakHashMap<>();
     private final Set<Class<?>> navControllers = Collections.newSetFromMap(new WeakHashMap<>());
     private FragmentAccess platform;
@@ -65,16 +66,29 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 this::resampleForFragmentReplay);
         transactionReplay = new FragmentTransactionReplay(main, capturingFragment, () -> resumed.keySet(),
                 this::resampleForFragmentReplay);
+        pagerReplay = new ViewPagerReplay(main,
+                activity -> resumed.containsKey(activity) && enabled.test(NavigationCaptureSource.VIEW_PAGER),
+                () -> resumed.keySet(), this::capturePage);
     }
 
     public void replay(Bundle descriptor, Bundle arguments, Consumer<Exception> result) {
-        if (FragmentTransactionReplay.handles(descriptor)) {
+        if (ViewPagerReplay.handles(descriptor)) {
+            pagerReplay.replay(descriptor, arguments, result);
+        } else if (FragmentTransactionReplay.handles(descriptor)) {
             transactionReplay.replay(descriptor, arguments, result);
         } else if (FragmentHostReplay.handles(descriptor)) {
             fragmentReplay.replay(descriptor, arguments, result);
         } else {
             jetpackReplay.replay(descriptor, arguments, result);
         }
+    }
+
+    private void capturePage(Activity activity, View pager, int fromPosition, int position, Bundle descriptor) {
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        arguments.put("from_position", fromPosition);
+        arguments.put("position", position);
+        String destination = pager.getClass().getName() + " [" + fromPosition + " → " + position + "]";
+        emit(activity, destination, NavigationCaptureSource.VIEW_PAGER, arguments, descriptor, null);
     }
 
     private boolean waitingForFragmentReplay(Activity activity) {
@@ -148,6 +162,7 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         ViewTreeObserver observer;
         boolean observing;
         boolean initialized;
+        boolean supportChecked;
         long scheduledAt = Long.MAX_VALUE;
         String navFragment;
         long navFragmentUntil;
@@ -159,7 +174,9 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
 
         void refresh() {
             boolean capturing = enabled.test(NavigationCaptureSource.FRAGMENT);
-            if (!capturing && !waitingForFragmentReplay(activity)) {
+            boolean observingFragments = capturing || waitingForFragmentReplay(activity);
+            boolean capturingPager = enabled.test(NavigationCaptureSource.VIEW_PAGER);
+            if (!observingFragments && !capturingPager) {
                 stop();
                 return;
             }
@@ -167,19 +184,26 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 fragmentReplay.install(activity);
                 transactionReplay.install(activity.getClass().getClassLoader());
             }
-            if (!observing) {
-                observer = decor.getViewTreeObserver();
-                if (!observer.isAlive()) return;
+            if (observingFragments && !supportChecked) {
+                supportChecked = true;
                 ClassLoader loader = activity.getClass().getClassLoader();
                 support = supportByLoader.get(loader);
                 if (support == null) {
                     support = FragmentAccess.load(loader, "androidx.fragment.app", true);
                     if (support != null) supportByLoader.put(loader, support);
                 }
-                observing = true;
-                observer.addOnGlobalLayoutListener(layout);
-                sample();
             }
+            if (!observingFragments) clearFragmentObservation();
+            if (!capturingPager) pagerReplay.forget(activity);
+            if (observing) {
+                if (capturingPager) scheduleSample(SystemClock.uptimeMillis());
+                return;
+            }
+            observer = decor.getViewTreeObserver();
+            if (!observer.isAlive()) return;
+            observing = true;
+            observer.addOnGlobalLayoutListener(layout);
+            sample();
         }
 
         void stop() {
@@ -189,13 +213,18 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 current.removeOnGlobalLayoutListener(layout);
             }
             observing = false;
-            initialized = false;
             observer = null;
+            scheduledAt = Long.MAX_VALUE;
+            main.removeCallbacks(sample);
+            clearFragmentObservation();
+            pagerReplay.forget(activity);
+        }
+
+        private void clearFragmentObservation() {
+            initialized = false;
             states.clear();
             navFragment = null;
             navFragmentUntil = 0;
-            scheduledAt = Long.MAX_VALUE;
-            main.removeCallbacks(sample);
             forgetFragmentRoutes();
         }
 
@@ -205,7 +234,8 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         }
 
         private void onLayout() {
-            if (enabled.test(NavigationCaptureSource.FRAGMENT) || waitingForFragmentReplay(activity)) {
+            if (enabled.test(NavigationCaptureSource.FRAGMENT) || waitingForFragmentReplay(activity)
+                    || enabled.test(NavigationCaptureSource.VIEW_PAGER)) {
                 scheduleSample(SystemClock.uptimeMillis() + LAYOUT_SAMPLE_MS);
             }
         }
@@ -220,10 +250,14 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         void sample() {
             if (!observing) return;
             boolean capturing = enabled.test(NavigationCaptureSource.FRAGMENT);
-            if (!capturing && !waitingForFragmentReplay(activity)) {
+            boolean observingFragments = capturing || waitingForFragmentReplay(activity);
+            boolean capturingPager = enabled.test(NavigationCaptureSource.VIEW_PAGER);
+            if (!observingFragments && !capturingPager) {
                 stop();
                 return;
             }
+            if (capturingPager) pagerReplay.scan(activity);
+            if (!observingFragments) return;
             if (!decor.getGlobalVisibleRect(screen)) {
                 forgetFragmentRoutes();
                 return;
@@ -260,7 +294,10 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                             descriptor, descriptor == null ? diagnostics : null);
                 }
                 scheduleSample(frame.nextSample);
-                if (!capturing && !waitingForFragmentReplay(activity)) stop();
+                if (!capturing && !waitingForFragmentReplay(activity)) {
+                    if (capturingPager) clearFragmentObservation();
+                    else stop();
+                }
             } catch (ReflectiveOperationException | RuntimeException | LinkageError error) {
                 forgetFragmentRoutes();
                 report(error);

@@ -9,23 +9,27 @@ import java.util.Map;
 /** Source and configuration of a built-in in-app navigation observation. */
 public enum NavigationCaptureSource {
     FRAGMENT(Constants.FRAGMENT_CATEGORY, Constants.FRAGMENT_CAPTURE_ENABLED,
-            "android.view.ViewTreeObserver$OnGlobalLayoutListener", "onGlobalLayout", "#7255AB"),
+            "android.view.ViewTreeObserver$OnGlobalLayoutListener", "onGlobalLayout", "#7255AB", true),
     NAV_CONTROLLER(Constants.NAV_CONTROLLER_CATEGORY, Constants.NAV_CONTROLLER_CAPTURE_ENABLED,
-            "androidx.navigation.NavController$OnDestinationChangedListener", "onDestinationChanged", "#2C7585");
+            "androidx.navigation.NavController$OnDestinationChangedListener", "onDestinationChanged", "#2C7585", true),
+    VIEW_PAGER(Constants.VIEW_PAGER_CATEGORY, Constants.VIEW_PAGER_CAPTURE_ENABLED,
+            "androidx.viewpager.widget.ViewPager", "setCurrentItem", "#8B5735", false);
 
     private final String category;
     private final String preference;
     private final String className;
     private final String method;
     private final String defaultColor;
+    private final boolean migrateLegacyPreference;
 
     NavigationCaptureSource(String category, String preference, String className, String method,
-            String defaultColor) {
+            String defaultColor, boolean migrateLegacyPreference) {
         this.category = category;
         this.preference = preference;
         this.className = className;
         this.method = method;
         this.defaultColor = defaultColor;
+        this.migrateLegacyPreference = migrateLegacyPreference;
     }
 
     public String category() {
@@ -45,8 +49,9 @@ public enum NavigationCaptureSource {
     }
 
     public boolean isEnabled(Context context) {
-        boolean previous = SharedPreferencesUtils.getBoolean(context, Constants.IN_APP_NAVIGATION_CAPTURE);
-        return SharedPreferencesUtils.getBoolean(context, preference, previous);
+        boolean defaultValue = migrateLegacyPreference
+                && SharedPreferencesUtils.getBoolean(context, Constants.IN_APP_NAVIGATION_CAPTURE);
+        return SharedPreferencesUtils.getBoolean(context, preference, defaultValue);
     }
 
     public void setEnabled(Context context, boolean enabled) {
@@ -86,12 +91,10 @@ public enum NavigationCaptureSource {
     }
 
     public static NavigationCaptureSource fromRecord(String category, Bundle record) {
-        if (record == null || (!Constants.FRAGMENT_CATEGORY.equals(category)
-                && !Constants.NAV_CONTROLLER_CATEGORY.equals(category)
-                && !Constants.NAVIGATION_CATEGORY.equals(category))) return null;
-        if (!record.containsKey(Constants.NAVIGATION_ARGUMENTS)) return null;
-        if (Constants.FRAGMENT_CATEGORY.equals(category)) return FRAGMENT;
-        if (Constants.NAV_CONTROLLER_CATEGORY.equals(category)) return NAV_CONTROLLER;
+        if (record == null || !record.containsKey(Constants.NAVIGATION_ARGUMENTS)) return null;
+        for (NavigationCaptureSource source : values()) {
+            if (source.category.equals(category)) return source;
+        }
 
         // The first release used one category and stored the source in FunctionCall.
         if (Constants.NAVIGATION_CATEGORY.equals(category)) {
