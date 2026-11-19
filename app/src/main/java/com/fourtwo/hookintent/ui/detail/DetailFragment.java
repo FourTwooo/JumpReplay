@@ -49,7 +49,6 @@ import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
 import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.replay.ExtrasEditorDialog;
-import com.fourtwo.hookintent.replay.NavigationReplay;
 import com.fourtwo.hookintent.utils.HashUtil;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.tabs.TabLayout;
@@ -172,6 +171,10 @@ public class DetailFragment extends Fragment {
             }
 
             dataList.add(new Pair<>("separator", ""));
+            if (source != null && !bundle.containsKey(Constants.NAVIGATION_REPLAY)) {
+                dataList.add(new Pair<>(getString(R.string.navigation_replay_options),
+                        getString(R.string.navigation_replay_unavailable)));
+            }
 
             List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data",
                     "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS,
@@ -276,7 +279,10 @@ public class DetailFragment extends Fragment {
                 boolean navigation = itemData != null
                         && NavigationCaptureSource.fromRecord(itemData.getCategory(), itemData.getAppBundle()) != null;
                 menu.findItem(R.id.action_save).setVisible(canReplay);
-                if (navigation) menu.findItem(R.id.copy_code).setTitle(R.string.navigation_replay_options);
+                MenuItem replayMenu = menu.findItem(R.id.copy_code);
+                if (navigation) replayMenu.setTitle(R.string.navigation_replay_options);
+                replayMenu.setVisible(canReplay || (navigation
+                        && itemData.getAppBundle().containsKey(Constants.NAVIGATION_REPLAY)));
 
                 // 动态设置收藏按钮图标
                 try {
@@ -378,13 +384,10 @@ public class DetailFragment extends Fragment {
                 options.add(getString(R.string.navigation_replay_in_app));
                 actions.add(() -> NavigationReplayDialogs.editInApp(requireActivity(), record, descriptor));
             }
-            options.add(getString(R.string.navigation_binding_title));
-            actions.add(() -> NavigationReplayDialogs.editBinding(requireActivity(), record,
-                    () -> { if (isAdded()) requireActivity().invalidateOptionsMenu(); }));
         }
 
         if (category.equals("Intent")) {
-            options.add(navigation == null ? "编辑参数并重放" : getString(R.string.navigation_replay_external));
+            options.add("编辑参数并重放");
             actions.add(() -> ExtrasEditorDialog.show(requireActivity(), bundle, edited -> {
                 try {
                     ItemData draft = new ItemData(replay.getIcon(), replay.getAppName(), replay.getItem_from(),
@@ -423,6 +426,7 @@ public class DetailFragment extends Fragment {
             actions.add(() -> openInterceptor(replay));
         }
 
+        if (options.isEmpty()) return;
         // 改用 PopupMenu
         PopupMenu popupMenu = new PopupMenu(requireContext(), anchorView == null ? requireView() : anchorView);
         for (int i = 0; i < options.size(); i++) {
@@ -464,7 +468,7 @@ public class DetailFragment extends Fragment {
         if (itemData == null) return null;
         String category = itemData.getCategory();
         if ("Intent".equals(category) || "Scheme".equals(category)) return itemData;
-        return NavigationReplay.prepare(requireContext(), itemData);
+        return null;
     }
 
     private String replayToken(ItemData replay) {

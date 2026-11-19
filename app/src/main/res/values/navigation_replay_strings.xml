@@ -1,12 +1,7 @@
 <resources>
     <string name="navigation_replay_options">重放选项</string>
     <string name="navigation_replay_in_app">编辑参数并应用内重放</string>
-    <string name="navigation_replay_external">编辑参数并通过绑定入口重放</string>
-    <string name="navigation_binding_title">绑定启动入口</string>
-    <string name="navigation_binding_uri">Intent URI 或 Scheme</string>
-    <string name="navigation_binding_mapping">导航参数=入口参数（每行一条，可留空）</string>
-    <string name="navigation_binding_remove">移除绑定</string>
-    <string name="navigation_binding_invalid_mapping">每行填写一个不同的导航参数，格式为「导航参数=入口参数」。</string>
+    <string name="navigation_replay_unavailable">这条记录未捕获到可重放的导航调用。</string>
     <string name="navigation_replay_edit_title">编辑导航参数</string>
     <string name="navigation_replay_start">重放</string>
     <string name="navigation_replay_missing_launcher">目标应用没有可打开的桌面入口。</string>

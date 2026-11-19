@@ -7,6 +7,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -16,7 +17,7 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 
-/** Drives an ordinary Jetpack action and an exported deep link for device replay checks. */
+/** Drives Jetpack and direct Fragment navigation for device replay checks. */
 public final class NavigationFixtureActivity extends FragmentActivity {
     @Override protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
@@ -49,10 +50,37 @@ public final class NavigationFixtureActivity extends FragmentActivity {
     public static final class Home extends Fragment {
         @Override public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
                 @Nullable Bundle state) {
-            Button button = new Button(requireContext());
-            button.setText("Open navigation detail");
-            button.setOnClickListener(view -> openDetail(NavHostFragment.findNavController(this), "initial"));
-            return button;
+            LinearLayout buttons = new LinearLayout(requireContext());
+            buttons.setOrientation(LinearLayout.VERTICAL);
+            Button navigation = new Button(requireContext());
+            navigation.setText("Open navigation detail");
+            navigation.setOnClickListener(view -> openDetail(NavHostFragment.findNavController(this), "initial"));
+            buttons.addView(navigation);
+
+            Button transaction = new Button(requireContext());
+            transaction.setText("Open Fragment detail");
+            transaction.setOnClickListener(view -> {
+                FragmentDetail detail = new FragmentDetail();
+                Bundle arguments = new Bundle();
+                arguments.putString("value", "initial");
+                detail.setArguments(arguments);
+                requireActivity().getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.navigation_fixture_host, detail)
+                        .addToBackStack("fragment_fixture_detail")
+                        .commit();
+            });
+            buttons.addView(transaction);
+            return buttons;
+        }
+    }
+
+    public static final class FragmentDetail extends Fragment {
+        @Override public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
+                @Nullable Bundle state) {
+            TextView label = new TextView(requireContext());
+            label.setGravity(Gravity.CENTER);
+            label.setText("Fragment detail: " + requireArguments().getString("value"));
+            return label;
         }
     }
 

@@ -1,12 +1,7 @@
 <resources>
     <string name="navigation_replay_options">再実行オプション</string>
     <string name="navigation_replay_in_app">引数を編集してアプリ内で再実行</string>
-    <string name="navigation_replay_external">引数を編集して登録済みの入口から再実行</string>
-    <string name="navigation_binding_title">起動入口を登録</string>
-    <string name="navigation_binding_uri">Intent URI またはスキーム</string>
-    <string name="navigation_binding_mapping">画面遷移の引数=起動引数（1 行に 1 組、省略可）</string>
-    <string name="navigation_binding_remove">登録を解除</string>
-    <string name="navigation_binding_invalid_mapping">各行に異なる画面遷移の引数を「画面遷移の引数=起動引数」の形式で入力してください。</string>
+    <string name="navigation_replay_unavailable">この記録には再実行可能な画面遷移の呼び出しがありません。</string>
     <string name="navigation_replay_edit_title">画面遷移の引数を編集</string>
     <string name="navigation_replay_start">再実行</string>
     <string name="navigation_replay_missing_launcher">対象アプリにランチャー入口がありません。</string>
