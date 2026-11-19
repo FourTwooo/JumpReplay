@@ -1,5 +1,9 @@
 <resources>
     <string name="replay_templates_title">再実行</string>
+    <string name="replay_templates_more">テンプレートの操作</string>
+    <string name="replay_templates_copy_link">リンクをコピー</string>
+    <string name="replay_templates_edit_hint">変更は今回の再実行またはコピーするリンクに適用されます。</string>
+    <string name="replay_templates_fixed_hint">引数が固定されたテンプレートです。再実行やリンクのコピーができます。</string>
     <string name="replay_templates_save">再実行テンプレートを保存</string>
     <string name="replay_templates_empty">再実行できる Fragment の記録からテンプレートを作成するか、共有されたテンプレートをインポートできます。</string>
     <string name="replay_templates_import">テンプレートをインポート</string>

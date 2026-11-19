@@ -2,7 +2,9 @@ package com.fourtwo.hookintent.library;
 
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -15,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -25,6 +28,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.view.ActionMode;
+import androidx.appcompat.widget.AppCompatButton;
 import androidx.appcompat.widget.SearchView;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.AccessibilityDelegateCompat;
@@ -37,9 +41,15 @@ import androidx.navigation.fragment.NavHostFragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.fourtwo.hookintent.IntentIntercept;
 import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.base.DataConverter;
+import com.fourtwo.hookintent.base.DetailPayloadStore;
+import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.utils.AppDialogs;
+import com.fourtwo.hookintent.utils.AppInfoHelper;
 
+import java.net.URISyntaxException;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -529,8 +539,19 @@ public final class IntentLibraryFragment extends Fragment {
         field(metadata, R.string.library_action, activity.action);
         field(metadata, R.string.library_data, activity.data);
 
-        AlertDialog dialog = AppDialogs.builder(context).setTitle(activityTitle(activity))
-                .setView(details).setPositiveButton(R.string.library_close, null).create();
+        AlertDialog.Builder builder = AppDialogs.builder(context).setTitle(activityTitle(activity)).setView(details);
+        IntentLibrary.Observation sample = activity.name.isEmpty() ? activity.observations.stream()
+                .filter(entry -> !TextUtils.isEmpty(entry.intentUri)).findFirst().orElse(null) : null;
+        if (!activity.name.isEmpty() || sample != null) {
+            builder.setNegativeButton(R.string.library_close, null)
+                    .setPositiveButton(R.string.library_open_interceptor, (ignored, which) -> {
+                        if (sample != null) openSampleInInterceptor(sample);
+                        else openActivityInInterceptor(activity);
+                    });
+        } else {
+            builder.setPositiveButton(R.string.library_close, null);
+        }
+        AlertDialog dialog = builder.create();
         List<IntentLibrary.Observation> samples = new ArrayList<>(activity.observations);
         renderDetails(rows, metadata.toString(), samples, activity.declaration != null, dialog);
         dialog.show();
@@ -581,18 +602,76 @@ public final class IntentLibraryFragment extends Fragment {
                     .append(TextUtils.join(" · ", extra.examples));
         }
         if (!entry.parameters.isEmpty() && !entry.parametersComplete) data.append('\n').append(getString(R.string.library_extras_incomplete));
-        androidx.appcompat.app.AlertDialog.Builder dialog = AppDialogs.builder(context)
-                .setTitle(R.string.library_observed_title).setView(detailBody(data))
+        boolean completeSample = !TextUtils.isEmpty(entry.intentUri);
+        AlertDialog.Builder builder = AppDialogs.builder(context)
+                .setTitle(R.string.library_observed_title)
                 .setNegativeButton(R.string.library_close, null)
                 .setNeutralButton(R.string.delete, (d, which) -> confirmDelete(entry, onDeleted));
-        if (entry.intentUri != null) dialog.setPositiveButton(R.string.library_copy_uri, (d, which) -> {
+        if (completeSample) builder.setPositiveButton(R.string.library_copy_uri, (d, which) -> {
             ClipboardManager clipboard = context.getSystemService(ClipboardManager.class);
             if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText("Intent", entry.intentUri));
         });
+        AlertDialog dialog = builder.create();
+        dialog.setView(detailBody(data, completeSample ? () -> {
+            dialog.dismiss();
+            openSampleInInterceptor(entry);
+        } : null));
         dialog.show();
     }
 
-    private View detailBody(CharSequence value) {
+    private void openActivityInInterceptor(PackageActivityCatalog.Activity activity) {
+        Intent draft = new Intent().setComponent(new ComponentName(packageName, activity.name));
+        if (activity.declaration != null && activity.declaration.launcher) {
+            draft.setAction(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        }
+        openInterceptor(draft, draft.toUri(Intent.URI_INTENT_SCHEME), packageName, activity.name);
+    }
+
+    private void openSampleInInterceptor(IntentLibrary.Observation sample) {
+        try {
+            Intent draft = Intent.parseUri(sample.intentUri, Intent.URI_INTENT_SCHEME);
+            String source = sample.sourcePackage.isEmpty() ? packageName : sample.sourcePackage;
+            openInterceptor(draft, sample.intentUri, source, sample.activity);
+        } catch (URISyntaxException | RuntimeException error) {
+            showInterceptorError();
+        }
+    }
+
+    private void openInterceptor(Intent target, String uri, String source, String activity) {
+        Context context = requireContext().getApplicationContext();
+        View requestView = getView();
+        IntentLibrary.UI_IO.execute(() -> {
+            try {
+                Bundle payload = DataConverter.convertIntentToBundle(target);
+                payload.putString("packageName", source);
+                payload.putString("category", "Intent");
+                payload.putString("uri", uri);
+                String appName = AppInfoHelper.getAppInfo(context, packageName).getAppName();
+                ItemData draft = new ItemData(null, appName, activity, target.getDataString(), "", "",
+                        payload, "Intent", "", uri);
+                String token = DetailPayloadStore.save(context, draft);
+                ContextCompat.getMainExecutor(context).execute(() -> {
+                    if (getView() != requestView || !isResumed()) return;
+                    try {
+                        startActivity(new Intent(requireContext(), IntentIntercept.class)
+                                .putExtra(DetailPayloadStore.EXTRA_TOKEN, token));
+                    } catch (RuntimeException error) {
+                        showInterceptorError();
+                    }
+                });
+            } catch (RuntimeException error) {
+                ContextCompat.getMainExecutor(context).execute(() -> {
+                    if (getView() == requestView && isResumed()) showInterceptorError();
+                });
+            }
+        });
+    }
+
+    private void showInterceptorError() {
+        Toast.makeText(requireContext(), R.string.library_open_interceptor_error, Toast.LENGTH_LONG).show();
+    }
+
+    private View detailBody(CharSequence value, @Nullable Runnable onOpenInterceptor) {
         Context themed = AppDialogs.context(requireContext());
         ScrollView scroll = new ScrollView(themed);
         TextView details = new TextView(themed);
@@ -602,7 +681,19 @@ public final class IntentLibraryFragment extends Fragment {
         details.setPadding(padding, padding, padding, padding);
         details.setText(value);
         scroll.addView(details);
-        return scroll;
+        if (onOpenInterceptor == null) return scroll;
+
+        AppCompatButton transfer = new AppCompatButton(themed, null, androidx.appcompat.R.attr.borderlessButtonStyle);
+        transfer.setText(R.string.library_open_interceptor);
+        transfer.setTextColor(ContextCompat.getColor(themed, R.color.dialog_accent));
+        transfer.setAllCaps(false);
+        transfer.setMinimumHeight(AppDialogs.dp(themed, 48));
+        transfer.setOnClickListener(view -> onOpenInterceptor.run());
+        LinearLayout body = new LinearLayout(themed);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.addView(transfer, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        body.addView(scroll, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        return body;
     }
 
     private void field(StringBuilder body, int label, String value) {

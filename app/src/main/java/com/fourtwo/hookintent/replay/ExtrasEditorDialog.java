@@ -47,7 +47,13 @@ public final class ExtrasEditorDialog {
     public static void show(FragmentActivity activity, Bundle captureRecord, int title,
             int confirmation, Consumer<Bundle> onSaved) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
-        new Editor(activity, captureRecord, title, confirmation, onSaved).show();
+        new Editor(activity, captureRecord, activity.getText(title), confirmation, onSaved, null, true).show();
+    }
+
+    public static void showReplay(FragmentActivity activity, Bundle record, CharSequence title, boolean editable,
+            Consumer<Bundle> onReplay, Consumer<Bundle> onCopyLink) {
+        if (activity.isFinishing() || activity.isDestroyed()) return;
+        new Editor(activity, record, title, R.string.navigation_replay_start, onReplay, onCopyLink, editable).show();
     }
 
     private static final class Location {
@@ -59,8 +65,10 @@ public final class ExtrasEditorDialog {
         final FragmentActivity activity;
         final Context context;
         final Bundle draft;
-        final Consumer<Bundle> onSaved;
-        final int title, confirmation;
+        final Consumer<Bundle> onSaved, onCopyLink;
+        final CharSequence title;
+        final int confirmation;
+        final boolean editable;
         final List<Location> trail = new ArrayList<>();
         final List<JSONObject> nodes = new ArrayList<>();
         final NodesAdapter adapter = new NodesAdapter();
@@ -76,13 +84,16 @@ public final class ExtrasEditorDialog {
         boolean closed, busy, opened;
         int generation;
 
-        Editor(FragmentActivity activity, Bundle record, int title, int confirmation, Consumer<Bundle> onSaved) {
+        Editor(FragmentActivity activity, Bundle record, CharSequence title, int confirmation, Consumer<Bundle> onSaved,
+                Consumer<Bundle> onCopyLink, boolean editable) {
             this.activity = activity;
             this.context = AppDialogs.context(activity);
             this.draft = new Bundle(record);
             this.title = title;
             this.confirmation = confirmation;
             this.onSaved = onSaved;
+            this.onCopyLink = onCopyLink;
+            this.editable = editable;
         }
 
         void show() {
@@ -108,7 +119,8 @@ public final class ExtrasEditorDialog {
             navigation.addView(breadcrumb, pathParameters);
             content.addView(navigation);
             TextView explanation = text(12, R.color.dialog_secondary);
-            explanation.setText(R.string.extras_editor_hint);
+            explanation.setText(onCopyLink == null ? R.string.extras_editor_hint
+                    : editable ? R.string.replay_templates_edit_hint : R.string.replay_templates_fixed_hint);
             explanation.setPadding(0, dp(4), 0, dp(8));
             content.addView(explanation);
             progress = new ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal);
@@ -127,9 +139,11 @@ public final class ExtrasEditorDialog {
             list.setClipToPadding(false);
             list.setPadding(0, 0, 0, dp(12));
             content.addView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
-            dialog = AppDialogs.builder(context).setTitle(title).setView(content)
+            AlertDialog.Builder builder = AppDialogs.builder(context).setTitle(title).setView(content)
                     .setNegativeButton(R.string.extras_cancel, null)
-                    .setPositiveButton(confirmation, null).create();
+                    .setPositiveButton(confirmation, null);
+            if (onCopyLink != null) builder.setNeutralButton(R.string.replay_templates_copy_link, null);
+            dialog = builder.create();
             dialog.setOnDismissListener(unused -> close());
             dialog.setOnKeyListener((unused, code, event) -> {
                 if (code == KeyEvent.KEYCODE_BACK && trail.size() > 1) {
@@ -141,7 +155,10 @@ public final class ExtrasEditorDialog {
             back.setOnClickListener(view -> up());
             dialog.show();
             AppDialogs.sizeForList(dialog);
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> save());
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> submit(onSaved, true));
+            if (onCopyLink != null) {
+                dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(view -> submit(onCopyLink, false));
+            }
             activity.getLifecycle().addObserver(lifecycle);
             open();
         }
@@ -215,13 +232,18 @@ public final class ExtrasEditorDialog {
                 trail.add(new Location(node.optString("id"), node.optString("name")));
                 updateTrail();
                 load();
-            } else if (node.optBoolean("editable")) edit(node);
-            else if (node.optBoolean("nullable")) nullValue(node);
+            } else if (editable && node.optBoolean("editable")
+                    && (onCopyLink == null || !node.optBoolean("isNull"))) edit(node);
+            else if (canSetNull(node)) nullValue(node);
             else {
                 String reason = node.optString("reason", node.optString("error", context.getString(R.string.extras_read_only)));
                 AppDialogs.builder(context).setTitle(node.optString("name")).setMessage(reason)
                         .setPositiveButton(android.R.string.ok, null).show();
             }
+        }
+
+        boolean canSetNull(JSONObject node) {
+            return editable && onCopyLink == null && node.optBoolean("nullable");
         }
 
         void up() {
@@ -271,7 +293,7 @@ public final class ExtrasEditorDialog {
             form.addView(input, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
             AlertDialog.Builder builder = AppDialogs.builder(context).setTitle(node.optString("name")).setView(form)
                     .setNegativeButton(R.string.extras_cancel, null).setPositiveButton(R.string.extras_apply, null);
-            if (node.optBoolean("nullable")) builder.setNeutralButton(R.string.extras_set_null, null);
+            if (canSetNull(node)) builder.setNeutralButton(R.string.extras_set_null, null);
             AlertDialog child = builder.create();
             valueDialog = child;
             child.setOnDismissListener(unused -> { if (valueDialog == child) valueDialog = null; });
@@ -279,12 +301,12 @@ public final class ExtrasEditorDialog {
             Spinner finalTypePicker = typePicker;
             child.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> apply(node, input.getText().toString(), false, child, input,
                     finalTypePicker == null ? null : "java.lang." + finalTypePicker.getSelectedItem().toString()));
-            if (node.optBoolean("nullable")) child.getButton(AlertDialog.BUTTON_NEUTRAL)
+            if (canSetNull(node)) child.getButton(AlertDialog.BUTTON_NEUTRAL)
                     .setOnClickListener(view -> apply(node, "", true, child, input));
         }
 
         void nullValue(JSONObject node) {
-            if (!alive() || busy || !node.optBoolean("nullable")) return;
+            if (!alive() || busy || !canSetNull(node)) return;
             AlertDialog child = AppDialogs.builder(context).setTitle(node.optString("name"))
                     .setMessage(R.string.extras_null_confirmation).setNegativeButton(R.string.extras_cancel, null)
                     .setPositiveButton(R.string.extras_set_null, null).create();
@@ -335,11 +357,11 @@ public final class ExtrasEditorDialog {
             }
         }
 
-        void save() {
+        void submit(Consumer<Bundle> action, boolean dismiss) {
             if (!alive() || busy || !opened) return;
             try {
-                onSaved.accept(new Bundle(draft));
-                dialog.dismiss();
+                action.accept(new Bundle(draft));
+                if (dismiss) dialog.dismiss();
             } catch (RuntimeException error) { fail(error); }
         }
 
@@ -351,6 +373,8 @@ public final class ExtrasEditorDialog {
             retry.setEnabled(!value);
             Button save = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
             if (save != null) save.setEnabled(opened && !value);
+            Button copy = dialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+            if (copy != null) copy.setEnabled(opened && !value);
         }
 
         void message(String text, boolean error) {
@@ -420,7 +444,7 @@ public final class ExtrasEditorDialog {
                 holder.value.setVisibility(value.isEmpty() ? View.GONE : View.VISIBLE);
                 holder.itemView.setOnClickListener(view -> enter(node));
                 holder.itemView.setOnLongClickListener(view -> {
-                    if (!busy && node.optBoolean("nullable")) { nullValue(node); return true; }
+                    if (!busy && canSetNull(node)) { nullValue(node); return true; }
                     return false;
                 });
                 holder.itemView.setContentDescription(node.optString("name") + ", " + node.optString("type") + ", " + value);

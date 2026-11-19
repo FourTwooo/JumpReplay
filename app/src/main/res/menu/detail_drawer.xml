@@ -3,14 +3,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        android:id="@+id/copy_code"
-        android:icon="@drawable/copy"
-        android:orderInCategory="1"
-        android:title="@string/copy_code"
-        app:tint="@color/white"
-        app:showAsAction="ifRoom" />
-
-    <item
         android:id="@+id/star"
         android:icon="@drawable/star_selector"
         android:orderInCategory="0"
@@ -20,4 +12,17 @@
         app:showAsAction="ifRoom" />
 
     <item android:id="@+id/action_save" android:title="@string/action_save" app:showAsAction="never" />
+
+    <item android:id="@+id/detail_copy_intent_uri"
+        android:title="@string/detail_copy_intent_uri" app:showAsAction="never" />
+    <item android:id="@+id/detail_copy_scheme_uri"
+        android:title="@string/detail_copy_scheme_uri" app:showAsAction="never" />
+    <item android:id="@+id/detail_copy_am_command"
+        android:title="@string/detail_copy_am_command" app:showAsAction="never" />
+    <item android:id="@+id/detail_open_interceptor"
+        android:title="@string/detail_open_interceptor" app:showAsAction="never" />
+    <item android:id="@+id/detail_generate_replay_intent"
+        android:title="@string/navigation_replay_generate_intent" app:showAsAction="never" />
+    <item android:id="@+id/detail_generate_native_intent"
+        android:title="@string/navigation_replay_native_intent" app:showAsAction="never" />
 </menu>

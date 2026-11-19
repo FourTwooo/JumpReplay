@@ -1,5 +1,9 @@
 <resources>
     <string name="replay_templates_title">重放</string>
+    <string name="replay_templates_more">模板操作</string>
+    <string name="replay_templates_copy_link">复制链接</string>
+    <string name="replay_templates_edit_hint">修改仅用于本次重放或复制的链接。</string>
+    <string name="replay_templates_fixed_hint">此模板使用固定参数，可以直接重放或复制链接。</string>
     <string name="replay_templates_save">保存重放模板</string>
     <string name="replay_templates_empty">还没有重放模板。可以从可重放的 Fragment 记录生成，也可以导入别人分享的模板。</string>
     <string name="replay_templates_import">导入模板</string>

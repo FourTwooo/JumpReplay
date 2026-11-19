@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_replay_edit">Edit and replay</string>
+    <string name="detail_replay_checking">Looking for a replay route…</string>
+    <string name="detail_replay_unavailable">Replay unavailable · %1$s</string>
+    <string name="detail_copy_intent_uri">Copy Intent URI</string>
+    <string name="detail_copy_scheme_uri">Copy Scheme URI</string>
+    <string name="detail_copy_am_command">Copy am command</string>
+    <string name="detail_open_interceptor">Open Intent Interceptor</string>
+</resources>

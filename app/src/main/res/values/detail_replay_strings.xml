@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_replay_edit">改参重放</string>
+    <string name="detail_replay_checking">正在查找可用的重放入口…</string>
+    <string name="detail_replay_unavailable">无法重放 · %1$s</string>
+    <string name="detail_copy_intent_uri">复制 Intent URI</string>
+    <string name="detail_copy_scheme_uri">复制 Scheme URI</string>
+    <string name="detail_copy_am_command">复制 am 命令</string>
+    <string name="detail_open_interceptor">转到意图拦截器</string>
+</resources>

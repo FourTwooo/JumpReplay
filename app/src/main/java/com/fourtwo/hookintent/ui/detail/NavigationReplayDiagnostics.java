@@ -27,6 +27,22 @@ final class NavigationReplayDiagnostics {
         add(context, rows, diagnostics.getString("storage"), R.string.navigation_replay_diagnostic_storage);
     }
 
+    static String summary(Context context, Bundle record) {
+        Bundle diagnostics = record.getBundle(Constants.NAVIGATION_REPLAY_DIAGNOSTICS);
+        if (diagnostics == null || diagnostics.isEmpty()) {
+            return context.getString(R.string.navigation_replay_diagnostic_legacy);
+        }
+        String reason = diagnostics.getString("storage");
+        if (reason == null) reason = diagnostics.getString("observation");
+        if (reason == null) {
+            String transaction = diagnostics.getString("transaction");
+            String host = diagnostics.getString("host");
+            reason = transaction == null || "transaction_not_seen".equals(transaction) ? host : transaction;
+            if (reason == null) reason = transaction;
+        }
+        return context.getString(reason == null ? R.string.navigation_replay_diagnostic_unknown : reasonText(reason));
+    }
+
     private static void add(Context context, List<Pair<String, String>> rows, String reason, @StringRes int label) {
         if (reason == null) return;
         rows.add(new Pair<>(context.getString(label), context.getString(reasonText(reason))));

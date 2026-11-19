@@ -40,6 +40,8 @@
     <string name="library_declared_title">系统声明的 Activity</string>
     <string name="library_show_observations">查看已捕获的 Intent</string>
     <string name="library_copy_uri">复制 Intent URI</string>
+    <string name="library_open_interceptor">转到意图拦截器</string>
+    <string name="library_open_interceptor_error">无法打开意图拦截器</string>
     <string name="library_close">关闭</string>
     <string name="library_permission">访问权限</string>
     <string name="library_alias">别名指向的 Activity</string>

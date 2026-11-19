@@ -40,6 +40,8 @@
     <string name="library_declared_title">Declared Activity</string>
     <string name="library_show_observations">Show captured Intents</string>
     <string name="library_copy_uri">Copy Intent URI</string>
+    <string name="library_open_interceptor">Open in Intent interceptor</string>
+    <string name="library_open_interceptor_error">Could not open the Intent interceptor</string>
     <string name="library_close">Close</string>
     <string name="library_permission">Required permission</string>
     <string name="library_alias">Alias target Activity</string>

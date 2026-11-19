@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="detail_replay_edit">編集して再実行</string>
+    <string name="detail_replay_checking">再実行できる経路を確認しています…</string>
+    <string name="detail_replay_unavailable">再実行不可 · %1$s</string>
+    <string name="detail_copy_intent_uri">Intent URI をコピー</string>
+    <string name="detail_copy_scheme_uri">Scheme URI をコピー</string>
+    <string name="detail_copy_am_command">am コマンドをコピー</string>
+    <string name="detail_open_interceptor">Intent インターセプターを開く</string>
+</resources>

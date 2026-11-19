@@ -1,5 +1,9 @@
 <resources>
     <string name="replay_templates_title">Replay</string>
+    <string name="replay_templates_more">Template options</string>
+    <string name="replay_templates_copy_link">Copy link</string>
+    <string name="replay_templates_edit_hint">Edits apply to this replay or the link you copy.</string>
+    <string name="replay_templates_fixed_hint">This template uses fixed arguments. You can replay it or copy its link.</string>
     <string name="replay_templates_save">Save replay template</string>
     <string name="replay_templates_empty">Generate a template from a replayable Fragment capture or import a shared template.</string>
     <string name="replay_templates_import">Import template</string>

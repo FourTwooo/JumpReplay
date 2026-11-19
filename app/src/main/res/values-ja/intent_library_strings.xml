@@ -40,6 +40,8 @@
     <string name="library_declared_title">宣言された Activity</string>
     <string name="library_show_observations">捕捉した Intent を表示</string>
     <string name="library_copy_uri">Intent URI をコピー</string>
+    <string name="library_open_interceptor">Intent インターセプターで開く</string>
+    <string name="library_open_interceptor_error">Intent インターセプターを開けませんでした</string>
     <string name="library_close">閉じる</string>
     <string name="library_permission">必要な権限</string>
     <string name="library_alias">エイリアス先の Activity</string>

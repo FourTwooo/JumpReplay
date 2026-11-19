@@ -10,12 +10,47 @@
         android:maxLines="4" android:ellipsize="end"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+    <LinearLayout
+        android:id="@+id/detail_replay_area"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="6dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/urlTextView">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/detail_replay_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/detail_replay_edit"
+            android:textAllCaps="false"
+            android:textColor="@android:color/white"
+            app:backgroundTint="@color/screen_primary"
+            app:cornerRadius="12dp" />
+
+        <TextView
+            android:id="@+id/detail_replay_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityLiveRegion="polite"
+            android:lineSpacingExtra="3dp"
+            android:paddingBottom="6dp"
+            android:textColor="@color/screen_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+    </LinearLayout>
     <com.google.android.material.tabs.TabLayout android:id="@+id/tabLayout"
         android:layout_width="0dp" android:layout_height="wrap_content"
         android:background="@color/screen_bg" app:tabTextColor="@color/screen_secondary"
         app:tabSelectedTextColor="@color/screen_accent" app:tabIndicatorColor="@color/screen_accent"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/urlTextView" />
+        app:layout_constraintTop_toBottomOf="@id/detail_replay_area" />
     <FrameLayout android:id="@+id/contentFrame" android:layout_width="0dp" android:layout_height="0dp"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tabLayout" app:layout_constraintBottom_toBottomOf="parent">

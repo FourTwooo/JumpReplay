@@ -216,11 +216,15 @@ public final class FragmentReplayStore {
     }
 
     public static synchronized Intent templateIntent(Context context, String id) throws Exception {
+        return templateDraft(context, id).intent(null);
+    }
+
+    public static synchronized TemplateDraft templateDraft(Context context, String id) throws Exception {
         Bundle payload = requireReady(context, id, readPayload(context, id));
         NavigationReplayTransport.Source.installed(context, payload.getBundle("source"));
-        Bundle arguments = payload.getInt("version") == VERSION_EDITABLE_ARGUMENTS
-                ? payload.getBundle("arguments") : null;
-        return intent(context, id, arguments);
+        Bundle arguments = checkedEdits(payload.getBundle("descriptor"), payload.getBundle("arguments"));
+        boolean editable = payload.getInt("version") == VERSION_EDITABLE_ARGUMENTS;
+        return new TemplateDraft(intent(context, id, editable ? arguments : null), arguments, editable);
     }
 
     public static synchronized void deleteTemplate(Context context, String id) throws IOException {
@@ -430,6 +434,32 @@ public final class FragmentReplayStore {
             this.versionCode = versionCode;
             this.ready = ready;
             this.pending = pending;
+        }
+    }
+
+    /** A local draft applies edits only to the outgoing Intent, leaving the saved template intact. */
+    public static final class TemplateDraft {
+        private final Intent target;
+        private final Bundle arguments;
+        public final boolean editable;
+
+        private TemplateDraft(Intent target, Bundle arguments, boolean editable) {
+            this.target = target;
+            this.arguments = arguments;
+            this.editable = editable;
+        }
+
+        public Bundle arguments() {
+            return new Bundle(arguments);
+        }
+
+        public Intent intent(Bundle edited) {
+            Intent result = new Intent(target);
+            if (!editable || edited == null) return result;
+            if (!arguments.keySet().equals(edited.keySet())) {
+                throw new IllegalArgumentException("重放参数与原调用不匹配");
+            }
+            return result.replaceExtras(applyOverrides(new Bundle(arguments), edited));
         }
     }
 

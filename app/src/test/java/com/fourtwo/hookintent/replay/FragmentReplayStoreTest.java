@@ -98,6 +98,29 @@ public class FragmentReplayStoreTest {
                 new Intent(generated).putExtra("item", new String(new char[8193]))));
     }
 
+    @Test public void templateDraftEditsSurviveUriRoundTripWithoutChangingSavedDefaults() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        Bundle capture = capturedCall(context);
+        Bundle descriptor = capture.getBundle(Constants.NAVIGATION_REPLAY);
+        Intent original = FragmentReplayStore.createIntent(context, capture, descriptor,
+                descriptor.getBundle("arguments"), "draft test", "draft-test");
+        FragmentReplayStore.TemplateDraft draft = FragmentReplayStore.templateDraft(context, "draft-test");
+        assertTrue(draft.editable);
+        Bundle edited = draft.arguments();
+        edited.putString("item", "只用于本次重放");
+        edited.putLong("selectedIndex", 42L);
+        Intent replay = draft.intent(edited);
+        assertEquals(original.getData(), replay.getData());
+        Intent copied = Intent.parseUri(replay.toUri(Intent.URI_INTENT_SCHEME), Intent.URI_INTENT_SCHEME);
+        FragmentReplayStore.Prepared loaded = FragmentReplayStore.load(context, copied);
+        assertEquals("只用于本次重放", loaded.arguments.getString("item"));
+        assertEquals(42L, loaded.arguments.get("selectedIndex"));
+        assertEquals(original.toUri(Intent.URI_INTENT_SCHEME),
+                FragmentReplayStore.templateIntent(context, "draft-test").toUri(Intent.URI_INTENT_SCHEME));
+        edited.putInt("selectedIndex", 42);
+        assertThrows(IllegalArgumentException.class, () -> draft.intent(edited));
+    }
+
     @Test public void olderFixedArgumentIntentStillIgnoresOverrides() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         Bundle capture = capturedCall(context);
@@ -114,6 +137,14 @@ public class FragmentReplayStoreTest {
 
         Intent legacy = new Intent(generated).replaceExtras((Bundle) null).putExtra("item", "ignored value");
         assertEquals("old captured value", FragmentReplayStore.load(context, legacy).arguments.getString("item"));
+
+        FragmentReplayStore.TemplateDraft draft = FragmentReplayStore.templateDraft(context,
+                generated.getData().getLastPathSegment());
+        assertFalse(draft.editable);
+        assertEquals("old captured value", draft.arguments().getString("item"));
+        Intent fromDraft = draft.intent(legacy.getExtras());
+        assertEquals(generated.getData(), fromDraft.getData());
+        assertFalse(fromDraft.hasExtra("item"));
     }
 
     @Test public void rejectsUnknownCapabilitiesAndUnexpectedEntryShape() throws Exception {

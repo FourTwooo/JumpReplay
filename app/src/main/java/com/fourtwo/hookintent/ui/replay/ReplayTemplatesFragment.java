@@ -15,11 +15,16 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatEditText;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.base.DataConverter;
+import com.fourtwo.hookintent.base.IntentPayloadCodec;
+import com.fourtwo.hookintent.replay.ExtrasEditorDialog;
 import com.fourtwo.hookintent.replay.FragmentReplayStore;
 import com.fourtwo.hookintent.replay.FragmentReplayStore.Template;
 import com.fourtwo.hookintent.utils.AppDialogs;
@@ -31,6 +36,7 @@ import java.util.function.Consumer;
 
 public class ReplayTemplatesFragment extends Fragment {
     private TemplateAdapter adapter;
+    private int openingTemplate;
 
     public ReplayTemplatesFragment() {
         super(R.layout.fragment_replay_templates);
@@ -106,31 +112,48 @@ public class ReplayTemplatesFragment extends Fragment {
         });
     }
 
-    private void showActions(Template entry) {
+    private void openTemplate(Template entry) {
+        int request = ++openingTemplate;
+        if (entry.pending) {
+            showPending();
+            return;
+        }
         Context app = requireContext().getApplicationContext();
-        String[] options = {
-                getString(R.string.navigation_replay_generated_intent), getString(R.string.replay_templates_export),
-                getString(R.string.replay_templates_duplicate), getString(R.string.replay_templates_rename),
-                getString(R.string.delete)
-        };
-        Runnable[] actions = {
-                () -> {
-                    if (entry.pending) {
-                        showPending();
-                    } else {
-                        run(() -> FragmentReplayStore.templateIntent(app, entry.id),
-                                intent -> ReplayTemplateDialogs.showIntent(requireActivity(), intent));
-                    }
-                },
-                () -> run(() -> FragmentReplayStore.exportTemplate(app, entry.id), this::showExport),
-                () -> showDuplicate(entry),
-                () -> showRename(entry),
-                () -> confirmDelete(entry)
-        };
-        AppDialogs.builder(requireContext())
-                .setTitle(entry.name)
-                .setItems(options, (dialog, which) -> actions[which].run())
-                .show();
+        run(() -> FragmentReplayStore.templateDraft(app, entry.id), draft -> {
+            if (request != openingTemplate) return;
+            FragmentActivity activity = requireActivity();
+            Bundle record = DataConverter.convertIntentToBundle(new Intent().putExtras(draft.arguments()));
+            ExtrasEditorDialog.showReplay(activity, record, entry.name, draft.editable,
+                    edited -> activity.startActivity(draft.intent(IntentPayloadCodec.decode(edited).getExtras())),
+                    edited -> {
+                        Intent target = draft.intent(IntentPayloadCodec.decode(edited).getExtras());
+                        ReplayTemplateDialogs.copy(activity, R.string.replay_templates_title,
+                                target.toUri(Intent.URI_INTENT_SCHEME));
+                    });
+        });
+    }
+
+    private void showActions(View anchor, Template entry) {
+        openingTemplate++;
+        Context app = requireContext().getApplicationContext();
+        PopupMenu menu = new PopupMenu(requireContext(), anchor, Gravity.END);
+        menu.getMenu().add(R.string.replay_templates_export).setOnMenuItemClickListener(item -> {
+            run(() -> FragmentReplayStore.exportTemplate(app, entry.id), this::showExport);
+            return true;
+        });
+        menu.getMenu().add(R.string.replay_templates_duplicate).setOnMenuItemClickListener(item -> {
+            showDuplicate(entry);
+            return true;
+        });
+        menu.getMenu().add(R.string.replay_templates_rename).setOnMenuItemClickListener(item -> {
+            showRename(entry);
+            return true;
+        });
+        menu.getMenu().add(R.string.delete).setOnMenuItemClickListener(item -> {
+            confirmDelete(entry);
+            return true;
+        });
+        menu.show();
     }
 
     private void showPending() {
@@ -218,12 +241,7 @@ public class ReplayTemplatesFragment extends Fragment {
                         }
                         dialog.dismiss();
                         refresh();
-                        if (duplicate.ready) {
-                            run(() -> FragmentReplayStore.templateIntent(app, duplicate.id),
-                                    intent -> ReplayTemplateDialogs.showIntent(requireActivity(), intent));
-                        } else if (duplicate.pending) {
-                            showPending();
-                        }
+                        if (duplicate.ready || duplicate.pending) openTemplate(duplicate);
                     });
         });
     }
@@ -285,7 +303,8 @@ public class ReplayTemplatesFragment extends Fragment {
             int status = entry.ready ? R.string.replay_templates_ready
                     : entry.pending ? R.string.replay_templates_pending : R.string.replay_templates_unavailable;
             holder.status.setText(getString(R.string.replay_templates_status, entry.id, getString(status)));
-            holder.itemView.setOnClickListener(v -> showActions(entry));
+            holder.itemView.setOnClickListener(v -> openTemplate(entry));
+            holder.more.setOnClickListener(v -> showActions(v, entry));
         }
 
         @Override public int getItemCount() {
@@ -297,12 +316,14 @@ public class ReplayTemplatesFragment extends Fragment {
         final TextView name;
         final TextView source;
         final TextView status;
+        final View more;
 
         TemplateHolder(View view) {
             super(view);
             name = view.findViewById(R.id.replay_template_name);
             source = view.findViewById(R.id.replay_template_source);
             status = view.findViewById(R.id.replay_template_status);
+            more = view.findViewById(R.id.replay_template_more);
         }
     }
 }

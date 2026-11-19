@@ -18,7 +18,6 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.PopupMenu;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,6 +39,7 @@ import com.fourtwo.hookintent.utils.AppDialogs;
 import com.fourtwo.hookintent.IntentIntercept;
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
+import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.IntentPayloadCodec;
 import com.fourtwo.hookintent.base.DetailPayloadStore;
 import com.fourtwo.hookintent.base.JsonHandler;
@@ -86,7 +86,7 @@ public class DetailFragment extends Fragment {
         if (dbManager == null) dbManager = new LocalDatabaseManager(requireContext());
         // 打开数据库
         dbManager.openDatabase(Constants.STAR_DB_NAME);
-        // 触发菜单重新创建
+        loadNativeReplay();
         requireActivity().invalidateOptionsMenu();
     }
     @SuppressLint("MissingInflatedId")
@@ -283,6 +283,8 @@ public class DetailFragment extends Fragment {
             }
         }
 
+        nativeReplay = null;
+        updateReplayAction(view, navigationRecord() != null);
         requireActivity().addMenuProvider(new MenuProvider() {
             boolean isStarred = false; // 是否已收藏的状态
 
@@ -290,16 +292,16 @@ public class DetailFragment extends Fragment {
             public void onCreateMenu(@NonNull Menu menu, @NonNull MenuInflater menuInflater) {
                 menu.clear(); // 清除现有菜单项，避免重复
                 menuInflater.inflate(R.menu.detail_drawer, menu); // 加载菜单
-                boolean canReplay = replayableItem() != null;
-                boolean navigation = itemData != null
-                        && NavigationCaptureSource.fromRecord(itemData.getCategory(), itemData.getAppBundle()) != null;
-                menu.findItem(R.id.action_save).setVisible(canReplay);
-                MenuItem replayMenu = menu.findItem(R.id.copy_code);
-                if (navigation) replayMenu.setTitle(R.string.navigation_replay_options);
-                boolean localReplay = navigation
-                        && itemData.getAppBundle().getBundle(Constants.NAVIGATION_REPLAY) != null;
-                replayMenu.setVisible(canReplay || localReplay);
-                if (navigation) loadNativeReplay(itemData.getAppBundle(), replayMenu, localReplay);
+                ItemData replay = replayableItem();
+                boolean intent = replay != null && "Intent".equals(replay.getCategory());
+                boolean scheme = replay != null && "Scheme".equals(replay.getCategory());
+                menu.findItem(R.id.action_save).setVisible(replay != null);
+                menu.findItem(R.id.detail_copy_intent_uri).setVisible(intent);
+                menu.findItem(R.id.detail_copy_scheme_uri).setVisible(scheme);
+                menu.findItem(R.id.detail_copy_am_command).setVisible(intent);
+                menu.findItem(R.id.detail_open_interceptor).setVisible(replay != null);
+                menu.findItem(R.id.detail_generate_replay_intent).setVisible(localReplayDescriptor() != null);
+                menu.findItem(R.id.detail_generate_native_intent).setVisible(nativeReplay != null);
 
                 // 动态设置收藏按钮图标
                 try {
@@ -335,11 +337,6 @@ public class DetailFragment extends Fragment {
                         Toast.makeText(requireContext(), error.getMessage(), Toast.LENGTH_LONG).show();
                     }
                     return true;
-                } else if (itemId == R.id.copy_code) {
-                    // 获取菜单项的 View 并传递给 showOptionsDialog
-                    View anchorView = requireActivity().findViewById(R.id.copy_code);
-                    showOptionsDialog(anchorView); // 调用修改后的 showOptionsDialog
-                    return true;
                 } else if (itemId == R.id.star) {
                     try {
                         String _hash = jsonObject.getString(Constants.SQL_HASH); // 获取 _hash
@@ -372,7 +369,7 @@ public class DetailFragment extends Fragment {
                     }
                     return true;
                 }
-                return false;
+                return handleReplayMenu(itemId);
             }
         }, getViewLifecycleOwner(), Lifecycle.State.RESUMED);
 
@@ -381,12 +378,30 @@ public class DetailFragment extends Fragment {
     private static final java.util.concurrent.Executor NATIVE_LOOKUP =
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private Intent nativeReplay;
+    private int nativeLookupRequest;
 
-    private void loadNativeReplay(Bundle record, MenuItem replayMenu, boolean hasLocalReplay) {
+    private Bundle navigationRecord() {
+        if (itemData == null) return null;
+        Bundle record = itemData.getAppBundle();
+        return NavigationCaptureSource.fromRecord(itemData.getCategory(), record) == null ? null : record;
+    }
+
+    private Bundle localReplayDescriptor() {
+        Bundle record = navigationRecord();
+        if (record == null) return null;
+        Bundle descriptor = record.getBundle(Constants.NAVIGATION_REPLAY);
+        return descriptor != null && descriptor.getBundle("arguments") != null ? descriptor : null;
+    }
+
+    private void loadNativeReplay() {
+        Bundle record = navigationRecord();
+        View view = getView();
+        if (record == null || view == null) return;
+        int request = ++nativeLookupRequest;
         nativeReplay = null;
-        android.content.Context context = requireContext().getApplicationContext();
+        updateReplayAction(view, true);
+        Context context = requireContext().getApplicationContext();
         android.app.Activity host = requireActivity();
-        View view = requireView();
         NATIVE_LOOKUP.execute(() -> {
             Intent match = null;
             try {
@@ -396,102 +411,87 @@ public class DetailFragment extends Fragment {
             }
             final Intent result = match;
             host.runOnUiThread(() -> {
-                if (getView() != view) return;
+                if (getView() != view || request != nativeLookupRequest) return;
                 nativeReplay = result;
-                replayMenu.setVisible(hasLocalReplay || result != null);
+                updateReplayAction(view, false);
+                if (result != null) host.invalidateOptionsMenu();
             });
         });
     }
 
-    private void showOptionsDialog(View anchorView) {
-        // 如果 itemData 为空，直接返回
-        if (itemData == null) {
-            Toast.makeText(requireContext(), "错误：数据未加载", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
+    private void updateReplayAction(View view, boolean checkingNative) {
+        View area = view.findViewById(R.id.detail_replay_area);
+        Button button = view.findViewById(R.id.detail_replay_button);
+        TextView status = view.findViewById(R.id.detail_replay_status);
         ItemData replay = replayableItem();
-        Bundle capture = itemData.getAppBundle();
-        NavigationCaptureSource navigation = NavigationCaptureSource.fromRecord(itemData.getCategory(), capture);
-        if (replay == null && navigation == null) return;
-        Bundle bundle = replay == null ? Bundle.EMPTY : replay.getAppBundle();
-        String category = replay == null ? "" : replay.getCategory();
-        List<String> options = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
+        Bundle record = navigationRecord();
+        Bundle descriptor = localReplayDescriptor();
+        Intent nativeIntent = nativeReplay;
+        Runnable action = null;
+        String reason = null;
+        if (replay != null) {
+            action = "Intent".equals(replay.getCategory())
+                    ? () -> editIntentAndReplay(replay, replay.getAppBundle(), replay.getUri())
+                    : () -> openInterceptor(replay);
+        } else if (descriptor != null) {
+            action = () -> NavigationReplayDialogs.editInApp(requireActivity(), itemData, descriptor);
+        } else if (nativeIntent != null) {
+            action = () -> editIntentAndReplay(itemData, DataConverter.convertIntentToBundle(nativeIntent),
+                    nativeIntent.toUri(Intent.URI_INTENT_SCHEME));
+        } else if (record != null) {
+            reason = checkingNative ? getString(R.string.detail_replay_checking)
+                    : getString(R.string.detail_replay_unavailable,
+                            NavigationReplayDiagnostics.summary(requireContext(), record));
+        }
 
-        if (navigation != null) {
-            Intent nativeIntent = nativeReplay;
-            if (nativeIntent != null) {
-                options.add(getString(R.string.navigation_replay_native_intent));
-                actions.add(() -> ReplayTemplateDialogs.showIntent(requireActivity(), nativeIntent,
-                        R.string.navigation_replay_native_title));
+        area.setVisibility(action != null || reason != null ? View.VISIBLE : View.GONE);
+        button.setVisibility(action != null ? View.VISIBLE : View.GONE);
+        Runnable replayAction = action;
+        button.setOnClickListener(replayAction == null ? null : ignored -> replayAction.run());
+        status.setVisibility(reason != null ? View.VISIBLE : View.GONE);
+        status.setText(reason);
+    }
+
+    private void editIntentAndReplay(ItemData source, Bundle record, String originalUri) {
+        ExtrasEditorDialog.show(requireActivity(), record, edited -> {
+            ItemData draft = new ItemData(source.getIcon(), source.getAppName(), source.getItem_from(),
+                    source.getItem_data(), source.getTimestamp(), source.getDataSize(), edited,
+                    "Intent", source.getStackTrace(), edited.getString("uri", originalUri));
+            try {
+                launchInterceptor(draft);
+            } catch (Exception error) {
+                throw new IllegalStateException("无法打开重放：" + error.getMessage(), error);
             }
-            Bundle descriptor = capture.getBundle(Constants.NAVIGATION_REPLAY);
-            ItemData record = itemData;
-            if (descriptor != null) {
-                options.add(getString(R.string.navigation_replay_in_app));
-                actions.add(() -> NavigationReplayDialogs.editInApp(requireActivity(), record, descriptor));
-                options.add(getString(R.string.navigation_replay_generate_intent));
-                actions.add(() -> NavigationReplayDialogs.generateIntent(requireActivity(), record, descriptor));
-            }
-        }
-
-        if (category.equals("Intent")) {
-            options.add("编辑参数并重放");
-            actions.add(() -> ExtrasEditorDialog.show(requireActivity(), bundle, edited -> {
-                try {
-                    ItemData draft = new ItemData(replay.getIcon(), replay.getAppName(), replay.getItem_from(),
-                            replay.getItem_data(), replay.getTimestamp(), replay.getDataSize(), edited,
-                            replay.getCategory(), replay.getStackTrace(), edited.getString("uri", replay.getUri()));
-                    launchInterceptor(draft);
-                } catch (Exception error) {
-                    throw new IllegalStateException("无法打开重放：" + error.getMessage(), error);
-                }
-            }));
-            AmCommandBuilder.CommandResult command = AmCommandBuilder.buildIntentCommand(bundle);
-            boolean hasError = command.hasError;
-            String activityCommand = command.command;
-
-            options.add("am命令");
-            boolean finalHasError = hasError;
-            actions.add(() -> showAmCommandDialog(activityCommand, finalHasError, "am命令", bundle));
-
-            String uriCommand = replay.getUri();
-            if (replay == itemData) Log.d(TAG, "intentCommand: " + uriCommand);
-
-            options.add("intentUri");
-            actions.add(() -> showAmCommandDialog(uriCommand, false, "intentUri", bundle));
-
-            options.add("转到 意图拦截器");
-            actions.add(() -> openInterceptor(replay));
-
-        } else if (category.equals("Scheme")) {
-            String uriCommand = bundle.getString("scheme_raw_url");
-
-            Log.d(TAG, "schemeCommand: " + uriCommand);
-            options.add("schemeUri");
-            actions.add(() -> showAmCommandDialog(uriCommand, false, "schemeUri", bundle));
-
-            options.add("转到 意图拦截器");
-            actions.add(() -> openInterceptor(replay));
-        }
-
-        if (options.isEmpty()) return;
-        // 改用 PopupMenu
-        PopupMenu popupMenu = new PopupMenu(requireContext(), anchorView == null ? requireView() : anchorView);
-        for (int i = 0; i < options.size(); i++) {
-            popupMenu.getMenu().add(Menu.NONE, i, i, options.get(i));
-        }
-
-        // 设置菜单项点击事件
-        popupMenu.setOnMenuItemClickListener(item -> {
-            int which = item.getItemId();
-            actions.get(which).run(); // 执行对应的操作
-            return true;
         });
+    }
 
-        // 显示 PopupMenu
-        popupMenu.show();
+    private boolean handleReplayMenu(int id) {
+        if (id == R.id.detail_generate_replay_intent) {
+            Bundle descriptor = localReplayDescriptor();
+            if (descriptor == null) return false;
+            NavigationReplayDialogs.generateIntent(requireActivity(), itemData, descriptor);
+            return true;
+        }
+        if (id == R.id.detail_generate_native_intent && nativeReplay != null) {
+            ReplayTemplateDialogs.showIntent(requireActivity(), nativeReplay, R.string.navigation_replay_native_title);
+            return true;
+        }
+        ItemData replay = replayableItem();
+        if (replay == null) return false;
+        Bundle record = replay.getAppBundle();
+        if (id == R.id.detail_copy_am_command) {
+            AmCommandBuilder.CommandResult command = AmCommandBuilder.buildIntentCommand(record);
+            showAmCommandDialog(command.command, command.hasError, "am命令", record);
+        } else if (id == R.id.detail_copy_intent_uri) {
+            showAmCommandDialog(replay.getUri(), false, "intentUri", record);
+        } else if (id == R.id.detail_copy_scheme_uri) {
+            showAmCommandDialog(record.getString("scheme_raw_url"), false, "schemeUri", record);
+        } else if (id == R.id.detail_open_interceptor) {
+            openInterceptor(replay);
+        } else {
+            return false;
+        }
+        return true;
     }
 
     private void loadItemData() {
