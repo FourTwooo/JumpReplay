@@ -32,6 +32,8 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 Bundle replayDescriptor, Bundle replayDiagnostics);
     }
 
+    static final long SOURCE_READY_MS = 6_500;
+    static final long COLD_SOURCE_READY_MS = 15_000;
     private static final long LAYOUT_SAMPLE_MS = 40;
     private static final long SETTLE_MS = 120;
     private static final long TRANSITION_RECHECK_MS = 280;
@@ -60,13 +62,14 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         pagerReplay = new ViewPagerReplay(main, capturingFragment, () -> resumed.keySet(), this::onPageSelected);
     }
 
-    public void replay(Bundle descriptor, Bundle arguments, Consumer<Exception> result) {
+    public void replay(Bundle descriptor, Bundle arguments, boolean waitForStartup, Consumer<Exception> result) {
+        long sourceWait = waitForStartup ? COLD_SOURCE_READY_MS : SOURCE_READY_MS;
         if (ViewPagerReplay.handles(descriptor)) {
-            pagerReplay.replay(descriptor, arguments, result);
+            pagerReplay.replay(descriptor, arguments, sourceWait, result);
         } else if (FragmentTransactionReplay.handles(descriptor)) {
-            transactionReplay.replay(descriptor, arguments, result);
+            transactionReplay.replay(descriptor, arguments, sourceWait, result);
         } else if (FragmentHostReplay.handles(descriptor)) {
-            fragmentReplay.replay(descriptor, arguments, result);
+            fragmentReplay.replay(descriptor, arguments, sourceWait, result);
         } else {
             result.accept(new IllegalArgumentException("这条 Fragment 记录没有可重放的导航调用"));
         }

@@ -1,6 +1,10 @@
 <resources>
     <string name="navigation_replay_options">重放选项</string>
     <string name="navigation_replay_in_app">编辑参数并应用内重放</string>
+    <string name="navigation_replay_generate_intent">生成重放 Intent</string>
+    <string name="navigation_replay_generate">生成 Intent</string>
+    <string name="navigation_replay_generated_intent">重放 Intent</string>
+    <string name="navigation_replay_generate_error">无法生成重放 Intent。\n%1$s</string>
     <string name="navigation_replay_pager_transition">页签切换</string>
     <string name="navigation_replay_page_range" translatable="false">%1$d → %2$d</string>
     <string name="navigation_replay_edit_title">编辑导航参数</string>

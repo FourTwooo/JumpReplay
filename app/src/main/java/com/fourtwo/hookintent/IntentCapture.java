@@ -236,14 +236,14 @@ public class IntentCapture implements IXposedHookLoadPackage {
         });
     }
 
-    private void replayNavigation(Bundle descriptor, Bundle arguments,
+    private void replayNavigation(Bundle descriptor, Bundle arguments, boolean waitForStartup,
             java.util.function.Consumer<Exception> callback) {
         InAppNavigationCapture capture = inAppNavigation;
         if (capture == null) {
             callback.accept(new IllegalStateException("应用内导航尚未初始化"));
             return;
         }
-        capture.replay(descriptor, arguments, callback);
+        capture.replay(descriptor, arguments, waitForStartup, callback);
     }
 
     private void reportCaptureError(Throwable error) {

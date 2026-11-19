@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -48,7 +49,7 @@ public class FragmentHostReplayTest {
         edited.putInt("aisle", 29);
         AtomicReference<Exception> error = new AtomicReference<>();
         AtomicBoolean done = new AtomicBoolean();
-        fixture.engine.replay(recorded, edited, failure -> {
+        fixture.engine.replay(recorded, edited, InAppNavigationCapture.SOURCE_READY_MS, failure -> {
             error.set(failure);
             done.set(true);
         });
@@ -128,7 +129,7 @@ public class FragmentHostReplayTest {
         Bundle edited = new Bundle(recorded.getBundle("arguments"));
         edited.putString("sku", "new-sku");
         AtomicReference<Exception> failure = new AtomicReference<>();
-        fixture.engine.replay(recorded, edited, failure::set);
+        fixture.engine.replay(recorded, edited, InAppNavigationCapture.SOURCE_READY_MS, failure::set);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(7));
         assertNotNull(failure.get());
         assertEquals(1, fixture.host.calls);
@@ -136,10 +137,34 @@ public class FragmentHostReplayTest {
         fixture.returnToCatalog();
         fixture.host.ignoreEditedValue = true;
         failure.set(null);
-        fixture.engine.replay(recorded, edited, failure::set);
+        fixture.engine.replay(recorded, edited, InAppNavigationCapture.SOURCE_READY_MS, failure::set);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(9));
         assertNotNull(failure.get());
         assertEquals(2, fixture.host.calls);
+    }
+
+    @Test public void waitsForTheOriginalSourceDuringColdStartup() throws Exception {
+        Fixture fixture = new Fixture();
+        Bundle recorded = fixture.record(false, false, 0);
+        assertNotNull(recorded);
+        Bundle edited = new Bundle(recorded.getBundle("arguments"));
+        edited.putString("sku", "cold-sku");
+        AtomicBoolean completed = new AtomicBoolean();
+        AtomicReference<Exception> error = new AtomicReference<>();
+        fixture.engine.replay(recorded, edited, InAppNavigationCapture.COLD_SOURCE_READY_MS, failure -> {
+            error.set(failure);
+            completed.set(true);
+        });
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(9));
+        assertFalse(completed.get());
+        assertEquals(1, fixture.host.calls);
+
+        fixture.returnToCatalog();
+        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200));
+        assertTrue(completed.get());
+        assertNull(error.get());
+        assertEquals("cold-sku", fixture.host.getFragmentManager().findFragmentByTag("current")
+                .getArguments().getString("sku"));
     }
 
     @Test public void stillReplaysAnExistingSingleArgumentRecord() {
@@ -158,7 +183,7 @@ public class FragmentHostReplayTest {
         Bundle edited = new Bundle();
         edited.putString("sku", "new-sku");
         AtomicBoolean done = new AtomicBoolean();
-        fixture.engine.replay(descriptor, edited, failure -> done.set(failure == null));
+        fixture.engine.replay(descriptor, edited, InAppNavigationCapture.SOURCE_READY_MS, failure -> done.set(failure == null));
         Shadows.shadowOf(Looper.getMainLooper()).idle();
         assertTrue(done.get());
         assertEquals("new-sku", fixture.host.getFragmentManager().findFragmentByTag("current")

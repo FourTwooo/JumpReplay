@@ -1,6 +1,10 @@
 <resources>
     <string name="navigation_replay_options">Replay options</string>
     <string name="navigation_replay_in_app">Edit arguments and replay in app</string>
+    <string name="navigation_replay_generate_intent">Generate replay Intent</string>
+    <string name="navigation_replay_generate">Generate Intent</string>
+    <string name="navigation_replay_generated_intent">Replay Intent</string>
+    <string name="navigation_replay_generate_error">Could not generate replay Intent.\n%1$s</string>
     <string name="navigation_replay_pager_transition">Page selection</string>
     <string name="navigation_replay_edit_title">Edit navigation arguments</string>
     <string name="navigation_replay_start">Replay</string>

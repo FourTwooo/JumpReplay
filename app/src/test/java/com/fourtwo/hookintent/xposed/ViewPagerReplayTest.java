@@ -61,7 +61,7 @@ public class ViewPagerReplayTest {
         fixture.engine.forget(fixture.activity);
         AtomicBoolean completed = new AtomicBoolean();
         AtomicReference<Exception> error = new AtomicReference<>();
-        fixture.engine.replay(record, position(2), failure -> {
+        fixture.engine.replay(record, position(2), InAppNavigationCapture.SOURCE_READY_MS, failure -> {
             error.set(failure);
             completed.set(true);
         });
@@ -78,7 +78,7 @@ public class ViewPagerReplayTest {
         Fixture fixture = new Fixture();
         Bundle record = fixture.captureSelection();
         AtomicReference<Exception> error = new AtomicReference<>();
-        fixture.engine.replay(record, position(3), error::set);
+        fixture.engine.replay(record, position(3), InAppNavigationCapture.SOURCE_READY_MS, error::set);
         Shadows.shadowOf(Looper.getMainLooper()).idle();
 
         assertNotNull(error.get());
@@ -91,7 +91,7 @@ public class ViewPagerReplayTest {
         Bundle record = fixture.captureSelection();
         fixture.pager.getAdapter().count = 4;
         AtomicReference<Exception> error = new AtomicReference<>();
-        fixture.engine.replay(record, position(2), error::set);
+        fixture.engine.replay(record, position(2), InAppNavigationCapture.SOURCE_READY_MS, error::set);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(7));
 
         assertNotNull(error.get());

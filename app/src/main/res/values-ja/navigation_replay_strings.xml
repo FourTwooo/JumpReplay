@@ -1,6 +1,10 @@
 <resources>
     <string name="navigation_replay_options">再実行オプション</string>
     <string name="navigation_replay_in_app">引数を編集してアプリ内で再実行</string>
+    <string name="navigation_replay_generate_intent">再実行用 Intent を生成</string>
+    <string name="navigation_replay_generate">Intent を生成</string>
+    <string name="navigation_replay_generated_intent">再実行用 Intent</string>
+    <string name="navigation_replay_generate_error">再実行用 Intent を生成できませんでした。\n%1$s</string>
     <string name="navigation_replay_pager_transition">ページ切り替え</string>
     <string name="navigation_replay_edit_title">画面遷移の引数を編集</string>
     <string name="navigation_replay_start">再実行</string>

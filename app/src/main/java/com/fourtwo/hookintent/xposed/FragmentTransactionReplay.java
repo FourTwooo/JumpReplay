@@ -57,7 +57,6 @@ final class FragmentTransactionReplay {
     private static final int MAX_ARGUMENTS = 64;
     private static final int MAX_FIELD = 8192;
     private static final long CAPTURE_MS = 9000;
-    private static final long SOURCE_MS = 6500;
     private static final long RESULT_MS = 8500;
 
     private final Handler main;
@@ -361,14 +360,14 @@ final class FragmentTransactionReplay {
         }
     }
 
-    void replay(Bundle descriptor, Bundle edited, Consumer<Exception> complete) {
+    void replay(Bundle descriptor, Bundle edited, long sourceWait, Consumer<Exception> complete) {
         main.post(() -> {
             if (request != null) {
                 complete.accept(new IllegalStateException("已有 Fragment 事务正在重放"));
                 return;
             }
             try {
-                request = new Request(descriptor, edited, complete);
+                request = new Request(descriptor, edited, sourceWait, complete);
             } catch (JSONException | RuntimeException invalid) {
                 complete.accept(new IllegalArgumentException("Fragment 事务参数无效", invalid));
                 return;
@@ -868,12 +867,13 @@ final class FragmentTransactionReplay {
         final int container;
         final Consumer<Exception> complete;
 
-        long deadline = SystemClock.uptimeMillis() + SOURCE_MS;
+        long deadline;
         Activity activity;
         Object fragment;
         Api api;
 
-        Request(Bundle descriptor, Bundle edited, Consumer<Exception> complete) throws JSONException {
+        Request(Bundle descriptor, Bundle edited, long sourceWait, Consumer<Exception> complete) throws JSONException {
+            deadline = SystemClock.uptimeMillis() + sourceWait;
             this.descriptor = descriptor;
             this.complete = complete;
             host = descriptor.getString("host");

@@ -33,15 +33,21 @@ public final class NavigationReplayTransport {
     private static final int RESULT = 204;
     private static final int REQUEST_ID = 1;
     private static final long DELIVERY_TIMEOUT_MS = 3_000;
+    private static final long STARTUP_DELIVERY_TIMEOUT_MS = 8_000;
+    private static final long STARTUP_TIMEOUT_MS = 15_000;
+    private static final long DISCOVERY_RETRY_MS = 250;
     private static final long RESULT_TIMEOUT_MS = 18_000;
+    private static final long STARTUP_RESULT_TIMEOUT_MS = 35_000;
     private static final String DESCRIPTOR = "descriptor";
     private static final String ARGUMENTS = "arguments";
+    private static final String WAIT_FOR_STARTUP = "wait_for_startup";
     private static final String ERROR = "error";
 
     private NavigationReplayTransport() {}
 
     public interface Executor {
-        void replay(Bundle descriptor, Bundle editedArguments, Consumer<Exception> completion);
+        void replay(Bundle descriptor, Bundle editedArguments, boolean waitForStartup,
+                    Consumer<Exception> completion);
     }
 
     public static Bundle seal(Context source, Bundle descriptor) throws Exception {
@@ -75,8 +81,10 @@ public final class NavigationReplayTransport {
         };
         try {
             Bundle data = message.getData();
+            boolean waitForStartup = data.getBoolean(WAIT_FOR_STARTUP, false);
+            long deliveryTimeout = waitForStartup ? STARTUP_DELIVERY_TIMEOUT_MS : DELIVERY_TIMEOUT_MS;
             long remaining = data.getLong("expires_at") - SystemClock.elapsedRealtime();
-            if (remaining <= 0 || remaining > DELIVERY_TIMEOUT_MS) {
+            if (remaining <= 0 || remaining > deliveryTimeout) {
                 throw new TimeoutException("进程内重放请求已过期");
             }
             Source actual = Source.current(app);
@@ -85,7 +93,7 @@ public final class NavigationReplayTransport {
             }
             Bundle descriptor = NavigationCaptureProof.verify(app, actual.pack(), data.getBundle(DESCRIPTOR));
             Bundle arguments = NavigationCaptureProof.copy(data.getBundle(ARGUMENTS), false);
-            executor.replay(descriptor, arguments, completion);
+            executor.replay(descriptor, arguments, waitForStartup, completion);
         } catch (Exception error) { completion.accept(error); }
         return true;
     }
@@ -93,6 +101,17 @@ public final class NavigationReplayTransport {
     /** Call from the host UI. Run onDispatched after delivery, then report the target's actual result. */
     public static void replay(Context context, Bundle captureRecord, Bundle replayCall, Bundle editedArgs,
                               Runnable onDispatched, Consumer<Exception> completion) {
+        begin(context, captureRecord, replayCall, editedArgs, null, onDispatched, completion);
+    }
+
+    /** Launch from a foreground Activity, then wait for the injected target process to register. */
+    public static void replayAfterLaunch(Context context, Bundle captureRecord, Bundle replayCall,
+                                         Bundle editedArgs, Runnable launch, Consumer<Exception> completion) {
+        begin(context, captureRecord, replayCall, editedArgs, Objects.requireNonNull(launch), null, completion);
+    }
+
+    private static void begin(Context context, Bundle captureRecord, Bundle replayCall, Bundle editedArgs,
+                              Runnable launch, Runnable onDispatched, Consumer<Exception> completion) {
         Context app = appContext(context);
         new Handler(Looper.getMainLooper()).post(() -> {
             ClientRequest request;
@@ -106,7 +125,8 @@ public final class NavigationReplayTransport {
                     throw new IllegalArgumentException("这条记录没有可验证的原导航调用，请重新捕获");
                 }
                 request = new ClientRequest(app, source, descriptor,
-                        NavigationCaptureProof.copy(editedArgs, false), onDispatched, completion);
+                        NavigationCaptureProof.copy(editedArgs, false), launch != null, onDispatched, completion);
+                if (launch != null) launch.run();
             } catch (Exception error) {
                 completion.accept(error);
                 return;
@@ -197,21 +217,28 @@ public final class NavigationReplayTransport {
         private final Source source;
         private final Bundle descriptor;
         private final Bundle arguments;
+        private final boolean waitForStartup;
         private final Runnable onDispatched;
         private final Consumer<Exception> completion;
         private final Handler main = new Handler(Looper.getMainLooper());
         private final Messenger replies = new Messenger(new Handler(Looper.getMainLooper(), this::receive));
         private final Runnable timeout = () -> finish(new TimeoutException("等待目标应用响应超时"));
+        private final Runnable discoveryTimeout = this::missingEndpoint;
+        private final Runnable retryDiscovery = this::discover;
+        private Messenger captureService;
+        private int discoverySequence;
+        private int pendingDiscovery;
         private boolean bound;
         private boolean discovered;
         private boolean finished;
 
-        ClientRequest(Context app, Source source, Bundle descriptor, Bundle arguments,
+        ClientRequest(Context app, Source source, Bundle descriptor, Bundle arguments, boolean waitForStartup,
                       Runnable onDispatched, Consumer<Exception> completion) {
             this.app = app;
             this.source = source;
             this.descriptor = descriptor;
             this.arguments = arguments;
+            this.waitForStartup = waitForStartup;
             this.onDispatched = onDispatched;
             this.completion = completion;
         }
@@ -220,19 +247,32 @@ public final class NavigationReplayTransport {
             try {
                 Intent intent = new Intent(app, MessengerService.class);
                 bound = app.bindService(intent, this, Context.BIND_AUTO_CREATE);
-                if (bound) main.postDelayed(timeout, DELIVERY_TIMEOUT_MS);
+                if (bound) main.postDelayed(discoveryTimeout, waitForStartup ? STARTUP_TIMEOUT_MS : DELIVERY_TIMEOUT_MS);
                 else finish(new IllegalStateException("无法连接捕获服务"));
             } catch (RuntimeException error) { finish(error); }
         }
 
         @Override public void onServiceConnected(ComponentName name, IBinder binder) {
             if (finished || discovered) return;
+            captureService = new Messenger(binder);
+            discover();
+        }
+
+        private void discover() {
+            if (finished || discovered || captureService == null || pendingDiscovery != 0) return;
+            pendingDiscovery = ++discoverySequence;
             Message discover = Message.obtain(null, DISCOVER);
-            discover.arg1 = REQUEST_ID;
+            discover.arg1 = pendingDiscovery;
             discover.replyTo = replies;
             discover.setData(source.pack());
-            try { new Messenger(binder).send(discover); }
+            try { captureService.send(discover); }
             catch (RemoteException error) { finish(error); }
+        }
+
+        private void missingEndpoint() {
+            String detail = waitForStartup ? "目标应用启动后未连接到唯一的导航进程"
+                    : "目标应用的导航进程未连接或存在多个匹配进程，请先打开目标应用";
+            finish(new IllegalStateException(detail));
         }
 
         @Override public void onServiceDisconnected(ComponentName name) {
@@ -249,10 +289,13 @@ public final class NavigationReplayTransport {
             if (finished) return true;
             if (message.what == MessengerService.MSG_REPLY && !discovered && isHost(app, message.sendingUid)) {
                 Bundle data = message.getData();
-                if (data.getInt("requestType") != DISCOVER || data.getInt("requestId") != REQUEST_ID) return true;
+                if (pendingDiscovery == 0 || data.getInt("requestType") != DISCOVER
+                        || data.getInt("requestId") != pendingDiscovery) return true;
+                pendingDiscovery = 0;
                 IBinder endpoint = data.getBinder(ENDPOINT);
                 if (data.getInt("resultCode") != 1 || endpoint == null || !endpoint.isBinderAlive()) {
-                    finish(new IllegalStateException("目标应用的导航进程未连接或存在多个匹配进程，请先打开目标应用"));
+                    if (waitForStartup) main.postDelayed(retryDiscovery, DISCOVERY_RETRY_MS);
+                    else missingEndpoint();
                 } else dispatch(endpoint);
             } else if (message.what == RESULT && discovered && message.arg1 == REQUEST_ID
                     && message.sendingUid == source.uid) {
@@ -264,9 +307,12 @@ public final class NavigationReplayTransport {
 
         private void dispatch(IBinder endpoint) {
             discovered = true;
-            main.removeCallbacks(timeout);
+            main.removeCallbacks(discoveryTimeout);
+            main.removeCallbacks(retryDiscovery);
             Bundle data = source.pack();
-            data.putLong("expires_at", SystemClock.elapsedRealtime() + DELIVERY_TIMEOUT_MS);
+            long deliveryTimeout = waitForStartup ? STARTUP_DELIVERY_TIMEOUT_MS : DELIVERY_TIMEOUT_MS;
+            data.putLong("expires_at", SystemClock.elapsedRealtime() + deliveryTimeout);
+            data.putBoolean(WAIT_FOR_STARTUP, waitForStartup);
             data.putBundle(DESCRIPTOR, descriptor);
             data.putBundle(ARGUMENTS, arguments);
             Message execute = Message.obtain(null, EXECUTE);
@@ -275,7 +321,7 @@ public final class NavigationReplayTransport {
             execute.setData(data);
             try {
                 new Messenger(endpoint).send(execute);
-                main.postDelayed(timeout, RESULT_TIMEOUT_MS);
+                main.postDelayed(timeout, waitForStartup ? STARTUP_RESULT_TIMEOUT_MS : RESULT_TIMEOUT_MS);
                 if (onDispatched != null) onDispatched.run();
             } catch (RemoteException | RuntimeException error) { finish(error); }
         }
@@ -283,6 +329,8 @@ public final class NavigationReplayTransport {
         private void finish(Exception error) {
             if (finished) return;
             finished = true;
+            main.removeCallbacks(discoveryTimeout);
+            main.removeCallbacks(retryDiscovery);
             main.removeCallbacks(timeout);
             if (bound) {
                 bound = false;

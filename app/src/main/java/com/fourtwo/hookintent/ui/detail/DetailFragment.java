@@ -396,6 +396,8 @@ public class DetailFragment extends Fragment {
             if (descriptor != null) {
                 options.add(getString(R.string.navigation_replay_in_app));
                 actions.add(() -> NavigationReplayDialogs.editInApp(requireActivity(), record, descriptor));
+                options.add(getString(R.string.navigation_replay_generate_intent));
+                actions.add(() -> NavigationReplayDialogs.generateIntent(requireActivity(), record, descriptor));
             }
         }
 

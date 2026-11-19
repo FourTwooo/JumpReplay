@@ -61,7 +61,6 @@ final class FragmentHostReplay {
     private static final int MAX_KEY = 256;
     private static final int MAX_VALUE = 8192;
     private static final long CORRELATION_MS = 9000;
-    private static final long SOURCE_WAIT_MS = 6500;
     private static final long DESTINATION_WAIT_MS = 8500;
     private static final long POLL_MS = 100;
 
@@ -358,14 +357,14 @@ final class FragmentHostReplay {
                 && (waiting.invoked == null || waiting.invoked == activity);
     }
 
-    void replay(Bundle descriptor, Bundle arguments, Consumer<Exception> complete) {
+    void replay(Bundle descriptor, Bundle arguments, long sourceWait, Consumer<Exception> complete) {
         main.post(() -> {
             if (request != null) {
                 complete.accept(new IllegalStateException("已有 Fragment 重放等待执行"));
                 return;
             }
             try {
-                request = new Request(descriptor, arguments, complete);
+                request = new Request(descriptor, arguments, sourceWait, complete);
             } catch (JSONException | RuntimeException failure) {
                 complete.accept(new IllegalArgumentException("Fragment 重放参数无效", failure));
                 return;
@@ -767,9 +766,10 @@ final class FragmentHostReplay {
         Activity invoked;
         boolean invoking;
         boolean observed;
-        long deadline = SystemClock.uptimeMillis() + SOURCE_WAIT_MS;
+        long deadline;
 
-        Request(Bundle descriptor, Bundle edited, Consumer<Exception> complete) throws JSONException {
+        Request(Bundle descriptor, Bundle edited, long sourceWait, Consumer<Exception> complete) throws JSONException {
+            deadline = SystemClock.uptimeMillis() + sourceWait;
             host = descriptor.getString(HOST);
             source = descriptor.getString(SOURCE);
             method = descriptor.getString(METHOD);

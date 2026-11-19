@@ -89,7 +89,7 @@ public class FragmentTransactionReplayTest {
         edited.putInt("quantity", 5);
         AtomicBoolean completed = new AtomicBoolean();
         AtomicReference<Exception> failure = new AtomicReference<>();
-        engine.replay(descriptor, edited, error -> {
+        engine.replay(descriptor, edited, InAppNavigationCapture.SOURCE_READY_MS, error -> {
             failure.set(error);
             completed.set(true);
         });
@@ -146,7 +146,7 @@ public class FragmentTransactionReplayTest {
         edited.putLong("quantity", 7L);
         AtomicBoolean completed = new AtomicBoolean();
         AtomicReference<Exception> failure = new AtomicReference<>();
-        replay.replay(descriptor, edited, error -> {
+        replay.replay(descriptor, edited, InAppNavigationCapture.SOURCE_READY_MS, error -> {
             failure.set(error);
             completed.set(true);
         });

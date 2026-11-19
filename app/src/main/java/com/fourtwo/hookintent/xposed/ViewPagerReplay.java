@@ -39,7 +39,6 @@ final class ViewPagerReplay {
     private static final String CALL = "hookIntentViewPagerCall";
     private static final int MAX_VIEWS = 4096;
     private static final int MAX_PATH = 8192;
-    private static final long SOURCE_WAIT_MS = 6500;
     private static final long RESULT_WAIT_MS = 2500;
     private static final long POLL_MS = 100;
 
@@ -209,14 +208,14 @@ final class ViewPagerReplay {
         return count == 1;
     }
 
-    void replay(Bundle descriptor, Bundle arguments, Consumer<Exception> complete) {
+    void replay(Bundle descriptor, Bundle arguments, long sourceWait, Consumer<Exception> complete) {
         main.post(() -> {
             if (request != null) {
                 complete.accept(new IllegalStateException("已有 ViewPager 重放正在进行"));
                 return;
             }
             try {
-                request = new Request(descriptor, arguments, complete);
+                request = new Request(descriptor, arguments, sourceWait, complete);
             } catch (RuntimeException error) {
                 complete.accept(new IllegalArgumentException("ViewPager 重放参数无效", error));
                 return;
@@ -469,12 +468,13 @@ final class ViewPagerReplay {
         final int position;
         final Boolean smooth;
         final Consumer<Exception> complete;
-        long deadline = SystemClock.uptimeMillis() + SOURCE_WAIT_MS;
+        long deadline;
         boolean adapterMismatch;
         Activity activity;
         View view;
 
-        Request(Bundle descriptor, Bundle arguments, Consumer<Exception> complete) {
+        Request(Bundle descriptor, Bundle arguments, long sourceWait, Consumer<Exception> complete) {
+            deadline = SystemClock.uptimeMillis() + sourceWait;
             host = descriptor.getString("host");
             pagerType = descriptor.getString("pager");
             adapter = descriptor.getString("adapter");
