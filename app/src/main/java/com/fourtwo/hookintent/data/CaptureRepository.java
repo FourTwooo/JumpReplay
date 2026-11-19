@@ -17,6 +17,8 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 
 import com.fourtwo.hookintent.base.JsonHandler;
+import com.fourtwo.hookintent.library.IntentLibrary;
+import com.fourtwo.hookintent.library.ObservedFragmentIntent;
 import com.fourtwo.hookintent.utils.AppInfoHelper;
 import com.fourtwo.hookintent.utils.DataProcessor;
 
@@ -97,6 +99,36 @@ public final class CaptureRepository {
     public LiveData<Boolean> getHasMore() { return hasMore; }
     public LiveData<String> getErrors() { return errors; }
 
+    /** A monotonic marker for newly committed capture rows, including after clearing history. */
+    public long captureHistoryRevision() {
+        try (Cursor cursor = store.getReadableDatabase().rawQuery(
+                "SELECT seq FROM sqlite_sequence WHERE name='captures'", null)) {
+            return cursor.moveToFirst() ? cursor.getLong(0) : 0;
+        }
+    }
+
+    /** Reads existing navigation evidence on a caller's worker thread. */
+    public <T> T findNavigationCapture(String destination, java.util.function.Function<Bundle, T> matching) {
+        String escaped = destination.toLowerCase(Locale.ROOT).replace("\\", "\\\\")
+                .replace("%", "\\%").replace("_", "\\_");
+        try (Cursor cursor = store.getReadableDatabase().query("captures", new String[]{"data"},
+                "search LIKE ? ESCAPE '\\'", new String[]{"%\n" + escaped + "\n%"},
+                null, null, "id DESC")) {
+            while (cursor.moveToNext()) {
+                try {
+                    JSONObject stored = new JSONObject(readArchive(cursor.getString(0)));
+                    if (!NavigationCaptureSource.FRAGMENT.category().equals(stored.optString("category"))) continue;
+                    Bundle capture = JsonHandler.toBundle(stored.getJSONObject("bundle"));
+                    T result = matching.apply(capture);
+                    if (result != null) return result;
+                } catch (IOException | org.json.JSONException error) {
+                    Log.w(TAG, "Cannot read archived navigation capture", error);
+                }
+            }
+        }
+        return null;
+    }
+
     public void latestDetail(java.util.function.BiConsumer<String, Exception> callback) {
         worker.execute(() -> {
             String token = null; Exception error = null;
@@ -113,21 +145,30 @@ public final class CaptureRepository {
 
     /** The success callback runs only after the raw payload has been committed to disk. */
     public void append(Bundle message, Runnable onPersisted, Consumer<Exception> onError) {
+        append(message, -1, onPersisted, onError);
+    }
+
+    public void append(Bundle message, int sendingUid, Runnable onPersisted, Consumer<Exception> onError) {
         try {
             if (message == null) throw new IllegalArgumentException("Empty capture message");
             String payload = message.getString("batch_data_binder");
             if (payload == null) throw new IllegalArgumentException("Missing capture payload");
             String transportId = message.getString("capture_transport_id");
-            worker.execute(() -> persistIncoming(payload, null, transportId, onPersisted, onError));
+            worker.execute(() -> persistIncoming(payload, null, transportId, sendingUid, onPersisted, onError));
         } catch (Exception error) { fail(error, onError); }
     }
 
     /** Receives a reassembled file without copying a large payload through Binder or byte arrays. */
     public void appendFile(File source, String transportId, Runnable onPersisted, Consumer<Exception> onError) {
-        worker.execute(() -> persistIncoming(null, source, transportId, onPersisted, onError));
+        appendFile(source, transportId, -1, onPersisted, onError);
     }
 
-    private void persistIncoming(String payload, File source, String suppliedId,
+    public void appendFile(File source, String transportId, int sendingUid,
+            Runnable onPersisted, Consumer<Exception> onError) {
+        worker.execute(() -> persistIncoming(null, source, transportId, sendingUid, onPersisted, onError));
+    }
+
+    private void persistIncoming(String payload, File source, String suppliedId, int sendingUid,
             Runnable onPersisted, Consumer<Exception> onError) {
         try {
             String transportId = suppliedId == null || suppliedId.isEmpty() ? UUID.randomUUID().toString() : suppliedId;
@@ -152,7 +193,13 @@ public final class CaptureRepository {
                     values.put("transport_id", transportId);
                     values.put("payload", payloadFile.getAbsolutePath());
                     values.put("processed", 0);
-                    db.insertOrThrow("incoming", null, values);
+                    long incoming = db.insertOrThrow("incoming", null, values);
+                    if (sendingUid >= 0) {
+                        ContentValues sender = new ContentValues();
+                        sender.put("id", incoming);
+                        sender.put("uid", sendingUid);
+                        db.insertOrThrow("pending_capture_senders", null, sender);
+                    }
                     db.setTransactionSuccessful();
                 } finally { db.endTransaction(); }
             }
@@ -270,11 +317,14 @@ public final class CaptureRepository {
             while (true) {
                 long id;
                 String payloadPath;
-                try (Cursor cursor = db.query("incoming", new String[]{"id", "payload"}, "processed=0",
-                        null, null, null, "id ASC", "1")) {
+                int sendingUid;
+                try (Cursor cursor = db.rawQuery("SELECT incoming.id,incoming.payload,pending_capture_senders.uid "
+                        + "FROM incoming LEFT JOIN pending_capture_senders ON incoming.id=pending_capture_senders.id "
+                        + "WHERE incoming.processed=0 ORDER BY incoming.id LIMIT 1", null)) {
                     if (!cursor.moveToFirst()) return;
                     id = cursor.getLong(0);
                     payloadPath = cursor.getString(1);
+                    sendingUid = cursor.isNull(2) ? -1 : cursor.getInt(2);
                 }
                 Object checkpoint = processor.checkpointDeduplication();
                 List<String> uncommittedFiles = new ArrayList<>();
@@ -285,6 +335,16 @@ public final class CaptureRepository {
                     List<ItemData> converted = new ArrayList<>();
                     processor.processReceivedData(batch, converted::add);
                     String processingError = processor.getLastError();
+                    IntentLibrary library = IntentLibrary.get(context);
+                    boolean cacheEnabled = library.enabled();
+                    List<Bundle> fragmentEvidence = new ArrayList<>();
+                    for (ItemData item : converted) {
+                        Bundle record = item.getAppBundle();
+                        if (record != null && record.containsKey(ObservedFragmentIntent.RECORD_KEY)) {
+                            if (cacheEnabled && sendingUid >= 0) fragmentEvidence.add(new Bundle(record));
+                            record.remove(ObservedFragmentIntent.RECORD_KEY);
+                        }
+                    }
                     db.beginTransaction();
                     try {
                         for (ItemData item : converted) {
@@ -300,10 +360,13 @@ public final class CaptureRepository {
                         ContentValues completed = new ContentValues();
                         completed.put("processed", 1);
                         if (processingError == null) completed.putNull("payload");
-                        db.update("incoming", completed, "id=?", new String[]{Long.toString(id)});
+                        String[] row = {Long.toString(id)};
+                        db.update("incoming", completed, "id=?", row);
+                        db.delete("pending_capture_senders", "id=?", row);
                         db.setTransactionSuccessful();
                     } finally { db.endTransaction(); }
                     committed = true;
+                    if (cacheEnabled) library.ingest(converted, fragmentEvidence, sendingUid);
                     com.fourtwo.hookintent.manager.CaptureMonitor.committed(converted);
                     if (processingError == null) deleteArchive(payloadPath);
                     else errors.postValue(processingError + "（原始批次已保留）");
@@ -452,6 +515,11 @@ public final class CaptureRepository {
             db.execSQL("CREATE INDEX incoming_pending ON incoming(processed,id)");
             db.execSQL("CREATE TABLE captures(id INTEGER PRIMARY KEY AUTOINCREMENT,source_id INTEGER NOT NULL,"
                     + "data TEXT NOT NULL,search TEXT NOT NULL)");
+        }
+        @Override public void onOpen(SQLiteDatabase db) {
+            super.onOpen(db);
+            // An optional side table leaves the capture schema readable by older releases.
+            db.execSQL("CREATE TABLE IF NOT EXISTS pending_capture_senders(id INTEGER PRIMARY KEY,uid INTEGER NOT NULL)");
         }
         @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
             throw new IllegalStateException("Unsupported capture archive version " + newVersion);

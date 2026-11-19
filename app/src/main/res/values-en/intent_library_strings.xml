@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="intent_library_title">Intent library</string>
+    <string name="library_cache_enabled">Save new Intent captures to the library</string>
+    <string name="library_observed_tab">Observed</string>
+    <string name="library_declared_tab">App activities</string>
+    <string name="library_choose_app">Choose app</string>
+    <string name="library_current_app">Change app · %1$s</string>
+    <string name="library_search">Search apps, components or parameters</string>
+    <string name="library_clear">Clear Intent cache</string>
+    <string name="library_clear_message">Delete the saved Intent examples and Fragment associations? Original capture records are kept.</string>
+    <string name="library_more">Load more</string>
+    <string name="library_empty">New Intents appear here after you capture them.</string>
+    <string name="library_cache_off">Automatic caching is off. App activities still shows declared entries.</string>
+    <string name="library_no_match">No matching entries</string>
+    <string name="library_no_activities">No Activity declarations are available for this app</string>
+    <string name="library_read_error">Could not load the Intent library</string>
+    <string name="library_write_error">Could not change the Intent cache</string>
+    <string name="library_delivered">Delivery observed</string>
+    <string name="library_requested">Launch requested</string>
+    <string name="library_destination">Destination package</string>
+    <string name="library_activity">Activity</string>
+    <string name="library_target_version">Destination app version</string>
+    <string name="library_source">App where captured</string>
+    <string name="library_source_version">Capture app version</string>
+    <string name="library_action">Action</string>
+    <string name="library_data">Example data URI</string>
+    <string name="library_mime">MIME type</string>
+    <string name="library_categories">Categories</string>
+    <string name="library_flags">Flags</string>
+    <string name="library_last_seen">Last recorded</string>
+    <string name="library_extras">Parameter names, types and examples</string>
+    <string name="library_no_extras">No extras in this capture</string>
+    <string name="library_extras_incomplete">Some parameters are unavailable or truncated</string>
+    <string name="library_observed_title">Observed Intent</string>
+    <string name="library_declared_title">Declared Activity</string>
+    <string name="library_show_observations">Show captured Intents</string>
+    <string name="library_copy_uri">Copy Intent URI</string>
+    <string name="library_close">Close</string>
+    <string name="library_permission">Required permission</string>
+    <string name="library_alias">Alias target Activity</string>
+    <string name="library_declared_note">This entry comes from Android package metadata. Parameters and examples come from actual captures.</string>
+    <string name="library_delete_entry">Delete this cached Intent example?</string>
+    <string name="library_exported">Exported</string>
+    <string name="library_private">Internal</string>
+    <string name="library_activity_on">Enabled</string>
+    <string name="library_activity_off">Disabled</string>
+    <string name="library_launcher">Launcher entry</string>
+    <string name="library_unknown_version">Version unknown</string>
+    <plurals name="library_occurrences">
+        <item quantity="one">%d observation</item>
+        <item quantity="other">%d observations</item>
+    </plurals>
+</resources>

@@ -1,0 +1,28 @@
+<resources>
+    <string name="replay_templates_title">再実行テンプレート</string>
+    <string name="replay_templates_save">再実行テンプレートを保存</string>
+    <string name="replay_templates_empty">再実行できる Fragment の記録からテンプレートを作成するか、共有されたテンプレートをインポートできます。</string>
+    <string name="replay_templates_import">テンプレートをインポート</string>
+    <string name="replay_templates_import_text">共有されたテンプレートを貼り付け</string>
+    <string name="replay_templates_export">テンプレートをエクスポート</string>
+    <string name="replay_templates_export_help">テンプレートを共有すると保存済みの既定の引数も含まれます。</string>
+    <string name="replay_templates_share">テンプレートを共有</string>
+    <string name="replay_templates_duplicate">カスタムリンク ID で複製</string>
+    <string name="replay_templates_rename">表示名を変更</string>
+    <string name="replay_templates_name_optional">表示名（任意）</string>
+    <string name="replay_templates_id_new">カスタムリンク ID（空欄で自動生成）</string>
+    <string name="replay_templates_id_import">カスタムリンク ID（空欄で元の ID を使用）</string>
+    <string name="replay_templates_id_required">カスタムリンク ID</string>
+    <string name="replay_templates_id_help">英数字、ハイフン、アンダースコアを 64 文字まで使用できます。先頭は英数字にしてください。</string>
+    <string name="replay_templates_version">%1$s（%2$d）</string>
+    <string name="replay_templates_version_code">バージョンコード %1$d</string>
+    <string name="replay_templates_version_unknown">バージョン不明</string>
+    <string name="replay_templates_source">%1$s · %2$s\n%3$s</string>
+    <string name="replay_templates_status">%1$s · %2$s</string>
+    <string name="replay_templates_ready">この端末で利用可能</string>
+    <string name="replay_templates_unavailable">この端末で利用不可</string>
+    <string name="replay_templates_pending">この端末で一致する記録を待機中</string>
+    <string name="replay_templates_pending_help">テンプレートに表示されたバージョンの対象アプリを入れ、記録を有効にして該当する画面を一度開いてください。対応するナビゲーションが記録されるとテンプレートを利用できます。</string>
+    <string name="replay_templates_delete_confirm">「%1$s」を削除しますか。この ID を使う端末内の再実行リンクが無効になります。</string>
+    <string name="replay_templates_error">テンプレートの操作に失敗しました：%1$s</string>
+</resources>

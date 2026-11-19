@@ -53,13 +53,13 @@ public class MessengerService extends Service {
                 switch (type) {
                     case MSG_SEND_DATA:
                         // Legacy messages intentionally do not require replyTo, nor caller registration.
-                        CaptureRepository.get(getApplicationContext()).append(new Bundle(msg.getData()),
+                        CaptureRepository.get(getApplicationContext()).append(new Bundle(msg.getData()), msg.sendingUid,
                                 () -> sendReply(reply, type, request, 1, "Capture committed"),
                                 error -> { Log.e("MessengerService", "Cannot persist capture", error);
                                     sendReply(reply, type, request, 0, error.toString()); });
                         break;
                     case MSG_SEND_FRAME:
-                        if (reply != null) frames.receive(new Bundle(msg.getData()),
+                        if (reply != null) frames.receive(new Bundle(msg.getData()), msg.sendingUid,
                                 (ok, detail) -> sendReply(reply, type, request, ok ? 1 : 0, detail));
                         break;
                     case MSG_IS_HOOK:

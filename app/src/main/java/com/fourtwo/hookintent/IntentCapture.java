@@ -28,6 +28,8 @@ import com.fourtwo.hookintent.base.DataConverter;
 import com.fourtwo.hookintent.base.JsonHandler;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
+import com.fourtwo.hookintent.library.IntentLibrary;
+import com.fourtwo.hookintent.library.ObservedFragmentIntent;
 import com.fourtwo.hookintent.replay.NavigationReplayTransport;
 import com.fourtwo.hookintent.service.MessengerClient;
 import com.fourtwo.hookintent.service.MessengerService;
@@ -90,11 +92,14 @@ public class IntentCapture implements IXposedHookLoadPackage {
     private volatile HookConfigCache systemConfig;
     private volatile EnumSet<NavigationCaptureSource> navigationSources = EnumSet.noneOf(NavigationCaptureSource.class);
     private volatile InAppNavigationCapture inAppNavigation;
+    private volatile boolean learnNativeFragmentEntries;
     private boolean systemProcess;
     private boolean systemHooksInstalled;
     private ClassLoader systemClassLoader;
     private volatile boolean storageErrorShown;
     private long sourceLastUpdateTime;
+    private long sourceVersionCode;
+    private String sourceVersionName;
     private int sourceAppUid = -1;
     private final ThreadLocal<Boolean> captureInProgress = new ThreadLocal<Boolean>() {
         @Override protected Boolean initialValue() { return false; }
@@ -156,7 +161,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
         if (isHostApp || inAppNavigation != null || !(attached instanceof Application)) return;
         InAppNavigationCapture capture;
         try {
-            capture = new InAppNavigationCapture(this::shouldCaptureNavigation, this::captureNavigation);
+            capture = new InAppNavigationCapture(this::shouldCaptureNavigation,
+                    () -> learnNativeFragmentEntries, this::captureNavigation);
             capture.install((Application) attached);
         } catch (RuntimeException | LinkageError error) {
             XposedBridge.log("JumpReplay navigation initialization: " + error.getClass().getSimpleName());
@@ -179,16 +185,19 @@ public class IntentCapture implements IXposedHookLoadPackage {
 
     private void reloadNavigationConfig() {
         EnumSet<NavigationCaptureSource> sources = EnumSet.noneOf(NavigationCaptureSource.class);
+        boolean learnEntries = false;
         try {
             Map<String, String> config = getConfig(Constants.IN_APP_NAVIGATION_URI);
+            learnEntries = Boolean.parseBoolean(config.get(IntentLibrary.PREFERENCE));
             for (NavigationCaptureSource source : NavigationCaptureSource.values()) {
                 if (Boolean.parseBoolean(config.get(source.preference()))) sources.add(source);
             }
         } catch (RuntimeException error) {
             sources.clear();
         }
-        if (!navigationSources.equals(sources)) {
+        if (!navigationSources.equals(sources) || learnNativeFragmentEntries != learnEntries) {
             navigationSources = sources;
+            learnNativeFragmentEntries = learnEntries;
             navigationCaptureStateChanged();
         }
     }
@@ -203,7 +212,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
     }
 
     private void captureNavigation(Activity activity, String destination,
-            NavigationCaptureSource source, Bundle arguments, Bundle descriptor, Bundle diagnostics) {
+            NavigationCaptureSource source, Bundle arguments, Bundle descriptor, Bundle diagnostics, ObservedFragmentIntent.Evidence nativeEntry) {
         if (!shouldCaptureNavigation(source)) return;
         Bundle record = new Bundle();
         record.putString("category", source.category());
@@ -211,6 +220,13 @@ public class IntentCapture implements IXposedHookLoadPackage {
         record.putString("FunctionCall", source.method());
         record.putString("from", activity.getClass().getName());
         record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
+        if (nativeEntry != null && learnNativeFragmentEntries) {
+            try {
+                record.putString(ObservedFragmentIntent.RECORD_KEY, nativeEntry.encode());
+            } catch (org.json.JSONException ignored) {
+                // The regular Fragment capture is still available when the observed route cannot be indexed.
+            }
+        }
         if (descriptor == null) {
             if (diagnostics != null) record.putBundle(Constants.NAVIGATION_REPLAY_DIAGNOSTICS, diagnostics);
             filterCustomize(record);
@@ -329,6 +345,12 @@ public class IntentCapture implements IXposedHookLoadPackage {
             bundle.putString("category", "Intent");
             bundle.putString("uri", snapshot.toUri(Intent.URI_INTENT_SCHEME));
             bundle.putString("from", from);
+            if ("Activity.performCreate".equals(FunctionCall) || "ActivityThread.deliverNewIntents".equals(FunctionCall)
+                    || "Activity.onNewIntent".equals(FunctionCall)) {
+                bundle.putLong("library_destination_version_code", sourceVersionCode);
+                bundle.putString("library_destination_version_name", sourceVersionName);
+                bundle.putLong("library_destination_last_update", sourceLastUpdateTime);
+            }
             sendBroadcastSafely(bundle);
         } finally { captureInProgress.set(false); }
     }
@@ -848,6 +870,8 @@ public class IntentCapture implements IXposedHookLoadPackage {
                 android.content.pm.PackageInfo source = applicationContext.getPackageManager().getPackageInfo(packageName, 0);
                 sourceLastUpdateTime = source.lastUpdateTime;
                 if (source.applicationInfo != null) sourceAppUid = source.applicationInfo.uid;
+                sourceVersionCode = Build.VERSION.SDK_INT >= 28 ? source.getLongVersionCode() : source.versionCode;
+                sourceVersionName = source.versionName;
             }
             catch (Exception ignored) { }
             client = new MessengerClient(applicationContext);
@@ -972,7 +996,10 @@ public class IntentCapture implements IXposedHookLoadPackage {
             RecordXposedBridge.setHookedRecords(JsonHandler.deserializeHookedRecords(internalHooksConfig));
         }
 
-        new ActivityCaptureHooks(this::getIsHook, this::filterIntent).install(classLoader);
+        ActivityCaptureHooks.withDelivery(this::getIsHook, this::filterIntent, (activity, intent) -> {
+            InAppNavigationCapture capture = inAppNavigation;
+            if (capture != null) capture.observeDelivery(activity, intent);
+        }).install(classLoader);
 
         RecordXposedBridge.hookAllMethods("Scheme", XposedHelpers.findClass("android.net.Uri", classLoader), "parse", new XC_MethodHook() {
             @Override

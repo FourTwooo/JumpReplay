@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="intent_library_title">Intent ライブラリ</string>
+    <string name="library_cache_enabled">新しい Intent の捕捉を保存</string>
+    <string name="library_observed_tab">観測結果</string>
+    <string name="library_declared_tab">アプリの Activity</string>
+    <string name="library_choose_app">アプリを選択</string>
+    <string name="library_current_app">アプリを変更 · %1$s</string>
+    <string name="library_search">アプリ・コンポーネント・パラメーターを検索</string>
+    <string name="library_clear">Intent キャッシュを消去</string>
+    <string name="library_clear_message">保存した Intent のサンプルと Fragment の関連付けを削除しますか？元の捕捉記録は残ります。</string>
+    <string name="library_more">さらに表示</string>
+    <string name="library_empty">新しく捕捉した Intent がここに表示されます。</string>
+    <string name="library_cache_off">自動保存はオフです。「アプリの Activity」では宣言された入口を確認できます。</string>
+    <string name="library_no_match">一致する項目がありません</string>
+    <string name="library_no_activities">このアプリに読み取れる Activity 宣言はありません</string>
+    <string name="library_read_error">Intent ライブラリを読み込めませんでした</string>
+    <string name="library_write_error">Intent キャッシュを変更できませんでした</string>
+    <string name="library_delivered">受信を観測</string>
+    <string name="library_requested">起動要求を観測</string>
+    <string name="library_destination">対象パッケージ</string>
+    <string name="library_activity">Activity</string>
+    <string name="library_target_version">対象アプリのバージョン</string>
+    <string name="library_source">捕捉元アプリ</string>
+    <string name="library_source_version">捕捉元アプリのバージョン</string>
+    <string name="library_action">Action</string>
+    <string name="library_data">データ URI の例</string>
+    <string name="library_mime">MIME タイプ</string>
+    <string name="library_categories">カテゴリ</string>
+    <string name="library_flags">フラグ</string>
+    <string name="library_last_seen">最終記録日時</string>
+    <string name="library_extras">パラメーター名、型、サンプル</string>
+    <string name="library_no_extras">この捕捉に extras はありません</string>
+    <string name="library_extras_incomplete">読み取れない、または省略されたパラメーターがあります</string>
+    <string name="library_observed_title">観測した Intent</string>
+    <string name="library_declared_title">宣言された Activity</string>
+    <string name="library_show_observations">捕捉した Intent を表示</string>
+    <string name="library_copy_uri">Intent URI をコピー</string>
+    <string name="library_close">閉じる</string>
+    <string name="library_permission">必要な権限</string>
+    <string name="library_alias">エイリアス先の Activity</string>
+    <string name="library_declared_note">Android のパッケージ情報に基づく項目です。パラメーターとサンプルは実際の捕捉から得られます。</string>
+    <string name="library_delete_entry">この Intent のサンプルを削除しますか？</string>
+    <string name="library_exported">外部公開</string>
+    <string name="library_private">内部専用</string>
+    <string name="library_activity_on">有効</string>
+    <string name="library_activity_off">無効</string>
+    <string name="library_launcher">ランチャー入口</string>
+    <string name="library_unknown_version">バージョン不明</string>
+    <plurals name="library_occurrences">
+        <item quantity="other">%d 回</item>
+    </plurals>
+</resources>

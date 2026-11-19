@@ -9,14 +9,17 @@ import com.fourtwo.hookintent.data.CaptureRepository;
 import com.fourtwo.hookintent.xposed.ByteChunks;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -27,6 +30,12 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(application = Application.class, sdk = 33)
 public class CaptureFrameReceiverTest {
+    @Before public void resetRepositoryForApplication() throws Exception {
+        Field instance = CaptureRepository.class.getDeclaredField("instance");
+        instance.setAccessible(true);
+        instance.set(null, null);
+    }
+
     @Test public void largeTransferSurvivesCloseWhileFinalRepositoryCommitIsInFlightAndRetryIsIdempotent() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         JSONObject record = new JSONObject();
@@ -40,7 +49,7 @@ public class CaptureFrameReceiverTest {
         for (int frame = 0; frame < frames; frame++) {
             CountDownLatch received = new CountDownLatch(1);
             AtomicBoolean successful = new AtomicBoolean();
-            receiver.receive(frame(bytes, id, hash, frame), (ok, detail) -> {
+            receiver.receive(frame(bytes, id, hash, frame), 12001, (ok, detail) -> {
                 successful.set(ok); received.countDown();
             });
             if (frame == frames - 1) receiver.close();
@@ -52,7 +61,7 @@ public class CaptureFrameReceiverTest {
         CaptureFrameReceiver retryReceiver = new CaptureFrameReceiver(context);
         CountDownLatch retry = new CountDownLatch(1);
         AtomicBoolean retried = new AtomicBoolean();
-        retryReceiver.receive(frame(bytes, id, hash, 0), (ok, detail) -> { retried.set(ok); retry.countDown(); });
+        retryReceiver.receive(frame(bytes, id, hash, 0), 12001, (ok, detail) -> { retried.set(ok); retry.countDown(); });
         assertTrue(retry.await(10, TimeUnit.SECONDS));
         assertTrue(retried.get());
         retryReceiver.close();
@@ -72,12 +81,51 @@ public class CaptureFrameReceiverTest {
         CaptureFrameReceiver receiver = new CaptureFrameReceiver(RuntimeEnvironment.getApplication());
         CountDownLatch received = new CountDownLatch(1);
         AtomicBoolean accepted = new AtomicBoolean(true);
-        receiver.receive(frame(bytes, id, new String(new char[64]).replace('\0', '0'), 0),
+        receiver.receive(frame(bytes, id, new String(new char[64]).replace('\0', '0'), 0), 12001,
                 (ok, detail) -> { accepted.set(ok); received.countDown(); });
         receiver.close();
         assertTrue(received.await(10, TimeUnit.SECONDS));
         assertFalse(accepted.get());
         assertTrue(worker(receiver).awaitTermination(10, TimeUnit.SECONDS));
+    }
+
+    @Test public void mixedSenderFramesKeepCaptureButDiscardEvidenceOwnership() throws Exception {
+        Context context = RuntimeEnvironment.getApplication();
+        JSONObject record = new JSONObject().put("category", "Custom").put("title", "mixed sender")
+                .put("data", new String(new char[ByteChunks.PAYLOAD_BYTES]).replace('\0', 'x'));
+        byte[] bytes = new JSONArray().put(record).toString().getBytes(StandardCharsets.UTF_8);
+        int count = ByteChunks.count(bytes.length);
+        assertEquals(2, count);
+        String id = String.format(java.util.Locale.ROOT, "%019d", System.currentTimeMillis()) + "-" + UUID.randomUUID();
+        String hash = ByteChunks.sha256(new ByteArrayInputStream(bytes));
+        CaptureFrameReceiver receiver = new CaptureFrameReceiver(context);
+        File sender = new File(new File(context.getFilesDir(), "capture-transport/" + id), "sender_uid");
+
+        send(receiver, frame(bytes, id, hash, 0), 12001);
+        assertEquals("12001", new String(Files.readAllBytes(sender.toPath()), StandardCharsets.US_ASCII));
+        send(receiver, frame(bytes, id, hash, 0), 12002);
+        assertEquals("-1", new String(Files.readAllBytes(sender.toPath()), StandardCharsets.US_ASCII));
+        send(receiver, frame(bytes, id, hash, 1), 12001);
+        receiver.close();
+        assertTrue(worker(receiver).awaitTermination(10, TimeUnit.SECONDS));
+        assertFalse(sender.exists());
+        File transferIndex = new File(context.getFilesDir(), "capture-transport/completed.sqlite");
+        try (SQLiteDatabase database = SQLiteDatabase.openDatabase(transferIndex.getPath(), null, SQLiteDatabase.OPEN_READONLY);
+                Cursor row = database.rawQuery("SELECT id FROM completed WHERE id=?", new String[]{id})) {
+            assertTrue(row.moveToFirst());
+            assertEquals(id, row.getString(0));
+        }
+    }
+
+    private static void send(CaptureFrameReceiver receiver, Bundle frame, int uid) throws Exception {
+        CountDownLatch received = new CountDownLatch(1);
+        AtomicBoolean accepted = new AtomicBoolean(false);
+        receiver.receive(frame, uid, (ok, detail) -> {
+            accepted.set(ok);
+            received.countDown();
+        });
+        assertTrue(received.await(10, TimeUnit.SECONDS));
+        assertTrue(accepted.get());
     }
 
     private static Bundle frame(byte[] bytes, String id, String hash, int frame) {

@@ -1,0 +1,28 @@
+<resources>
+    <string name="replay_templates_title">Replay templates</string>
+    <string name="replay_templates_save">Save replay template</string>
+    <string name="replay_templates_empty">Generate a template from a replayable Fragment capture or import a shared template.</string>
+    <string name="replay_templates_import">Import template</string>
+    <string name="replay_templates_import_text">Paste a shared replay template</string>
+    <string name="replay_templates_export">Export template</string>
+    <string name="replay_templates_export_help">Sharing a template includes its saved default arguments.</string>
+    <string name="replay_templates_share">Share template</string>
+    <string name="replay_templates_duplicate">Duplicate with a custom link ID</string>
+    <string name="replay_templates_rename">Change display name</string>
+    <string name="replay_templates_name_optional">Display name (optional)</string>
+    <string name="replay_templates_id_new">Custom link ID (blank to generate)</string>
+    <string name="replay_templates_id_import">Custom link ID (blank to keep the original)</string>
+    <string name="replay_templates_id_required">Custom link ID</string>
+    <string name="replay_templates_id_help">Use up to 64 letters, numbers, hyphens or underscores. Start with a letter or number.</string>
+    <string name="replay_templates_version">%1$s (%2$d)</string>
+    <string name="replay_templates_version_code">Version code %1$d</string>
+    <string name="replay_templates_version_unknown">Unknown version</string>
+    <string name="replay_templates_source">%1$s · %2$s\n%3$s</string>
+    <string name="replay_templates_status">%1$s · %2$s</string>
+    <string name="replay_templates_ready">Ready on this device</string>
+    <string name="replay_templates_unavailable">Unavailable on this device</string>
+    <string name="replay_templates_pending">Waiting for a matching local capture</string>
+    <string name="replay_templates_pending_help">Install the target app version shown on the template, enable capture, and open the matching screen once. The template becomes ready when a compatible navigation is captured.</string>
+    <string name="replay_templates_delete_confirm">Delete “%1$s”? Local replay links that use this ID will stop working.</string>
+    <string name="replay_templates_error">Replay template operation failed: %1$s</string>
+</resources>

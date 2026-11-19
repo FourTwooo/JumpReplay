@@ -18,20 +18,31 @@ import de.robv.android.xposed.XposedHelpers;
 /** Independent sending paths and real delivery paths; no startActivity wrapper hooks. */
 public final class ActivityCaptureHooks {
     public interface Sink { void capture(Intent intent, String function, String from); }
+    public interface Delivery { void observe(Activity activity, Intent intent); }
     interface Installer { void install(Method method, XC_MethodHook callback); }
     private final BooleanSupplier enabled;
     private final Sink sink;
+    private final Delivery delivery;
     private final Installer installer;
     private final ThreadLocal<Integer> createDepth = new ThreadLocal<>();
     private final AtomicBoolean errorLogged = new AtomicBoolean();
 
     public ActivityCaptureHooks(BooleanSupplier enabled, Sink sink) {
-        this(enabled, sink, (method, callback) -> XposedBridge.hookMethod(method, callback));
+        this(enabled, sink, (activity, intent) -> {}, (method, callback) -> XposedBridge.hookMethod(method, callback));
+    }
+
+    public static ActivityCaptureHooks withDelivery(BooleanSupplier enabled, Sink sink, Delivery delivery) {
+        return new ActivityCaptureHooks(enabled, sink, delivery, (method, callback) -> XposedBridge.hookMethod(method, callback));
     }
 
     ActivityCaptureHooks(BooleanSupplier enabled, Sink sink, Installer installer) {
+        this(enabled, sink, (activity, intent) -> {}, installer);
+    }
+
+    private ActivityCaptureHooks(BooleanSupplier enabled, Sink sink, Delivery delivery, Installer installer) {
         this.enabled = enabled;
         this.sink = sink;
+        this.delivery = delivery;
         this.installer = installer;
     }
 
@@ -89,6 +100,7 @@ public final class ActivityCaptureHooks {
                             if (previous != 0 || !enabled.getAsBoolean()) return;
                             try {
                                 Activity activity = (Activity) param.thisObject;
+                                if (param.args[0] == null) delivery.observe(activity, activity.getIntent());
                                 capture(activity.getIntent(), "Activity.performCreate", activity.getClass().getName());
                             } catch (Throwable error) { report(error); }
                         }
@@ -135,11 +147,14 @@ public final class ActivityCaptureHooks {
                         try {
                             Activity activity = (Activity) field.get(param.args[0]);
                             if (activity == null || !(param.args[1] instanceof List)) return;
+                            List<?> intents = (List<?>) param.args[1];
+                            if (intents.size() != 1) delivery.observe(activity, null);
                             // Incoming ReferrerIntent extends Intent. Read the delivered argument,
                             // never Activity.getIntent(), which may still contain the old launch.
-                            for (Object item : (List<?>) param.args[1]) if (item instanceof Intent) {
+                            for (Object item : intents) if (item instanceof Intent) {
                                 Intent snapshot = new Intent((Intent) item);
                                 snapshot.setExtrasClassLoader(activity.getClassLoader());
+                                if (intents.size() == 1) delivery.observe(activity, snapshot);
                                 capture(snapshot, "ActivityThread.deliverNewIntents", activity.getClass().getName());
                             }
                         } catch (Throwable error) { report(error); }
@@ -153,8 +168,10 @@ public final class ActivityCaptureHooks {
                 XC_MethodHook fallback = new XC_MethodHook() {
                     @Override protected void beforeHookedMethod(MethodHookParam param) {
                         if (!enabled.getAsBoolean()) return;
-                        for (Intent intent : ActivityCapturePolicy.sendingIntents(param.args))
+                        for (Intent intent : ActivityCapturePolicy.sendingIntents(param.args)) {
+                            if (param.thisObject instanceof Activity) delivery.observe((Activity) param.thisObject, intent);
                             capture(intent, "Activity.onNewIntent", param.thisObject.getClass().getName());
+                        }
                     }
                 };
                 for (Method method : Activity.class.getDeclaredMethods())

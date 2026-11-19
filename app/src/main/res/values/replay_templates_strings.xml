@@ -1,0 +1,28 @@
+<resources>
+    <string name="replay_templates_title">重放模板</string>
+    <string name="replay_templates_save">保存重放模板</string>
+    <string name="replay_templates_empty">还没有重放模板。可以从可重放的 Fragment 记录生成，也可以导入别人分享的模板。</string>
+    <string name="replay_templates_import">导入模板</string>
+    <string name="replay_templates_import_text">粘贴别人分享的重放模板</string>
+    <string name="replay_templates_export">导出模板</string>
+    <string name="replay_templates_export_help">分享模板会包含已保存的默认参数。</string>
+    <string name="replay_templates_share">分享模板</string>
+    <string name="replay_templates_duplicate">复制为自定义链接</string>
+    <string name="replay_templates_rename">修改显示名称</string>
+    <string name="replay_templates_name_optional">显示名称（可选）</string>
+    <string name="replay_templates_id_new">自定义链接标识（留空自动生成）</string>
+    <string name="replay_templates_id_import">自定义链接标识（留空保留原标识）</string>
+    <string name="replay_templates_id_required">自定义链接标识</string>
+    <string name="replay_templates_id_help">标识最多 64 个字符，以英文字母或数字开头，可包含短横线和下划线。</string>
+    <string name="replay_templates_version">%1$s（%2$d）</string>
+    <string name="replay_templates_version_code">版本号 %1$d</string>
+    <string name="replay_templates_version_unknown">版本未知</string>
+    <string name="replay_templates_source">%1$s · %2$s\n%3$s</string>
+    <string name="replay_templates_status">%1$s · %2$s</string>
+    <string name="replay_templates_ready">本机可用</string>
+    <string name="replay_templates_unavailable">本机不可用</string>
+    <string name="replay_templates_pending">等待匹配本机捕获</string>
+    <string name="replay_templates_pending_help">安装模板对应版本的目标应用，启用捕获并打开对应页面一次。匹配到兼容的导航记录后，模板会自动可用。</string>
+    <string name="replay_templates_delete_confirm">删除「%1$s」？使用此标识的本机重放链接会失效。</string>
+    <string name="replay_templates_error">重放模板操作失败：%1$s</string>
+</resources>

@@ -23,6 +23,7 @@
 
     <!-- Other fragments -->
     <fragment android:id="@+id/nav_actions" android:name="com.fourtwo.hookintent.actions.ActionsFragment" android:label="@string/actions_title" tools:layout="@layout/fragment_actions" />
+    <fragment android:id="@+id/nav_intent_library" android:name="com.fourtwo.hookintent.library.IntentLibraryFragment" android:label="@string/intent_library_title" tools:layout="@layout/fragment_intent_library" />
     <fragment
         android:id="@+id/nav_star"
         android:name="com.fourtwo.hookintent.ui.star.StarFragment"
@@ -38,6 +39,12 @@
         android:name="com.fourtwo.hookintent.ui.settings.SettingsFragment"
         android:label="@string/settings"
         tools:layout="@layout/fragment_settings" />
+
+    <fragment
+        android:id="@+id/nav_replay_templates"
+        android:name="com.fourtwo.hookintent.ui.replay.ReplayTemplatesFragment"
+        android:label="@string/replay_templates_title"
+        tools:layout="@layout/fragment_replay_templates" />
 
     <fragment
         android:id="@+id/nav_me"

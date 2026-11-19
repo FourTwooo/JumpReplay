@@ -170,7 +170,9 @@ public class MainActivity extends AppCompatActivity {
         mAppBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_home,
                 R.id.nav_star,
+                R.id.nav_replay_templates,
                 R.id.nav_actions,
+                R.id.nav_intent_library,
                 R.id.nav_settings,
                 R.id.nav_blocker,
                 R.id.nav_history,

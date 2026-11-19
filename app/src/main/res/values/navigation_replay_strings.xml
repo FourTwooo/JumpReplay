@@ -46,4 +46,6 @@
     <string name="navigation_replay_host_observation_limited">宿主类的方法观察不完整，无法确认原调用。</string>
     <string name="navigation_replay_host_destination_already_visible">候选调用之前目标 Fragment 已可见，无法确认它触发了此次显示。</string>
     <string name="navigation_replay_host_candidate_overflow">观察到的调用过多，已丢弃的候选仍可能匹配该 Fragment 的参数，无法确认唯一调用。</string>
+    <string name="navigation_replay_native_intent">生成原生 Intent</string>
+    <string name="navigation_replay_native_title">原生 Intent</string>
 </resources>

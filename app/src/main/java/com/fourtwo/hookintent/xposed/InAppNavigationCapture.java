@@ -2,6 +2,7 @@ package com.fourtwo.hookintent.xposed;
 
 import android.app.Activity;
 import android.app.Application;
+import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Handler;
@@ -11,6 +12,7 @@ import android.view.View;
 import android.view.ViewParent;
 import android.view.ViewTreeObserver;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
+import com.fourtwo.hookintent.library.ObservedFragmentIntent;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import de.robv.android.xposed.XposedBridge;
@@ -29,7 +32,7 @@ import de.robv.android.xposed.XposedBridge;
 public final class InAppNavigationCapture implements Application.ActivityLifecycleCallbacks {
     public interface Sink {
         void capture(Activity activity, String destination, NavigationCaptureSource source, Bundle arguments,
-                Bundle replayDescriptor, Bundle replayDiagnostics);
+                Bundle replayDescriptor, Bundle replayDiagnostics, ObservedFragmentIntent.Evidence nativeEntry);
     }
 
     static final long SOURCE_READY_MS = 6_500;
@@ -38,10 +41,13 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     private static final long SETTLE_MS = 120;
     private static final long TRANSITION_RECHECK_MS = 280;
     private static final long PAGE_WINDOW_MS = 3000;
+    private static final long DELIVERY_WINDOW_MS = 2000;
     private static final int MAX_FRAGMENTS = 64;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<Activity, ActivityWatch> resumed = new IdentityHashMap<>();
+    private final Map<Activity, DeliveredIntent> deliveries = new WeakHashMap<>();
     private final Predicate<NavigationCaptureSource> enabled;
+    private final BooleanSupplier learningNativeEntries;
     private final Sink sink;
     private final FragmentHostReplay fragmentReplay;
     private final FragmentTransactionReplay transactionReplay;
@@ -50,8 +56,9 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     private FragmentAccess platform;
     private boolean errorLogged;
 
-    public InAppNavigationCapture(Predicate<NavigationCaptureSource> enabled, Sink sink) {
+    public InAppNavigationCapture(Predicate<NavigationCaptureSource> enabled, BooleanSupplier learningNativeEntries, Sink sink) {
         this.enabled = enabled;
+        this.learningNativeEntries = learningNativeEntries;
         this.sink = sink;
         Predicate<Activity> capturingFragment = activity -> resumed.containsKey(activity)
                 && enabled.test(NavigationCaptureSource.FRAGMENT);
@@ -110,7 +117,20 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     }
 
     private void refreshWatches() {
+        if (!learningNativeEntries.getAsBoolean() || !enabled.test(NavigationCaptureSource.FRAGMENT)) deliveries.clear();
         for (ActivityWatch watch : resumed.values()) watch.refresh();
+    }
+
+    public void observeDelivery(Activity activity, Intent intent) {
+        if (Looper.myLooper() != Looper.getMainLooper()) return;
+        deliveries.remove(activity);
+        if (!learningNativeEntries.getAsBoolean() || !enabled.test(NavigationCaptureSource.FRAGMENT)) return;
+        Intent snapshot = ObservedFragmentIntent.delivery(activity, intent);
+        if (snapshot == null) return;
+        long now = SystemClock.uptimeMillis();
+        deliveries.put(activity, new DeliveredIntent(snapshot, now + DELIVERY_WINDOW_MS));
+        ActivityWatch watch = resumed.get(activity);
+        if (watch != null && watch.observing) watch.scheduleSample(now + LAYOUT_SAMPLE_MS);
     }
 
     @Override public void onActivityResumed(Activity activity) {
@@ -121,7 +141,10 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     }
 
     @Override public void onActivityPaused(Activity activity) { stopWatching(activity); }
-    @Override public void onActivityDestroyed(Activity activity) { stopWatching(activity); }
+    @Override public void onActivityDestroyed(Activity activity) {
+        deliveries.remove(activity);
+        stopWatching(activity);
+    }
     @Override public void onActivityCreated(Activity activity, Bundle state) {}
     @Override public void onActivityStarted(Activity activity) {}
     @Override public void onActivityStopped(Activity activity) {}
@@ -250,6 +273,11 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 } else {
                     forgetFragmentRoutes();
                 }
+                ObservedFragmentIntent.Evidence entry = capturing ? nativeEntry(frame) : null;
+                if (entry != null && frame.baseline) {
+                    emit(activity, entry.fragment, NavigationCaptureSource.FRAGMENT,
+                            frame.visible.get(entry.fragment).get(0), null, null, entry);
+                }
                 Map<FragmentChange, PageRoute> pageRoutes = associatePages(frame);
                 for (FragmentChange change : frame.changes) {
                     Bundle descriptor = null;
@@ -269,7 +297,8 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                         }
                     }
                     emit(activity, change.destination, NavigationCaptureSource.FRAGMENT, change.arguments,
-                            descriptor, descriptor == null ? diagnostics : null);
+                            descriptor, descriptor == null ? diagnostics : null,
+                            entry != null && entry.fragment.equals(change.destination) ? entry : null);
                 }
                 scheduleSample(frame.nextSample);
                 if (!capturing && !waitingForFragmentReplay(activity)) stop();
@@ -277,6 +306,33 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
                 forgetFragmentRoutes();
                 report(error);
             }
+        }
+
+        private ObservedFragmentIntent.Evidence nativeEntry(Frame frame) {
+            DeliveredIntent delivered = deliveries.get(activity);
+            if (delivered == null) return null;
+            if (frame.incompleteReason != null || frame.now >= delivered.expiresAt || !learningNativeEntries.getAsBoolean()) {
+                deliveries.remove(activity);
+                return null;
+            }
+            ObservedFragmentIntent.Evidence evidence = null;
+            for (Map.Entry<String, List<Map<String, Object>>> destination : frame.visible.entrySet()) {
+                for (Map<String, Object> args : destination.getValue()) {
+                    ObservedFragmentIntent.Evidence match = ObservedFragmentIntent.associate(
+                            activity, delivered.intent, destination.getKey(), args);
+                    if (match == null) continue;
+                    if (evidence != null || destination.getValue().size() != 1) {
+                        deliveries.remove(activity);
+                        return null;
+                    }
+                    evidence = match;
+                }
+            }
+            if (evidence == null) return null;
+            String fragment = evidence.fragment;
+            if (!frame.baseline && frame.changes.stream().noneMatch(change -> fragment.equals(change.destination))) return null;
+            deliveries.remove(activity);
+            return evidence;
         }
 
         private Map<FragmentChange, PageRoute> associatePages(Frame frame) {
@@ -431,6 +487,16 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         }
     }
 
+    private static final class DeliveredIntent {
+        final Intent intent;
+        final long expiresAt;
+
+        DeliveredIntent(Intent intent, long expiresAt) {
+            this.intent = intent;
+            this.expiresAt = expiresAt;
+        }
+    }
+
     private static final class PageRoute {
         final Bundle descriptor;
         final int distance;
@@ -539,14 +605,15 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     }
 
     private void emit(Activity activity, String destination, NavigationCaptureSource source,
-            Map<String, Object> args, Bundle replayDescriptor, Bundle replayDiagnostics) {
+            Map<String, Object> args, Bundle replayDescriptor, Bundle replayDiagnostics,
+            ObservedFragmentIntent.Evidence nativeEntry) {
         if (!enabled.test(source)) return;
         Bundle bundle = new Bundle();
         for (Map.Entry<String, Object> entry : args.entrySet()) {
             bundle.putSerializable(entry.getKey(), (java.io.Serializable) entry.getValue());
         }
         try {
-            sink.capture(activity, destination, source, bundle, replayDescriptor, replayDiagnostics);
+            sink.capture(activity, destination, source, bundle, replayDescriptor, replayDiagnostics, nativeEntry);
         } catch (RuntimeException | LinkageError error) {
             report(error);
         }

@@ -47,6 +47,8 @@ import com.fourtwo.hookintent.base.LocalDatabaseManager;
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
+import com.fourtwo.hookintent.library.ObservedFragmentIntent;
+import com.fourtwo.hookintent.ui.replay.ReplayTemplateDialogs;
 import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.replay.ExtrasEditorDialog;
 import com.fourtwo.hookintent.utils.HashUtil;
@@ -294,8 +296,10 @@ public class DetailFragment extends Fragment {
                 menu.findItem(R.id.action_save).setVisible(canReplay);
                 MenuItem replayMenu = menu.findItem(R.id.copy_code);
                 if (navigation) replayMenu.setTitle(R.string.navigation_replay_options);
-                replayMenu.setVisible(canReplay || (navigation
-                        && itemData.getAppBundle().getBundle(Constants.NAVIGATION_REPLAY) != null));
+                boolean localReplay = navigation
+                        && itemData.getAppBundle().getBundle(Constants.NAVIGATION_REPLAY) != null;
+                replayMenu.setVisible(canReplay || localReplay);
+                if (navigation) loadNativeReplay(itemData.getAppBundle(), replayMenu, localReplay);
 
                 // 动态设置收藏按钮图标
                 try {
@@ -374,6 +378,31 @@ public class DetailFragment extends Fragment {
 
     }
 
+    private static final java.util.concurrent.Executor NATIVE_LOOKUP =
+            java.util.concurrent.Executors.newSingleThreadExecutor();
+    private Intent nativeReplay;
+
+    private void loadNativeReplay(Bundle record, MenuItem replayMenu, boolean hasLocalReplay) {
+        nativeReplay = null;
+        android.content.Context context = requireContext().getApplicationContext();
+        android.app.Activity host = requireActivity();
+        View view = requireView();
+        NATIVE_LOOKUP.execute(() -> {
+            Intent match = null;
+            try {
+                match = ObservedFragmentIntent.lookup(context, record);
+            } catch (Exception ignored) {
+                // A native route is optional and may be invalidated by an app update.
+            }
+            final Intent result = match;
+            host.runOnUiThread(() -> {
+                if (getView() != view) return;
+                nativeReplay = result;
+                replayMenu.setVisible(hasLocalReplay || result != null);
+            });
+        });
+    }
+
     private void showOptionsDialog(View anchorView) {
         // 如果 itemData 为空，直接返回
         if (itemData == null) {
@@ -391,6 +420,12 @@ public class DetailFragment extends Fragment {
         List<Runnable> actions = new ArrayList<>();
 
         if (navigation != null) {
+            Intent nativeIntent = nativeReplay;
+            if (nativeIntent != null) {
+                options.add(getString(R.string.navigation_replay_native_intent));
+                actions.add(() -> ReplayTemplateDialogs.showIntent(requireActivity(), nativeIntent,
+                        R.string.navigation_replay_native_title));
+            }
             Bundle descriptor = capture.getBundle(Constants.NAVIGATION_REPLAY);
             ItemData record = itemData;
             if (descriptor != null) {

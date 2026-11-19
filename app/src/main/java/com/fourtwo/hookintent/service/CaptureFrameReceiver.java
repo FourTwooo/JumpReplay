@@ -31,15 +31,15 @@ final class CaptureFrameReceiver {
 
     CaptureFrameReceiver(Context context) { this.context = context; }
 
-    void receive(Bundle data, BiConsumer<Boolean, String> reply) {
+    void receive(Bundle data, int sendingUid, BiConsumer<Boolean, String> reply) {
         synchronized (lifecycle) {
             if (closing) { respond(reply, false, "Capture receiver is closing; retry on the next connection"); return; }
             inFlight++;
-            worker.execute(() -> process(data, reply));
+            worker.execute(() -> process(data, sendingUid, reply));
         }
     }
 
-    private void process(Bundle data, BiConsumer<Boolean, String> reply) {
+    private void process(Bundle data, int sendingUid, BiConsumer<Boolean, String> reply) {
         boolean waitingForRepository = false;
         try {
             String id = data.getString("transferId");
@@ -68,7 +68,9 @@ final class CaptureFrameReceiver {
             byte[] expected = (length + ":" + frames + ":" + hash).getBytes(StandardCharsets.UTF_8);
             if (metadata.exists() && !java.util.Arrays.equals(readSmall(metadata), expected))
                 throw new IllegalArgumentException("Transfer metadata changed");
-            if (!metadata.exists()) CaptureFiles.write(metadata, expected);
+            boolean newTransfer = !metadata.exists();
+            if (newTransfer) CaptureFiles.write(metadata, expected);
+            int transferUid = transferUid(directory, newTransfer, sendingUid);
             File part = new File(directory, frame + ".part");
             if (!part.exists() || !java.util.Arrays.equals(readSmall(part), payload)) CaptureFiles.write(part, payload);
             if (frame != frames - 1) { respond(reply, true, "Frame persisted"); return; }
@@ -76,7 +78,7 @@ final class CaptureFrameReceiver {
             AtomicBoolean settled = new AtomicBoolean();
             waitingForRepository = true;
             try {
-                CaptureRepository.get(context).appendFile(assembled, id,
+                CaptureRepository.get(context).appendFile(assembled, id, transferUid,
                         () -> completeRepository(settled, () -> {
                             completed.execSQL("INSERT OR IGNORE INTO completed(id) VALUES(?)", new Object[]{id});
                             respond(reply, true, "Capture committed");
@@ -91,6 +93,22 @@ final class CaptureFrameReceiver {
         } finally {
             if (!waitingForRepository) finished();
         }
+    }
+
+    private static int transferUid(File directory, boolean newTransfer, int sender) throws IOException {
+        File identity = new File(directory, "sender_uid");
+        if (newTransfer) {
+            CaptureFiles.write(identity, Integer.toString(sender).getBytes(StandardCharsets.US_ASCII));
+            return sender;
+        }
+        // Legacy or interrupted metadata cannot establish who sent the earlier frames.
+        if (!identity.isFile()) return -1;
+        int owner;
+        try { owner = Integer.parseInt(new String(readSmall(identity), StandardCharsets.US_ASCII)); }
+        catch (NumberFormatException invalid) { return -1; }
+        if (owner == sender) return owner;
+        if (owner >= 0) CaptureFiles.write(identity, new byte[]{'-', '1'});
+        return -1;
     }
 
     private interface Completion { void run() throws Exception; }

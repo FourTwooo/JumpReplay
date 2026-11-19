@@ -45,4 +45,6 @@
     <string name="navigation_replay_host_observation_limited">Host method observation was incomplete. The original call could not be verified.</string>
     <string name="navigation_replay_host_destination_already_visible">The destination was already visible before the candidate call. Its role could not be verified.</string>
     <string name="navigation_replay_host_candidate_overflow">Too many calls were observed. A discarded candidate may match the Fragment arguments, so a unique call could not be verified.</string>
+    <string name="navigation_replay_native_intent">Generate native Intent</string>
+    <string name="navigation_replay_native_title">Native Intent</string>
 </resources>

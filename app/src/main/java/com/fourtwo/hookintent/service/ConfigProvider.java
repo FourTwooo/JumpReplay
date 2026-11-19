@@ -11,6 +11,7 @@ import androidx.annotation.Nullable;
 
 import com.fourtwo.hookintent.data.Constants;
 import com.fourtwo.hookintent.data.NavigationCaptureSource;
+import com.fourtwo.hookintent.library.IntentLibrary;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 
 import java.util.HashMap;
@@ -61,6 +62,8 @@ public class ConfigProvider extends ContentProvider {
                 anyNavigationEnabled |= enabled;
             }
             configData.put(Constants.IN_APP_NAVIGATION_CAPTURE, Boolean.toString(anyNavigationEnabled));
+            configData.put(IntentLibrary.PREFERENCE, Boolean.toString(
+                    SharedPreferencesUtils.getBoolean(getContext(), IntentLibrary.PREFERENCE)));
         }
 
         MatrixCursor cursor = new MatrixCursor(new String[]{"key", "value"});

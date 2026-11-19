@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="intent_library_title">Intent 数据库</string>
+    <string name="library_cache_enabled">自动记录新捕获的 Intent</string>
+    <string name="library_observed_tab">捕获记录</string>
+    <string name="library_declared_tab">应用活动</string>
+    <string name="library_choose_app">选择应用</string>
+    <string name="library_current_app">更换应用 · %1$s</string>
+    <string name="library_search">搜索应用、组件或参数</string>
+    <string name="library_clear">清除 Intent 缓存</string>
+    <string name="library_clear_message">删除数据库里的 Intent 样例和 Fragment 对应关系？捕获列表里的原始记录会保留。</string>
+    <string name="library_more">加载更多</string>
+    <string name="library_empty">开启捕获后，新抓到的 Intent 会出现在这里。</string>
+    <string name="library_cache_off">自动记录已关闭。可以在「应用活动」查看系统声明的入口。</string>
+    <string name="library_no_match">没有找到匹配的条目</string>
+    <string name="library_no_activities">此应用没有可读取的 Activity 声明</string>
+    <string name="library_read_error">读取 Intent 数据库失败</string>
+    <string name="library_write_error">无法修改 Intent 缓存</string>
+    <string name="library_delivered">已观察到接收</string>
+    <string name="library_requested">观察到启动请求</string>
+    <string name="library_destination">目标应用包名</string>
+    <string name="library_activity">Activity</string>
+    <string name="library_target_version">目标应用版本</string>
+    <string name="library_source">捕获进程所属应用</string>
+    <string name="library_source_version">捕获进程所属应用版本</string>
+    <string name="library_action">Action</string>
+    <string name="library_data">数据 URI 样例</string>
+    <string name="library_mime">MIME 类型</string>
+    <string name="library_categories">类别</string>
+    <string name="library_flags">标志位</string>
+    <string name="library_last_seen">最后记录时间</string>
+    <string name="library_extras">参数名、类型和样例</string>
+    <string name="library_no_extras">此次记录没有 extras</string>
+    <string name="library_extras_incomplete">有些参数未能读取或样例已截断</string>
+    <string name="library_observed_title">捕获到的 Intent</string>
+    <string name="library_declared_title">系统声明的 Activity</string>
+    <string name="library_show_observations">查看已捕获的 Intent</string>
+    <string name="library_copy_uri">复制 Intent URI</string>
+    <string name="library_close">关闭</string>
+    <string name="library_permission">访问权限</string>
+    <string name="library_alias">别名指向的 Activity</string>
+    <string name="library_declared_note">来自系统的应用活动清单。调用参数和样例来自实际捕获。</string>
+    <string name="library_delete_entry">删除这条 Intent 样例？</string>
+    <string name="library_exported">已导出</string>
+    <string name="library_private">内部活动</string>
+    <string name="library_activity_on">已启用</string>
+    <string name="library_activity_off">已停用</string>
+    <string name="library_launcher">桌面入口</string>
+    <string name="library_unknown_version">版本未知</string>
+    <plurals name="library_occurrences">
+        <item quantity="other">%d 次</item>
+    </plurals>
+    <item name="library_clear" type="id" />
+</resources>

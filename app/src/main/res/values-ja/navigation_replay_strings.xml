@@ -45,4 +45,6 @@
     <string name="navigation_replay_host_observation_limited">ホストメソッドを十分に観測できず、元の呼び出しを確認できませんでした。</string>
     <string name="navigation_replay_host_destination_already_visible">候補の呼び出し前から遷移先が表示されていたため、この表示を引き起こしたか確認できませんでした。</string>
     <string name="navigation_replay_host_candidate_overflow">観測した呼び出しが多く、破棄した候補も Fragment の引数に一致する可能性があるため、呼び出しを一つに特定できませんでした。</string>
+    <string name="navigation_replay_native_intent">ネイティブ Intent を生成</string>
+    <string name="navigation_replay_native_title">ネイティブ Intent</string>
 </resources>
