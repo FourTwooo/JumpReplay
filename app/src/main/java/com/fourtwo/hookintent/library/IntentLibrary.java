@@ -24,6 +24,7 @@ import com.fourtwo.hookintent.utils.AppInfoHelper;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
@@ -32,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,6 +49,7 @@ public final class IntentLibrary {
     private static final String TAG = "IntentLibrary";
     private static final int MAX_EXTRAS = 64;
     private static final int MAX_SAMPLE_TEXT = 1024;
+    private static final int MAX_PARAMETER_EXAMPLES = 4;
     private static final int MAX_URI = 16_384;
     private static final int MAX_EVIDENCE = 65_536;
     private static IntentLibrary instance;
@@ -237,6 +240,14 @@ public final class IntentLibrary {
 
         long timestamp = System.currentTimeMillis();
         String shapeKey = shape.toString();
+        int previousHits = 0;
+        try (Cursor row = db.query("observations", new String[]{"hits", "payload"}, "shape=?", new String[]{shapeKey},
+                null, null, null)) {
+            if (row.moveToFirst()) {
+                previousHits = row.getInt(0);
+                retainExamples(fields, row.getString(1));
+            }
+        }
         ContentValues values = new ContentValues();
         values.put("package_name", destination);
         values.put("target_version", destinationVersion.code);
@@ -244,17 +255,33 @@ public final class IntentLibrary {
         values.put("summary", appLabel + " " + destination + " " + activity + " " + source + " " + action + " " + data + " " + fields);
         values.put("payload", payload.toString());
         values.put("seen_at", timestamp);
-        int previousHits = 0;
-        try (Cursor row = db.query("observations", new String[]{"hits"}, "shape=?", new String[]{shapeKey},
-                null, null, null)) {
-            if (row.moveToFirst()) previousHits = row.getInt(0);
-        }
         values.put("hits", previousHits == Integer.MAX_VALUE ? previousHits : previousHits + 1);
         if (previousHits == 0) {
             values.put("shape", shapeKey);
             db.insertOrThrow("observations", null, values);
         } else db.update("observations", values, "shape=?", new String[]{shapeKey});
         return true;
+    }
+
+    private static void retainExamples(JSONArray fields, String previous) throws JSONException {
+        JSONArray old;
+        try { old = new JSONObject(previous).optJSONArray("extras"); }
+        catch (JSONException unreadable) { return; }
+        if (old == null || old.length() != fields.length()) return;
+        for (int i = 0; i < fields.length(); i++) {
+            JSONArray field = fields.getJSONArray(i);
+            JSONArray previousField = old.optJSONArray(i);
+            if (previousField == null || !field.getString(0).equals(previousField.optString(0))
+                    || !field.getString(1).equals(previousField.optString(1))) continue;
+            LinkedHashSet<String> samples = new LinkedHashSet<>();
+            samples.add(field.getString(2));
+            samples.add(previousField.optString(2));
+            JSONArray older = previousField.optJSONArray(3);
+            for (int j = 0; older != null && j < older.length() && samples.size() < MAX_PARAMETER_EXAMPLES; j++) {
+                samples.add(older.optString(j));
+            }
+            if (samples.size() > 1) field.put(3, new JSONArray(samples));
+        }
     }
 
     private ResolveInfo resolve(String raw) {
@@ -368,15 +395,17 @@ public final class IntentLibrary {
 
     public static final class Parameter {
         public final String name, type, example;
+        public final List<String> examples;
         private final boolean complete;
-        Parameter(String name, String type, String example) {
-            this(name, type, example, true);
-        }
         Parameter(String name, String type, String example, boolean complete) {
+            this(name, type, example, complete, Collections.singletonList(example));
+        }
+        Parameter(String name, String type, String example, boolean complete, List<String> examples) {
             this.name = name;
             this.type = type;
             this.example = example;
             this.complete = complete;
+            this.examples = Collections.unmodifiableList(examples);
         }
     }
 
@@ -413,7 +442,16 @@ public final class IntentLibrary {
             JSONArray extras = Objects.requireNonNull(data.optJSONArray("extras"));
             for (int i = 0; i < extras.length(); i++) {
                 JSONArray extra = extras.optJSONArray(i);
-                if (extra != null) fields.add(new Parameter(extra.optString(0), extra.optString(1), extra.optString(2)));
+                if (extra == null) continue;
+                String example = extra.optString(2);
+                List<String> samples = new ArrayList<>();
+                samples.add(example);
+                JSONArray retained = extra.optJSONArray(3);
+                for (int j = 0; retained != null && j < retained.length(); j++) {
+                    String sample = retained.optString(j);
+                    if (!samples.contains(sample)) samples.add(sample);
+                }
+                fields.add(new Parameter(extra.optString(0), extra.optString(1), example, true, samples));
             }
             parameters = Collections.unmodifiableList(fields);
             List<String> categories = new ArrayList<>();

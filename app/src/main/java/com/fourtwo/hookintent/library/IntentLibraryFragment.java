@@ -221,7 +221,8 @@ public final class IntentLibraryFragment extends Fragment {
         if (entry.parameters.isEmpty()) data.append('\n').append(getString(entry.parametersComplete
                 ? R.string.library_no_extras : R.string.library_extras_incomplete));
         for (IntentLibrary.Parameter extra : entry.parameters) {
-            data.append('\n').append(extra.name).append(" [").append(extra.type).append("] = ").append(extra.example);
+            data.append('\n').append(extra.name).append(" [").append(extra.type).append("] = ")
+                    .append(TextUtils.join(" · ", extra.examples));
         }
         if (!entry.parameters.isEmpty() && !entry.parametersComplete) data.append('\n').append(getString(R.string.library_extras_incomplete));
         androidx.appcompat.app.AlertDialog.Builder dialog = AppDialogs.builder(context)

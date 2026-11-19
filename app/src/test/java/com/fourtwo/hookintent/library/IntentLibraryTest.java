@@ -21,6 +21,7 @@ import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -61,8 +62,13 @@ public class IntentLibraryTest {
         assertTrue(entry.delivered);
         assertEquals(TARGET_ACTIVITY, entry.activity);
         assertEquals("second", entry.parameters.get(0).example);
+        assertEquals(Arrays.asList("second", "first"), entry.parameters.get(0).examples);
         assertEquals("java.lang.String", entry.parameters.get(0).type);
         assertEquals("second", Intent.parseUri(entry.intentUri, Intent.URI_INTENT_SCHEME).getStringExtra("topic"));
+        ingest(library, delivered("third", 7, INSTALLED), delivered("fourth", 7, INSTALLED),
+                delivered("fifth", 7, INSTALLED), delivered("second", 7, INSTALLED));
+        assertEquals(Arrays.asList("second", "fifth", "fourth", "third"),
+                library.observations(TARGET, 7).get(0).parameters.get(0).examples);
 
         long update = INSTALLED + 1_000;
         install(context, TARGET, 8, update);
@@ -101,7 +107,7 @@ public class IntentLibraryTest {
         assertTrue(library.observations(TARGET, 7).isEmpty());
     }
 
-    @Test public void clearRemovesFragmentEvidenceAndDisabledCacheDoesNotExposeIt() throws Exception {
+    @Test public void clearingRemovesFragmentEvidenceAndTurningOffRecordingRetainsIt() throws Exception {
         Context context = RuntimeEnvironment.getApplication();
         install(context, TARGET, 7, INSTALLED);
         IntentLibrary library = IntentLibrary.get(context);
