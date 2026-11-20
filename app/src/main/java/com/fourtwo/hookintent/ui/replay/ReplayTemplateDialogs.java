@@ -22,6 +22,7 @@ import androidx.fragment.app.FragmentActivity;
 
 import com.fourtwo.hookintent.R;
 import com.fourtwo.hookintent.replay.FragmentReplayStore;
+import com.fourtwo.hookintent.replay.ReplayFeedback;
 import com.fourtwo.hookintent.utils.AppDialogs;
 
 import java.util.concurrent.Callable;
@@ -112,10 +113,10 @@ public final class ReplayTemplateDialogs {
     }
 
     static void showIntent(FragmentActivity activity, Intent intent) {
-        showIntent(activity, intent, R.string.navigation_replay_generated_intent);
+        showIntent(activity, intent, R.string.navigation_replay_generated_intent, null);
     }
 
-    public static void showIntent(FragmentActivity activity, Intent intent, @StringRes int title) {
+    public static void showIntent(FragmentActivity activity, Intent intent, @StringRes int title, String feedbackKey) {
         String uri = intent.toUri(Intent.URI_INTENT_SCHEME);
         AlertDialog dialog = AppDialogs.builder(activity)
                 .setTitle(title)
@@ -123,11 +124,15 @@ public final class ReplayTemplateDialogs {
                 .setPositiveButton(R.string.copy_am_code,
                         (ignored, which) -> copy(activity, title, uri))
                 .setNeutralButton(R.string.navigation_replay_start, (ignored, which) -> {
+                    ReplayFeedback.Attempt attempt = feedbackKey == null ? null : ReplayFeedback.begin(activity, feedbackKey);
                     try {
                         activity.startActivity(intent);
+                        if (attempt != null) attempt.sent();
                     } catch (RuntimeException error) {
-                        showError(activity, R.string.navigation_replay_error, error);
+                        if (attempt == null) showError(activity, R.string.navigation_replay_error, error);
+                        else attempt.failed(error);
                     }
+                    if (attempt != null) attempt.announce();
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();

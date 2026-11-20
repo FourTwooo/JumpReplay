@@ -51,7 +51,7 @@ JumpReplay 用于查看、编辑和重放 Android 应用跳转。普通安装即
 
 <img src="https://github.com/user-attachments/assets/9af1fcd1-542f-404f-bb73-536897863f96" alt="配置" width="200"/>
 <img src="https://github.com/user-attachments/assets/1204cc25-facc-42a8-9e6d-0b550898996a" alt="捕获列表" width="200"/>
-<img src="https://github.com/user-attachments/assets/b73e8411-abb1-4a06-9dcd-938b148f502e" alt="捕获详情" width="200"/>
+<img src="https://github.com/user-attachments/assets/03f51eeb-1e9a-4a6a-b7b6-8c4d1af1231d" alt="捕获详情" width="200"/>
 <img src="https://github.com/user-attachments/assets/7d1a4ede-337d-4c44-add8-0d739964bc33" alt="意图拦截器" width="200"/>
 
 **抓包(作用域勾选对应应用)**

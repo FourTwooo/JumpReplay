@@ -12,6 +12,7 @@ import com.fourtwo.hookintent.base.IntentPayloadCodec;
 import com.fourtwo.hookintent.data.ItemData;
 import com.fourtwo.hookintent.replay.ExtrasEditorDialog;
 import com.fourtwo.hookintent.replay.NavigationReplayTransport;
+import com.fourtwo.hookintent.replay.ReplayFeedback;
 import com.fourtwo.hookintent.ui.replay.ReplayTemplateDialogs;
 
 import java.util.function.Consumer;
@@ -19,20 +20,30 @@ import java.util.function.Consumer;
 final class NavigationReplayDialogs {
     private NavigationReplayDialogs() {}
 
-    static void editInApp(FragmentActivity activity, ItemData record, Bundle descriptor) {
+    static void editInApp(FragmentActivity activity, ItemData record, Bundle descriptor, String feedbackKey) {
         editArguments(activity, descriptor, R.string.navigation_replay_start,
                 R.string.navigation_replay_error, editedArguments -> {
-            Bundle capture = record.getAppBundle();
-            Intent foreground = activity.getPackageManager().getLaunchIntentForPackage(
-                    capture.getString("packageName", ""));
-            if (foreground == null) {
-                throw new IllegalStateException(activity.getString(R.string.navigation_replay_missing_launcher));
+            ReplayFeedback.Attempt attempt = ReplayFeedback.begin(activity, feedbackKey);
+            try {
+                Bundle capture = record.getAppBundle();
+                Intent foreground = activity.getPackageManager().getLaunchIntentForPackage(
+                        capture.getString("packageName", ""));
+                if (foreground == null) {
+                    throw new IllegalStateException(activity.getString(R.string.navigation_replay_missing_launcher));
+                }
+                NavigationReplayTransport.replayAfterLaunch(activity, capture, descriptor, editedArguments,
+                        () -> {
+                            activity.startActivity(foreground);
+                            attempt.sent();
+                        }, error -> {
+                            if (error == null) attempt.confirmed();
+                            else attempt.failed(error);
+                            attempt.announce();
+                        });
+            } catch (RuntimeException error) {
+                attempt.failed(error);
+                attempt.announce();
             }
-            NavigationReplayTransport.replay(activity, capture, descriptor, editedArguments,
-                    () -> activity.startActivity(foreground), error -> {
-                        if (error != null) ReplayTemplateDialogs.showError(activity.getApplicationContext(),
-                                R.string.navigation_replay_error, error);
-                    });
         });
     }
 

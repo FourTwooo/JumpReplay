@@ -52,6 +52,9 @@ import com.fourtwo.hookintent.data.IntentMatchItem;
 import com.fourtwo.hookintent.databinding.ActivityIntentInterceptBinding;
 import com.fourtwo.hookintent.databinding.ContentInterceptMainBinding;
 import com.fourtwo.hookintent.manager.PermissionManager;
+import com.fourtwo.hookintent.replay.ExtrasClient;
+import com.fourtwo.hookintent.replay.ReplayFeedback;
+import com.fourtwo.hookintent.replay.ReplayTasks;
 import com.fourtwo.hookintent.utils.LoadingOverlay;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.fourtwo.hookintent.utils.ShortcutHelper;
@@ -82,7 +85,9 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     private String editorDraftToken;
     private int previewGeneration;
     private Runnable previewTask;
-    private com.fourtwo.hookintent.replay.ExtrasClient previewClient;
+    private ExtrasClient previewClient;
+    private ExtrasClient sendClient;
+    private int sendGeneration;
     private final ExecutorService iconExecutor = Executors.newSingleThreadExecutor();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private Future<?> iconTask;
@@ -180,8 +185,16 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        updateReplayFeedback();
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        cancelPendingSend();
+        binding.btnReloadIntent.setEnabled(true);
         setIntent(intent);
         handleIncomingIntent(intent);
     }
@@ -645,7 +658,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
         int generation = ++previewGeneration;
         if (previewTask != null) uiHandler.removeCallbacks(previewTask);
         if (previewClient != null) { previewClient.close(); previewClient = null; }
-        previewTask = () -> previewClient = com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin,
+        previewTask = () -> previewClient = ReplayTasks.fromText(this, replayOrigin,
                 updatedText, originalTarget, originalUrlText, (target, error) -> {
                     if (!isUiAlive() || generation != previewGeneration) return;
                     loadMatchingApps(error == null ? target : new Intent(Intent.ACTION_VIEW));
@@ -654,30 +667,54 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
     }
 
 
-    /**
-     * 处理发送按钮的点击事件
-     */
     private void handleReloadIntentClick() {
         boolean privileged = contentBinding.enableFeatureCheckbox.isChecked();
         String mode = contentBinding.dropdownSpinner.getSelectedItem().toString();
+        int generation = cancelPendingSend();
+        ReplayFeedback.Attempt attempt = ReplayFeedback.begin(this, ReplayFeedback.INTERCEPTOR_KEY);
         binding.btnReloadIntent.setEnabled(false);
-        com.fourtwo.hookintent.replay.ReplayTasks.fromText(this, replayOrigin,
-                contentBinding.urlTextView.getText().toString(), originalTarget, originalUrlText, (target, error) -> {
-                    if (!isUiAlive()) return;
+        sendClient = ReplayTasks.fromText(this, replayOrigin, contentBinding.urlTextView.getText().toString(),
+                originalTarget, originalUrlText, (target, error) -> {
+                    if (!isUiAlive() || generation != sendGeneration) return;
+                    sendClient = null;
                     binding.btnReloadIntent.setEnabled(true);
-                    if (error != null) Toast.makeText(this, "Intent 无法重放：" + error.getMessage(), Toast.LENGTH_LONG).show();
-                    else PermissionManager.startActivity(this, target, privileged, mode);
+                    if (error == null) launchReplay(target, privileged, mode, attempt);
+                    else finishReplay(attempt, error);
                 });
     }
 
-    /**
-     * 实现 OnIntentMatchClickListener 接口
-     */
     @Override
     public void onIntentMatchClick(Intent intent) {
-        if (intent != null) {
-            PermissionManager.startActivity(this, intent, contentBinding.enableFeatureCheckbox.isChecked(), contentBinding.dropdownSpinner.getSelectedItem().toString());
+        if (intent == null) return;
+        cancelPendingSend();
+        binding.btnReloadIntent.setEnabled(true);
+        launchReplay(intent, contentBinding.enableFeatureCheckbox.isChecked(),
+                contentBinding.dropdownSpinner.getSelectedItem().toString(),
+                ReplayFeedback.begin(this, ReplayFeedback.INTERCEPTOR_KEY));
+    }
+
+    private int cancelPendingSend() {
+        int generation = ++sendGeneration;
+        if (sendClient != null) {
+            sendClient.close();
+            sendClient = null;
         }
+        return generation;
+    }
+
+    private void launchReplay(Intent intent, boolean privileged, String mode, ReplayFeedback.Attempt attempt) {
+        PermissionManager.startActivity(this, intent, privileged, mode, error -> finishReplay(attempt, error));
+    }
+
+    private void finishReplay(ReplayFeedback.Attempt attempt, Exception error) {
+        if (error == null) attempt.sent();
+        else attempt.failed(error);
+        attempt.announce();
+        if (isUiAlive()) updateReplayFeedback();
+    }
+
+    private void updateReplayFeedback() {
+        ReplayFeedback.applySummary(contentBinding.replayFeedback, ReplayFeedback.INTERCEPTOR_KEY);
     }
 
     /**
@@ -738,6 +775,7 @@ public class IntentIntercept extends AppCompatActivity implements IntentIntercep
 
     @Override
     protected void onDestroy() {
+        cancelPendingSend();
         if (previewClient != null) previewClient.close();
         if (iconTask != null) iconTask.cancel(true);
         iconExecutor.shutdownNow();

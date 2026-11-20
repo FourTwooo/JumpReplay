@@ -213,14 +213,10 @@ final class FragmentHostReplay {
         state.source = source(visible);
         prune(state);
         Request waiting = request;
-        if (waiting != null && waiting.invoked == activity && active(activity)) {
-            Map<String, Object> actual = uniqueDestination(state, waiting.destination);
-            if (actual != null && waiting.expected.entrySet().stream()
-                    .allMatch(entry -> actual.containsKey(entry.getKey())
-                            && Objects.equals(entry.getValue(), actual.get(entry.getKey())))) {
-                waiting.observed = true;
-                if (!waiting.invoking) finish(waiting, null);
-            }
+        if (waiting != null && waiting.invoked == activity && active(activity)
+                && matchesDestination(waiting, state)) {
+            waiting.observed = true;
+            if (!waiting.invoking) finish(waiting, null);
         }
     }
 
@@ -377,7 +373,7 @@ final class FragmentHostReplay {
         Request waiting = request;
         if (waiting == null) return;
         if (SystemClock.uptimeMillis() >= waiting.deadline) {
-            String error = waiting.invoked == null ? "请返回捕获时的来源页面后再重放"
+            String error = waiting.invoked == null ? "Fragment 宿主 Activity 未获得前台焦点：" + waiting.host
                     : "原导航调用结束后，未观察到带有重放参数的 Fragment";
             finish(waiting, new IllegalStateException(error));
             return;
@@ -395,14 +391,17 @@ final class FragmentHostReplay {
         Activity host = null;
         for (Activity candidate : new ArrayList<>(resumed.get())) {
             if (!waitingFor(candidate) || !active(candidate)) continue;
-            resample.accept(candidate);
-            HostState state = states.get(candidate);
-            if (!active(candidate) || state == null || !waiting.source.equals(state.source)
-                    || state.visible.containsKey(waiting.destination)) continue;
             if (host != null) throw new IllegalStateException("当前有多个匹配的 Fragment 宿主");
             host = candidate;
         }
         if (host == null || SystemClock.uptimeMillis() >= waiting.deadline) return;
+        resample.accept(host);
+        if (!active(host) || SystemClock.uptimeMillis() >= waiting.deadline) return;
+        HostState state = states.get(host);
+        if (state != null && matchesDestination(waiting, state)) {
+            finish(waiting, null);
+            return;
+        }
         Method method = waiting.resolve(host.getClass());
         waiting.invoked = host;
         waiting.deadline = SystemClock.uptimeMillis() + DESTINATION_WAIT_MS;
@@ -455,6 +454,13 @@ final class FragmentHostReplay {
     private static Map<String, Object> uniqueDestination(HostState state, String destination) {
         List<Map<String, Object>> matches = state.visible.get(destination);
         return matches == null || matches.size() != 1 ? null : matches.get(0);
+    }
+
+    private static boolean matchesDestination(Request waiting, HostState state) {
+        Map<String, Object> actual = uniqueDestination(state, waiting.destination);
+        return actual != null && waiting.expected.entrySet().stream()
+                .allMatch(entry -> actual.containsKey(entry.getKey())
+                        && Objects.equals(entry.getValue(), actual.get(entry.getKey())));
     }
 
     private static boolean field(String name, int limit) {
@@ -756,7 +762,6 @@ final class FragmentHostReplay {
     private static final class Request {
         final String host;
         final String owner;
-        final String source;
         final String method;
         final String destination;
         final List<String> parameterTypes = new ArrayList<>();
@@ -771,7 +776,7 @@ final class FragmentHostReplay {
         Request(Bundle descriptor, Bundle edited, long sourceWait, Consumer<Exception> complete) throws JSONException {
             deadline = SystemClock.uptimeMillis() + sourceWait;
             host = descriptor.getString(HOST);
-            source = descriptor.getString(SOURCE);
+            String source = descriptor.getString(SOURCE);
             method = descriptor.getString(METHOD);
             destination = descriptor.getString(DESTINATION);
             Bundle original = descriptor.getBundle(ARGUMENTS);

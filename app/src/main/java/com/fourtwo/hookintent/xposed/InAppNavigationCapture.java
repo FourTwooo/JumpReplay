@@ -49,12 +49,16 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
     private final Predicate<NavigationCaptureSource> enabled;
     private final BooleanSupplier learningNativeEntries;
     private final Sink sink;
+    private final FragmentReplayHostActivation hostActivation = new FragmentReplayHostActivation(main, resumed::keySet);
+    private final ViewTreeObserver.OnWindowFocusChangeListener replayFocusChanged =
+            focused -> hostActivation.foregroundChanged();
     private final FragmentHostReplay fragmentReplay;
     private final FragmentTransactionReplay transactionReplay;
     private final ViewPagerReplay pagerReplay;
     private final Map<ClassLoader, FragmentAccess> supportByLoader = new WeakHashMap<>();
     private FragmentAccess platform;
     private boolean errorLogged;
+    private boolean replaying;
 
     public InAppNavigationCapture(Predicate<NavigationCaptureSource> enabled, BooleanSupplier learningNativeEntries, Sink sink) {
         this.enabled = enabled;
@@ -71,14 +75,37 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
 
     public void replay(Bundle descriptor, Bundle arguments, boolean waitForStartup, Consumer<Exception> result) {
         long sourceWait = waitForStartup ? COLD_SOURCE_READY_MS : SOURCE_READY_MS;
+        main.post(() -> {
+            if (replaying) {
+                result.accept(new IllegalStateException("已有 Fragment 重放正在执行"));
+                return;
+            }
+            String host = descriptor == null ? null : descriptor.getString("host");
+            if (host == null || host.isEmpty() || (!FragmentHostReplay.handles(descriptor)
+                    && !FragmentTransactionReplay.handles(descriptor) && !ViewPagerReplay.handles(descriptor))) {
+                result.accept(new IllegalArgumentException("这条 Fragment 记录没有可重放的导航调用"));
+                return;
+            }
+            replaying = true;
+            long deadline = SystemClock.uptimeMillis() + sourceWait;
+            Consumer<Exception> complete = error -> {
+                replaying = false;
+                result.accept(error);
+            };
+            hostActivation.await(host, deadline, error -> {
+                if (error != null) complete.accept(error);
+                else replayInHost(descriptor, arguments, Math.max(1, deadline - SystemClock.uptimeMillis()), complete);
+            });
+        });
+    }
+
+    private void replayInHost(Bundle descriptor, Bundle arguments, long sourceWait, Consumer<Exception> result) {
         if (ViewPagerReplay.handles(descriptor)) {
             pagerReplay.replay(descriptor, arguments, sourceWait, result);
         } else if (FragmentTransactionReplay.handles(descriptor)) {
             transactionReplay.replay(descriptor, arguments, sourceWait, result);
-        } else if (FragmentHostReplay.handles(descriptor)) {
-            fragmentReplay.replay(descriptor, arguments, sourceWait, result);
         } else {
-            result.accept(new IllegalArgumentException("这条 Fragment 记录没有可重放的导航调用"));
+            fragmentReplay.replay(descriptor, arguments, sourceWait, result);
         }
     }
 
@@ -137,6 +164,8 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
         if (resumed.containsKey(activity)) return;
         ActivityWatch watch = new ActivityWatch(activity);
         resumed.put(activity, watch);
+        watch.decor.getViewTreeObserver().addOnWindowFocusChangeListener(replayFocusChanged);
+        hostActivation.foregroundChanged();
         watch.refresh();
     }
 
@@ -152,7 +181,10 @@ public final class InAppNavigationCapture implements Application.ActivityLifecyc
 
     private void stopWatching(Activity activity) {
         ActivityWatch watch = resumed.remove(activity);
-        if (watch != null) watch.stop();
+        if (watch == null) return;
+        watch.decor.getViewTreeObserver().removeOnWindowFocusChangeListener(replayFocusChanged);
+        hostActivation.foregroundChanged();
+        watch.stop();
     }
 
     private final class ActivityWatch {

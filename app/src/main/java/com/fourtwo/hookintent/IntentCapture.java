@@ -220,6 +220,7 @@ public class IntentCapture implements IXposedHookLoadPackage {
         record.putString("FunctionCall", source.method());
         record.putString("from", activity.getClass().getName());
         record.putBundle(Constants.NAVIGATION_ARGUMENTS, arguments);
+        ObservedFragmentIntent.retainNumericArgumentTypes(record, arguments);
         if (nativeEntry != null && learnNativeFragmentEntries) {
             try {
                 record.putString(ObservedFragmentIntent.RECORD_KEY, nativeEntry.encode());

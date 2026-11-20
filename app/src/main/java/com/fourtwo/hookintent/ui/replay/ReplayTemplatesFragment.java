@@ -27,6 +27,7 @@ import com.fourtwo.hookintent.base.IntentPayloadCodec;
 import com.fourtwo.hookintent.replay.ExtrasEditorDialog;
 import com.fourtwo.hookintent.replay.FragmentReplayStore;
 import com.fourtwo.hookintent.replay.FragmentReplayStore.Template;
+import com.fourtwo.hookintent.replay.ReplayFeedback;
 import com.fourtwo.hookintent.utils.AppDialogs;
 
 import java.util.Collections;
@@ -47,6 +48,9 @@ public class ReplayTemplatesFragment extends Fragment {
         list.setLayoutManager(new LinearLayoutManager(requireContext()));
         adapter = new TemplateAdapter();
         list.setAdapter(adapter);
+        ReplayFeedback.observe(requireContext(), getViewLifecycleOwner(), () -> {
+            if (adapter != null) adapter.notifyDataSetChanged();
+        });
         view.findViewById(R.id.replay_template_import).setOnClickListener(v -> showImport());
     }
 
@@ -119,8 +123,15 @@ public class ReplayTemplatesFragment extends Fragment {
             return;
         }
         Context app = requireContext().getApplicationContext();
-        run(() -> FragmentReplayStore.templateDraft(app, entry.id), draft -> {
-            if (request != openingTemplate) return;
+        View requestView = getView();
+        ReplayTemplateDialogs.run(() -> FragmentReplayStore.templateDraft(app, entry.id), (draft, error) -> {
+            if (request != openingTemplate || requestView == null || getView() != requestView) return;
+            if (error != null) {
+                ReplayFeedback.Attempt attempt = ReplayFeedback.begin(app, ReplayFeedback.templateKey(entry.id));
+                attempt.failed(error);
+                attempt.announce();
+                return;
+            }
             FragmentActivity activity = requireActivity();
             Bundle record = DataConverter.convertIntentToBundle(new Intent().putExtras(draft.arguments()));
             ExtrasEditorDialog.showReplay(activity, record, entry.name, draft.editable,
@@ -302,7 +313,9 @@ public class ReplayTemplatesFragment extends Fragment {
                     entry.destination));
             int status = entry.ready ? R.string.replay_templates_ready
                     : entry.pending ? R.string.replay_templates_pending : R.string.replay_templates_unavailable;
-            holder.status.setText(getString(R.string.replay_templates_status, entry.id, getString(status)));
+            String availability = getString(R.string.replay_templates_status, entry.id, getString(status));
+            CharSequence feedback = ReplayFeedback.summary(holder.itemView.getContext(), ReplayFeedback.templateKey(entry.id));
+            holder.status.setText(TextUtils.isEmpty(feedback) ? availability : availability + "\n" + feedback);
             holder.itemView.setOnClickListener(v -> openTemplate(entry));
             holder.more.setOnClickListener(v -> showActions(v, entry));
         }

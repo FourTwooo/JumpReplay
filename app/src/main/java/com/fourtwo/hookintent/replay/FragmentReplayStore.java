@@ -123,6 +123,16 @@ public final class FragmentReplayStore {
         runIo(() -> load(app, incoming), callback);
     }
 
+    static String feedbackKey(Context context, Intent incoming) {
+        try {
+            String id = tokenFrom(context, incoming);
+            File file = templateFile(context, id);
+            return file.isFile() || new File(file + ".bak").isFile() ? ReplayFeedback.templateKey(id) : null;
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
+    }
+
     private static String tokenFrom(Context context, Intent incoming) {
         if (incoming != null && ACTION.equals(incoming.getAction())
                 && component(context).equals(incoming.getComponent())) {
@@ -232,6 +242,7 @@ public final class FragmentReplayStore {
         new AtomicFile(file).delete();
         if (file.exists() || new File(file + ".bak").exists()) throw new IOException("无法删除重放模板");
         ARCHIVE_MISSES.remove(file);
+        ReplayFeedback.clear(context, ReplayFeedback.templateKey(id));
     }
 
     public static synchronized void renameTemplate(Context context, String id, String name) throws Exception {

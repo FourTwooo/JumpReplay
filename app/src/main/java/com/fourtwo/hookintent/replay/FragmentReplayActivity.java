@@ -2,7 +2,6 @@ package com.fourtwo.hookintent.replay;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -10,13 +9,17 @@ import com.fourtwo.hookintent.R;
 
 /** Entry for a generated replay, scoped to its saved destination and editable argument types. */
 public final class FragmentReplayActivity extends AppCompatActivity {
+    private ReplayFeedback.Attempt attempt;
+
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         if (state != null) {
             finish();
             return;
         }
-        FragmentReplayStore.openAsync(this, getIntent(), this::launchPrepared);
+        Intent input = getIntent();
+        attempt = ReplayFeedback.begin(this, FragmentReplayStore.feedbackKey(this, input));
+        FragmentReplayStore.openAsync(this, input, this::launchPrepared);
     }
 
     private void launchPrepared(FragmentReplayStore.Prepared replay, Exception error) {
@@ -33,15 +36,14 @@ public final class FragmentReplayActivity extends AppCompatActivity {
                     if (launch == null) throw new IllegalStateException(
                             getString(R.string.navigation_replay_missing_launcher));
                     startActivity(launch);
+                    attempt.sent();
                 }, this::complete);
     }
 
     private void complete(Exception error) {
-        if (error != null) {
-            String detail = error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();
-            Toast.makeText(getApplicationContext(), getString(R.string.navigation_replay_error, detail),
-                    Toast.LENGTH_LONG).show();
-        }
+        if (error == null) attempt.confirmed();
+        else attempt.failed(error);
+        attempt.announce();
         if (!isFinishing() && !isDestroyed()) finish();
     }
 }

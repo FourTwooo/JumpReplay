@@ -122,28 +122,41 @@ public class FragmentHostReplayTest {
                 fixture.engine.captureFailure(fixture.host, ProductFragment.class.getName()));
     }
 
-    @Test public void rejectsWrongSourceAndUnconfirmedEditedValue() throws Exception {
+    @Test public void replaysAnotherDestinationOfTheSameClass() throws Exception {
         Fixture fixture = new Fixture();
         Bundle recorded = fixture.record(false, false, 0);
         assertNotNull(recorded);
         Bundle edited = new Bundle(recorded.getBundle("arguments"));
         edited.putString("sku", "new-sku");
+        AtomicBoolean completed = new AtomicBoolean();
         AtomicReference<Exception> failure = new AtomicReference<>();
-        fixture.engine.replay(recorded, edited, InAppNavigationCapture.SOURCE_READY_MS, failure::set);
-        Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(7));
-        assertNotNull(failure.get());
-        assertEquals(1, fixture.host.calls);
+        fixture.engine.replay(recorded, edited, InAppNavigationCapture.SOURCE_READY_MS, error -> {
+            failure.set(error);
+            completed.set(true);
+        });
+        Shadows.shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(completed.get());
+        assertNull(failure.get());
+        assertEquals(2, fixture.host.calls);
+        assertEquals("new-sku", fixture.host.getFragmentManager().findFragmentByTag("current")
+                .getArguments().getString("sku"));
+    }
 
-        fixture.returnToCatalog();
+    @Test public void rejectsUnconfirmedEditedValue() throws Exception {
+        Fixture fixture = new Fixture();
+        Bundle recorded = fixture.record(false, false, 0);
+        assertNotNull(recorded);
+        Bundle edited = new Bundle(recorded.getBundle("arguments"));
+        edited.putString("sku", "new-sku");
         fixture.host.ignoreEditedValue = true;
-        failure.set(null);
+        AtomicReference<Exception> failure = new AtomicReference<>();
         fixture.engine.replay(recorded, edited, InAppNavigationCapture.SOURCE_READY_MS, failure::set);
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(9));
         assertNotNull(failure.get());
         assertEquals(2, fixture.host.calls);
     }
 
-    @Test public void waitsForTheOriginalSourceDuringColdStartup() throws Exception {
+    @Test public void waitsForFocusedHostDuringColdStartupWithoutASourceFragment() throws Exception {
         Fixture fixture = new Fixture();
         Bundle recorded = fixture.record(false, false, 0);
         assertNotNull(recorded);
@@ -151,6 +164,10 @@ public class FragmentHostReplayTest {
         edited.putString("sku", "cold-sku");
         AtomicBoolean completed = new AtomicBoolean();
         AtomicReference<Exception> error = new AtomicReference<>();
+        fixture.host.focused = false;
+        fixture.host.getFragmentManager().beginTransaction()
+                .remove(fixture.host.getFragmentManager().findFragmentByTag("current"))
+                .commitNow();
         fixture.engine.replay(recorded, edited, InAppNavigationCapture.COLD_SOURCE_READY_MS, failure -> {
             error.set(failure);
             completed.set(true);
@@ -159,7 +176,7 @@ public class FragmentHostReplayTest {
         assertFalse(completed.get());
         assertEquals(1, fixture.host.calls);
 
-        fixture.returnToCatalog();
+        fixture.host.focused = true;
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(200));
         assertTrue(completed.get());
         assertNull(error.get());
@@ -203,10 +220,11 @@ public class FragmentHostReplayTest {
     public static class ShopBaseActivity extends Activity {
         int calls;
         boolean ignoreEditedValue;
+        boolean focused = true;
         long renderDelayMillis;
         Bundle received;
 
-        @Override public boolean hasWindowFocus() { return true; }
+        @Override public boolean hasWindowFocus() { return focused; }
 
         protected int openProduct(long quantity, Bundle options, boolean transitions, String sku) {
             calls++;
@@ -249,6 +267,10 @@ public class FragmentHostReplayTest {
 
         Map<String, Object> publish() {
             Fragment visible = host.getFragmentManager().findFragmentByTag("current");
+            if (visible == null) {
+                engine.observe(host, Map.of());
+                return Map.of();
+            }
             Bundle arguments = visible.getArguments();
             Map<String, Object> values = new LinkedHashMap<>();
             if (arguments != null) for (String key : arguments.keySet()) values.put(key, arguments.get(key));

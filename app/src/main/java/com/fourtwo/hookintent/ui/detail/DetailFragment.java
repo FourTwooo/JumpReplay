@@ -51,6 +51,7 @@ import com.fourtwo.hookintent.library.ObservedFragmentIntent;
 import com.fourtwo.hookintent.ui.replay.ReplayTemplateDialogs;
 import com.fourtwo.hookintent.manager.PermissionManager;
 import com.fourtwo.hookintent.replay.ExtrasEditorDialog;
+import com.fourtwo.hookintent.replay.ReplayFeedback;
 import com.fourtwo.hookintent.utils.HashUtil;
 import com.fourtwo.hookintent.utils.SharedPreferencesUtils;
 import com.google.android.material.tabs.TabLayout;
@@ -78,6 +79,7 @@ public class DetailFragment extends Fragment {
     private JSONObject jsonObject;
     private ItemData itemData = null;
     private String payloadToken;
+    private String replayFeedbackKey;
     @Override
     public void onResume() {
         super.onResume();
@@ -151,6 +153,9 @@ public class DetailFragment extends Fragment {
             try {
                 jsonObject.put(Constants.SQL_DATA, new JSONObject(map).toString());
                 jsonObject.put(Constants.SQL_HASH, HashUtil.hash(map.toString(), "SHA-256"));
+                long captureId = itemData.getCaptureId();
+                replayFeedbackKey = captureId > 0 ? "capture:" + captureId
+                        : "capture:legacy:" + jsonObject.getString(Constants.SQL_HASH);
             } catch (Exception e) {
                 Log.e(TAG, "onCreateView: ", e);
             }
@@ -182,7 +187,8 @@ public class DetailFragment extends Fragment {
 
             List<String> no_print_keys = Arrays.asList("stack_trace", "category", "uri", "title", "data",
                     "componentClassName", IntentPayloadCodec.KEY, Constants.NAVIGATION_ARGUMENTS,
-                    Constants.NAVIGATION_REPLAY, Constants.NAVIGATION_REPLAY_DIAGNOSTICS);
+                    Constants.NAVIGATION_REPLAY, Constants.NAVIGATION_REPLAY_DIAGNOSTICS,
+                    ObservedFragmentIntent.NUMERIC_ARGUMENT_TYPES_KEY);
             if (source != null || NavigationCaptureSource.isHistoricalRecord(category, bundle)) {
                 Bundle arguments = bundle.getBundle(Constants.NAVIGATION_ARGUMENTS);
                 if (arguments != null) {
@@ -284,7 +290,9 @@ public class DetailFragment extends Fragment {
         }
 
         nativeReplay = null;
-        updateReplayStatus(view, navigationRecord() != null);
+        checkingNativeReplay = navigationRecord() != null;
+        updateReplayStatus(view);
+        ReplayFeedback.observe(requireContext(), getViewLifecycleOwner(), () -> updateReplayStatus(view));
         requireActivity().addMenuProvider(new MenuProvider() {
             boolean isStarred = false; // 是否已收藏的状态
 
@@ -380,6 +388,7 @@ public class DetailFragment extends Fragment {
             java.util.concurrent.Executors.newSingleThreadExecutor();
     private Intent nativeReplay;
     private int nativeLookupRequest;
+    private boolean checkingNativeReplay;
 
     private Bundle navigationRecord() {
         if (itemData == null) return null;
@@ -400,7 +409,8 @@ public class DetailFragment extends Fragment {
         if (record == null || view == null) return;
         int request = ++nativeLookupRequest;
         nativeReplay = null;
-        updateReplayStatus(view, true);
+        checkingNativeReplay = true;
+        updateReplayStatus(view);
         Context context = requireContext().getApplicationContext();
         android.app.Activity host = requireActivity();
         NATIVE_LOOKUP.execute(() -> {
@@ -414,7 +424,8 @@ public class DetailFragment extends Fragment {
             host.runOnUiThread(() -> {
                 if (getView() != view || request != nativeLookupRequest) return;
                 nativeReplay = result;
-                updateReplayStatus(view, false);
+                checkingNativeReplay = false;
+                updateReplayStatus(view);
                 if (result != null) host.invalidateOptionsMenu();
             });
         });
@@ -430,7 +441,7 @@ public class DetailFragment extends Fragment {
 
         Bundle descriptor = localReplayDescriptor();
         if (descriptor != null) {
-            return () -> NavigationReplayDialogs.editInApp(requireActivity(), itemData, descriptor);
+            return () -> NavigationReplayDialogs.editInApp(requireActivity(), itemData, descriptor, replayFeedbackKey);
         }
 
         Intent nativeIntent = nativeReplay;
@@ -439,19 +450,18 @@ public class DetailFragment extends Fragment {
                         nativeIntent.toUri(Intent.URI_INTENT_SCHEME));
     }
 
-    private void updateReplayStatus(View view, boolean checkingNative) {
+    private void updateReplayStatus(View view) {
         TextView status = view.findViewById(R.id.detail_replay_status);
+        CharSequence text = ReplayFeedback.summary(view.getContext(), replayFeedbackKey);
         Bundle record = navigationRecord();
-        if (record == null || replayAction() != null) {
-            status.setVisibility(View.GONE);
-            return;
+        if (record != null && replayAction() == null) {
+            String reason = checkingNativeReplay ? getString(R.string.detail_replay_checking)
+                    : getString(R.string.detail_replay_unavailable,
+                            NavigationReplayDiagnostics.summary(requireContext(), record));
+            text = text.length() == 0 ? reason : reason + "\n" + text;
         }
-
-        String reason = checkingNative ? getString(R.string.detail_replay_checking)
-                : getString(R.string.detail_replay_unavailable,
-                        NavigationReplayDiagnostics.summary(requireContext(), record));
-        status.setText(reason);
-        status.setVisibility(View.VISIBLE);
+        status.setText(text);
+        status.setVisibility(text.length() == 0 ? View.GONE : View.VISIBLE);
     }
 
     private void editIntentAndReplay(ItemData source, Bundle record, String originalUri) {
@@ -481,7 +491,8 @@ public class DetailFragment extends Fragment {
             return true;
         }
         if (id == R.id.detail_generate_native_intent && nativeReplay != null) {
-            ReplayTemplateDialogs.showIntent(requireActivity(), nativeReplay, R.string.navigation_replay_native_title);
+            ReplayTemplateDialogs.showIntent(requireActivity(), nativeReplay, R.string.navigation_replay_native_title,
+                    replayFeedbackKey);
             return true;
         }
         ItemData replay = replayableItem();
@@ -588,6 +599,7 @@ public class DetailFragment extends Fragment {
         }
 
         suCodeButton.setOnClickListener(v -> {
+            ReplayFeedback.Attempt attempt = ReplayFeedback.begin(requireContext(), replayFeedbackKey);
             if (!Objects.equals(optionName, "am命令")) {
                 try {
                     String text = commandTextView.getText().toString();
@@ -599,14 +611,26 @@ public class DetailFragment extends Fragment {
                             originalText, (target, error) -> {
                                 if (!isAdded() || !suCodeButton.isAttachedToWindow()) return;
                                 suCodeButton.setEnabled(true);
-                                if (error != null) Toast.makeText(requireContext(), "启动失败：" + error.getMessage(), Toast.LENGTH_LONG).show();
-                                else PermissionManager.startActivity(requireContext(), target, privileged, mode);
+                                if (error != null) {
+                                    attempt.failed(error);
+                                    attempt.announce();
+                                } else PermissionManager.startActivity(requireContext(), target, privileged, mode, failure -> {
+                                    if (failure == null) attempt.sent();
+                                    else attempt.failed(failure);
+                                    attempt.announce();
+                                });
                             });
                 } catch (Exception e) {
-                    Toast.makeText(requireContext(), "启动失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    attempt.failed(e);
+                    attempt.announce();
                 }
             } else {
-                PermissionManager.executeCommand(String.valueOf(commandTextView.getText()), enableFeatureCheckbox.isChecked(), requireContext());
+                PermissionManager.executeCommand(String.valueOf(commandTextView.getText()),
+                        enableFeatureCheckbox.isChecked(), error -> {
+                            if (error == null) attempt.sent();
+                            else attempt.failed(error);
+                            attempt.announce();
+                        });
             }
         });
 

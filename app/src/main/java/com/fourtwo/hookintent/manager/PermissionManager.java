@@ -4,15 +4,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.util.Log;
-import android.widget.Toast;
 import android.os.Handler;
 import android.os.Looper;
 import com.fourtwo.hookintent.base.AmCommandBuilder;
 
-import com.fourtwo.hookintent.R;
+import com.fourtwo.hookintent.replay.ReplayFeedback;
 import com.fourtwo.hookintent.utils.RootServiceApi;
 import com.fourtwo.hookintent.utils.ShizukuServerApi;
+import com.fourtwo.hookintent.utils.ShortcutLaunchCoordinator;
 import com.topjohnwu.superuser.Shell;
+
+import java.util.function.Consumer;
 
 import rikka.shizuku.Shizuku;
 
@@ -81,50 +83,65 @@ public class PermissionManager {
         ShizukuCleanUp();
     }
 
-    public static void startActivity(Context context, Intent intent, Boolean isRoot, String SelectedItem) {
-        try {
-            if (Boolean.TRUE.equals(isRoot)) {
-                if ("root".equals(SelectedItem)) {
-                    // root
-                    Intent target = new Intent(intent);
-                    RootServiceApi.connectAsync(context, error -> {
-                        try {
-                            if (error != null) throw error;
-                            RootServiceApi.startActivityAsRoot(context, target);
-                            Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-                        } catch (Exception failure) {
-                            Log.e(TAG, "Root启动失败", failure);
-                            Toast.makeText(context, "调用失败：" + failure.getMessage(), Toast.LENGTH_LONG).show();
-                        }
-                    });
-                    return;
-                } else if ("Shizuku - 系统助手".equals(SelectedItem)) {
-                    // Shizuku - 系统助手
-                    ShizukuServerApi.launchAssistantAsync(context, intent);
-                    return;
-                } else if("Shizuku".equals(SelectedItem)){
-                    // Shizuku
-                    int result = ShizukuServerApi.startActivityAsShizuku(context, intent, android.os.Process.myUid() / 100000);
-                    if (result < 0 || result >= 100) throw new IllegalStateException("Activity启动失败，代码: " + result);
-                } else throw new IllegalArgumentException("未知启动模式: " + SelectedItem);
-            } else {
-                context.startActivity(intent);
-            }
-            Toast.makeText(context, "调用成功", Toast.LENGTH_SHORT).show();
-        } catch (Exception e) {
-            Log.e(TAG, "无法启动新的 Intent: " + e.getMessage(), e);
-            Toast.makeText(context, "调用失败", Toast.LENGTH_SHORT).show();
-        }
+    public static void startActivity(Context context, Intent intent, Boolean privileged, String mode) {
+        ReplayFeedback.Attempt attempt = ReplayFeedback.begin(context, ReplayFeedback.INTERCEPTOR_KEY);
+        startActivity(context, intent, privileged, mode, error -> {
+            if (error == null) attempt.sent();
+            else attempt.failed(error);
+            attempt.announce();
+        });
     }
 
-    public static void executeCommand(String command, Boolean Root, Context context) {
-        if (!isRootPermissionGranted) {
-            Toast.makeText(context, "Root服务不可用，无法执行am命令", Toast.LENGTH_SHORT).show();
+    /** Completion acknowledges Android's launch request. The caller can only report that it was sent. */
+    public static void startActivity(Context context, Intent intent, Boolean privileged, String mode,
+                                     Consumer<Exception> complete) {
+        String selection = ShortcutLaunchCoordinator.canonicalSelection(mode);
+        try {
+            if (!Boolean.TRUE.equals(privileged)) {
+                context.startActivity(intent);
+            } else if ("root".equals(selection)) {
+                Context app = context.getApplicationContext();
+                Intent target = new Intent(intent);
+                RootServiceApi.connectAsync(app, error -> {
+                    Exception failure = error;
+                    if (failure == null) {
+                        try {
+                            RootServiceApi.startActivityAsRoot(app, target);
+                        } catch (Exception launchError) {
+                            failure = launchError;
+                        }
+                    }
+                    complete.accept(failure);
+                });
+                return;
+            } else if ("Shizuku - 系统助手".equals(selection)) {
+                ShizukuServerApi.launchAssistantAsync(context, intent, complete);
+                return;
+            } else if ("Shizuku".equals(selection)) {
+                int result = ShizukuServerApi.startActivityAsShizuku(context, intent,
+                        android.os.Process.myUid() / 100000);
+                if (result < 0 || result >= 100) {
+                    throw new IllegalStateException("Activity启动失败，代码: " + result);
+                }
+            } else {
+                throw new IllegalArgumentException("未知启动模式: " + mode);
+            }
+        } catch (Exception error) {
+            Log.e(TAG, "无法启动新的 Intent", error);
+            complete.accept(error);
             return;
         }
-        Context app = context.getApplicationContext();
-        String job = Boolean.TRUE.equals(Root) ? command : "su shell -c " + AmCommandBuilder.shellQuote(command);
+        complete.accept(null);
+    }
+
+    public static void executeCommand(String command, boolean root, Consumer<Exception> complete) {
+        if (!isRootPermissionGranted) {
+            complete.accept(new IllegalStateException("Root 服务不可用，无法执行 am 命令"));
+            return;
+        }
+        String job = root ? command : "su shell -c " + AmCommandBuilder.shellQuote(command);
         Shell.cmd(job).submit(result -> new Handler(Looper.getMainLooper()).post(() ->
-                Toast.makeText(app, result.isSuccess() ? "调用成功" : "调用失败", Toast.LENGTH_SHORT).show()));
+                complete.accept(result.isSuccess() ? null
+                        : new IllegalStateException("am 命令执行失败，状态码：" + result.getCode()))));
     }
 }

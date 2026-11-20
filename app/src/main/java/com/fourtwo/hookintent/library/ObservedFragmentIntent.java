@@ -15,6 +15,7 @@ import com.fourtwo.hookintent.data.Constants;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.Serializable;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -25,6 +26,7 @@ import java.util.Objects;
 /** Native entry routes inferred from repeated matching deliveries and visible Fragment arguments. */
 public final class ObservedFragmentIntent {
     public static final String RECORD_KEY = "observed_fragment_intent";
+    public static final String NUMERIC_ARGUMENT_TYPES_KEY = "observed_fragment_numeric_types";
     private static final int MAX_URI_LENGTH = 8192;
     private static final int MAX_MAPPINGS = 24;
     private static final int URI_FLAGS = Intent.URI_INTENT_SCHEME;
@@ -44,24 +46,28 @@ public final class ObservedFragmentIntent {
         try {
             Bundle extras = snapshot.getExtras();
             if (extras == null || extras.size() > MAX_MAPPINGS || extras.isEmpty()) return null;
-            String uri = snapshot.toUri(URI_FLAGS);
-            if (uri.length() > MAX_URI_LENGTH) return null;
-            Intent encoded = Intent.parseUri(uri, URI_FLAGS);
-            if (!snapshot.filterEquals(encoded) || snapshot.getFlags() != encoded.getFlags()
-                    || !sameValues(extras, encoded.getExtras())) return null;
-            return encoded;
+            return roundTrip(snapshot);
         } catch (RuntimeException | URISyntaxException | LinkageError error) {
             return null;
         }
     }
 
+    private static Intent roundTrip(Intent snapshot) throws URISyntaxException {
+        String uri = snapshot.toUri(URI_FLAGS);
+        if (uri.length() > MAX_URI_LENGTH) return null;
+        Intent encoded = Intent.parseUri(uri, URI_FLAGS);
+        return snapshot.filterEquals(encoded) && snapshot.getFlags() == encoded.getFlags()
+                && sameValues(snapshot.getExtras(), encoded.getExtras()) ? encoded : null;
+    }
+
     public static Evidence associate(Activity activity, Intent delivered, String fragment, Map<String, Object> arguments) {
         if (delivered == null) return null;
         Bundle extras = delivered.getExtras();
+        if (extras == null) return null;
         Map<String, String> bindings = new LinkedHashMap<>();
         for (String key : extras.keySet()) {
             Object sample = extras.get(key);
-            if (!(sample instanceof String) || ((String) sample).isEmpty()) continue;
+            if (!isBindable(sample)) continue;
             String argument = uniqueKey(arguments, sample);
             if (argument == null) continue;
             int repeated = 0;
@@ -74,6 +80,54 @@ public final class ObservedFragmentIntent {
             return new Evidence(activity.getPackageName(), activity.getClass().getName(), fragment,
                     versionCode(info), info.lastUpdateTime, delivered.toUri(URI_FLAGS), bindings);
         } catch (PackageManager.NameNotFoundException error) {
+            return null;
+        }
+    }
+
+    private static boolean isIntegral(Object value) {
+        return value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long;
+    }
+
+    private static boolean isBindable(Object value) {
+        return (value instanceof String && !((String) value).isEmpty()) || isIntegral(value);
+    }
+
+    public static void retainNumericArgumentTypes(Bundle record, Bundle arguments) {
+        Bundle types = new Bundle();
+        for (String key : arguments.keySet()) {
+            Object value = arguments.get(key);
+            if (isIntegral(value)) types.putString(key, value.getClass().getSimpleName());
+        }
+        if (!types.isEmpty()) record.putBundle(NUMERIC_ARGUMENT_TYPES_KEY, types);
+    }
+
+    private static Bundle capturedArguments(Bundle record) {
+        Bundle arguments = record.getBundle(Constants.NAVIGATION_ARGUMENTS);
+        if (arguments == null) return null;
+        Bundle types = record.getBundle(NUMERIC_ARGUMENT_TYPES_KEY);
+        Bundle restored = new Bundle(arguments);
+        for (String key : arguments.keySet()) {
+            Object value = arguments.get(key);
+            if (!isIntegral(value)) continue;
+            // The capture archive stores JSON numbers without their original Java widths.
+            // A legacy capture cannot reliably distinguish a small Long from an Integer.
+            Serializable exact = integralValue(value.toString(), types == null ? "" : types.getString(key, ""));
+            if (exact == null) restored.remove(key);
+            else restored.putSerializable(key, exact);
+        }
+        return restored;
+    }
+
+    private static Serializable integralValue(String value, String type) {
+        try {
+            switch (type) {
+                case "Byte": return Byte.valueOf(value);
+                case "Short": return Short.valueOf(value);
+                case "Integer": return Integer.valueOf(value);
+                case "Long": return Long.valueOf(value);
+                default: return null;
+            }
+        } catch (NumberFormatException ignored) {
             return null;
         }
     }
@@ -95,7 +149,7 @@ public final class ObservedFragmentIntent {
         if (!evidence.destinationPackage.equals(record.getString("packageName"))
                 || !evidence.activity.equals(record.getString("from"))
                 || !evidence.fragment.equals(record.getString("title"))) return null;
-        Bundle captured = record.getBundle(Constants.NAVIGATION_ARGUMENTS);
+        Bundle captured = capturedArguments(record);
         if (captured == null || !evidence.matchesCapture(captured)) return null;
         PackageManager manager = context.getPackageManager();
         PackageInfo info = manager.getPackageInfo(evidence.destinationPackage, 0);
@@ -109,7 +163,7 @@ public final class ObservedFragmentIntent {
         String pkg = record.getString("packageName");
         String activity = record.getString("from");
         String fragment = record.getString("title");
-        Bundle args = record.getBundle(Constants.NAVIGATION_ARGUMENTS);
+        Bundle args = capturedArguments(record);
         if (pkg == null || activity == null || fragment == null || args == null) return null;
         PackageInfo info = context.getPackageManager().getPackageInfo(pkg, 0);
         long recordedUpdate = record.getLong("source_last_update", 0);
@@ -203,7 +257,7 @@ public final class ObservedFragmentIntent {
             Map<String, String> bindings = new LinkedHashMap<>();
             for (java.util.Iterator<String> keys = fields.keys(); keys.hasNext(); ) {
                 String key = keys.next();
-                if (extras == null || !(extras.get(key) instanceof String)) throw new JSONException("Invalid delivery arguments");
+                if (extras == null || !isBindable(extras.get(key))) throw new JSONException("Invalid delivery arguments");
                 bindings.put(key, fields.getString(key));
             }
             return new Evidence(pkg, activity, fragment, json.getLong("version"), json.getLong("updated"), uri, bindings);
@@ -220,6 +274,9 @@ public final class ObservedFragmentIntent {
         }
 
         private Intent resolve(Evidence other, Bundle arguments) {
+            if (versionCode != other.versionCode || lastUpdateTime != other.lastUpdateTime
+                    || !destinationPackage.equals(other.destinationPackage) || !activity.equals(other.activity)
+                    || !fragment.equals(other.fragment)) return null;
             try {
                 Intent first = Intent.parseUri(uri, URI_FLAGS);
                 Intent second = Intent.parseUri(other.uri, URI_FLAGS);
@@ -227,16 +284,25 @@ public final class ObservedFragmentIntent {
                 Bundle left = first.getExtras();
                 Bundle right = second.getExtras();
                 if (!left.keySet().equals(right.keySet())) return null;
+                Bundle resolved = new Bundle(left);
                 boolean varied = false;
                 for (String key : left.keySet()) {
-                    if (Objects.equals(left.get(key), right.get(key))) continue;
+                    Object sample = left.get(key);
+                    Object otherSample = right.get(key);
                     String fragmentKey = bindings.get(key);
-                    if (fragmentKey == null || !fragmentKey.equals(other.bindings.get(key))
-                            || !(arguments.get(fragmentKey) instanceof String)) return null;
-                    first.putExtra(key, arguments.getString(fragmentKey));
+                    boolean sharedBinding = fragmentKey != null && fragmentKey.equals(other.bindings.get(key));
+                    Object replacement = sharedBinding ? arguments.get(fragmentKey) : null;
+                    if (Objects.equals(sample, otherSample)) {
+                        // The samples do not prove how to change a mapped but constant extra.
+                        if (sharedBinding && !Objects.equals(sample, replacement)) return null;
+                        continue;
+                    }
+                    if (replacement == null || sample.getClass() != replacement.getClass()
+                            || sample.getClass() != otherSample.getClass()) return null;
+                    resolved.putSerializable(key, (Serializable) replacement);
                     varied = true;
                 }
-                return varied ? first : null;
+                return varied ? roundTrip(first.replaceExtras(resolved)) : null;
             } catch (URISyntaxException | RuntimeException error) {
                 return null;
             }

@@ -1,41 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
     android:padding="20dp">
-    <LinearLayout
-        android:id="@+id/linearLayout"
-        android:layout_width="0dp"
+    <TextView
+        android:id="@+id/all_package"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:ignore="MissingConstraints,UseCompoundDrawables"
-        app:layout_constraintEnd_toEndOf="parent">
-        <TextView
-            android:id="@+id/all_package"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="连接应用"
-            android:textStyle="bold"
-            android:textColor="@color/dialog_text"
-            android:textAppearance="@style/TextAppearance.HookIntent.DialogTitle" />
-    </LinearLayout>
+        android:text="连接应用"
+        android:textStyle="bold"
+        android:textColor="@color/dialog_text"
+        android:textAppearance="@style/TextAppearance.HookIntent.DialogTitle" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/services_list"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
+        android:clipToPadding="false"
         android:paddingBottom="8dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/linearLayout"
-        tools:ignore="MissingConstraints,NotSibling"
         tools:itemCount="2"
-        tools:listitem="@layout/dialog_custom_services_list"
-        android:clipToPadding="false" />
-</androidx.constraintlayout.widget.ConstraintLayout>
+        tools:listitem="@layout/dialog_custom_services_list" />
+</LinearLayout>
